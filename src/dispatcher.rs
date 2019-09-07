@@ -5,13 +5,13 @@ use syn::{FnArg, Ident, LitStr, Signature};
 pub(crate) struct Dispatcher<'a> {
     pub signature: &'a Signature,
     pub specializations: Vec<Specialization<'a>>,
-    pub default: &'a Ident,
+    pub default: Ident,
 }
 
 pub(crate) struct Specialization<'a> {
     pub architectures: Vec<&'a LitStr>,
-    pub functions: Vec<(Vec<&'a LitStr>, &'a Ident)>,
-    pub default: Option<&'a Ident>,
+    pub functions: Vec<(Vec<&'a LitStr>, Ident)>,
+    pub default: Option<Ident>,
 }
 
 impl ToTokens for Specialization<'_> {
