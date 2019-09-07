@@ -1,12 +1,13 @@
 extern crate proc_macro;
 
+mod dispatcher;
+
+use crate::dispatcher::{Dispatcher, Specialization};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::parse::{Error, Parse, ParseStream, Result};
 use syn::punctuated::Punctuated;
-use syn::{
-    braced, parenthesized, parse_macro_input, token, FnArg, Ident, LitStr, Signature, Token,
-};
+use syn::{braced, parenthesized, parse_macro_input, token, Ident, LitStr, Signature, Token};
 
 fn expect_token(input: &ParseStream, token: &str) -> Result<Ident> {
     let ident: Ident = input.parse()?;
@@ -108,13 +109,61 @@ impl Parse for SpecializeBlock {
     }
 }
 
-struct Dispatcher {
+struct MultiVersion {
+    signature: Signature,
     specializations: Punctuated<SpecializeBlock, token::Comma>,
     default_fn: DefaultFunction,
 }
 
-impl Parse for Dispatcher {
+impl ToTokens for MultiVersion {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let signature = &self.signature;
+        let dispatcher = Dispatcher {
+            signature: signature.clone(),
+            specializations: self
+                .specializations
+                .iter()
+                .map(|s| Specialization {
+                    architectures: s.arch.iter().map(|x| x.clone()).collect(),
+                    functions: s
+                        .arms
+                        .iter()
+                        .map(|a| {
+                            (
+                                a.feature.features.iter().map(|x| x.clone()).collect(),
+                                a.function.clone(),
+                            )
+                        })
+                        .collect(),
+                    default: s.default_fn.as_ref().map(|x| x.function.clone()),
+                })
+                .collect(),
+            default: self.default_fn.function.clone(),
+        };
+        tokens.extend(quote! {
+            #signature {
+                #dispatcher
+            }
+        });
+    }
+}
+
+impl Parse for MultiVersion {
     fn parse(input: ParseStream) -> Result<Self> {
+        let content;
+        let signature = Signature {
+            constness: None,
+            asyncness: None,
+            unsafety: input.parse().ok(),
+            abi: input.parse().ok(),
+            fn_token: input.parse()?,
+            ident: input.parse()?,
+            generics: input.parse()?,
+            paren_token: parenthesized!(content in input),
+            inputs: Punctuated::parse_terminated(&content)?,
+            variadic: None,
+            output: input.parse()?,
+        };
         let mut specializations: Punctuated<SpecializeBlock, token::Comma> = Punctuated::new();
         while !input.is_empty() && !input.peek(Token![default]) {
             specializations.push_value(input.parse()?);
@@ -125,159 +174,9 @@ impl Parse for Dispatcher {
             let _trailing_comma: token::Comma = input.parse()?;
         }
         Ok(Self {
+            signature: signature,
             specializations: specializations,
             default_fn: default_fn,
-        })
-    }
-}
-
-impl Dispatcher {
-    fn to_tokens_from_signature(&self, signature: &Signature) -> TokenStream {
-        let mut feature_detection = TokenStream::new();
-        for s in &self.specializations {
-            let mut arms = TokenStream::new();
-            for f in &s.arms {
-                let function = &f.function;
-                if f.feature.features.is_empty() {
-                    arms.extend(quote! { return #function });
-                } else {
-                    for (arch, detect) in vec![
-                        (
-                            quote! { any(target_arch = "x86", target_arch = "x86_64") },
-                            quote! { is_x86_feature_detected! },
-                        ),
-                        (
-                            quote! { target_arch = "arm" },
-                            quote! { is_arm_feature_detected! },
-                        ),
-                        (
-                            quote! { target_arch = "aarch64" },
-                            quote! { is_aarch64_feature_detected! },
-                        ),
-                        (
-                            quote! { target_arch = "mips" },
-                            quote! { is_mips_feature_detected! },
-                        ),
-                        (
-                            quote! { target_arch = "mips64" },
-                            quote! { is_mips64_feature_detected! },
-                        ),
-                        (
-                            quote! { target_arch = "powerpc" },
-                            quote! { is_powerpc_feature_detected! },
-                        ),
-                        (
-                            quote! { target_arch = "powerpc64" },
-                            quote! { is_powerpc64_feature_detected! },
-                        ),
-                    ] {
-                        let first_feature = f.feature.features.first().unwrap();
-                        let rest_features = f.feature.features.iter().skip(1);
-                        arms.extend(quote! {
-                            #[cfg(#arch)]
-                            {
-                                if #detect(#first_feature) #( && #detect(#rest_features) )* {
-                                    return #function
-                                }
-                            }
-                        });
-                    }
-                }
-            }
-            if let Some(default_fn) = &s.default_fn {
-                let function = &default_fn.function;
-                arms.extend(quote! { return #function });
-            }
-            let arch = s.arch.iter();
-            feature_detection.extend(quote! {
-                #[cfg(any(#(target_arch = #arch),*))]
-                {
-                    #arms
-                }
-            });
-        }
-        let default_function = &self.default_fn.function;
-        feature_detection.extend(quote! { return #default_function });
-        let argument_names = signature
-            .inputs
-            .iter()
-            .map(|x| {
-                if let FnArg::Typed(p) = x {
-                    p.pat.as_ref()
-                } else {
-                    unimplemented!("member fn not supported")
-                }
-            })
-            .collect::<Vec<_>>();
-        let argument_ty = signature
-            .inputs
-            .iter()
-            .map(|x| {
-                if let FnArg::Typed(p) = x {
-                    p.ty.as_ref()
-                } else {
-                    unimplemented!("member fn not supported")
-                }
-            })
-            .collect::<Vec<_>>();
-        let returns = &signature.output;
-        let function_type = quote! {
-            fn (#(#argument_ty),*) #returns
-        };
-        quote! {
-            use std::sync::atomic::{AtomicUsize, Ordering};
-            type __fn_ty = #function_type;
-            fn __get_fn() -> __fn_ty {
-                #feature_detection
-            }
-            static __DISPATCHED_FN: AtomicUsize = AtomicUsize::new(0usize);
-            let mut __current_ptr = __DISPATCHED_FN.load(Ordering::SeqCst);
-            if __current_ptr == 0 {
-                __current_ptr = unsafe { std::mem::transmute(__get_fn()) };
-                __DISPATCHED_FN.store(__current_ptr, Ordering::SeqCst);
-            }
-            let __current_fn = unsafe { std::mem::transmute::<usize, __fn_ty>(__current_ptr) };
-            __current_fn(#(#argument_names),*)
-        }
-    }
-}
-
-struct MultiVersion {
-    signature: Signature,
-    dispatcher: Dispatcher,
-}
-
-impl ToTokens for MultiVersion {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let signature = &self.signature;
-        let dispatcher = self.dispatcher.to_tokens_from_signature(&signature);
-        let generated = quote! {
-            #signature {
-                #dispatcher
-            }
-        };
-        tokens.extend(generated);
-    }
-}
-
-impl Parse for MultiVersion {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let content;
-        Ok(Self {
-            signature: Signature {
-                constness: None,
-                asyncness: None,
-                unsafety: input.parse().ok(),
-                abi: input.parse().ok(),
-                fn_token: input.parse()?,
-                ident: input.parse()?,
-                generics: input.parse()?,
-                paren_token: parenthesized!(content in input),
-                inputs: Punctuated::parse_terminated(&content)?,
-                variadic: None,
-                output: input.parse()?,
-            },
-            dispatcher: input.parse()?,
         })
     }
 }
