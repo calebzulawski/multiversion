@@ -17,22 +17,8 @@ fn expect_token(input: &ParseStream, token: &str) -> Result<Ident> {
     }
 }
 
-enum Architecture {
-    X86,
-}
-
-impl Parse for Architecture {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let arch: Ident = input.parse()?;
-        match arch.to_string().as_str() {
-            "x86" => Ok(Self::X86),
-            _ => Err(Error::new(arch.span(), "expected 'x86'")),
-        }
-    }
-}
-
 struct FeatureSet {
-    paren: token::Paren,
+    _paren: token::Paren,
     features: Punctuated<LitStr, token::Comma>,
 }
 
@@ -40,7 +26,7 @@ impl Parse for FeatureSet {
     fn parse(input: ParseStream) -> Result<Self> {
         let content;
         Ok(Self {
-            paren: parenthesized!(content in input),
+            _paren: parenthesized!(content in input),
             features: Punctuated::parse_terminated(&content)?,
         })
     }
@@ -48,7 +34,7 @@ impl Parse for FeatureSet {
 
 struct FunctionArm {
     feature: FeatureSet,
-    arrow: token::FatArrow,
+    _arrow: token::FatArrow,
     function: Ident,
 }
 
@@ -56,41 +42,68 @@ impl Parse for FunctionArm {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(Self {
             feature: input.parse()?,
-            arrow: input.parse()?,
+            _arrow: input.parse()?,
             function: input.parse()?,
         })
     }
 }
 
 struct DefaultFunction {
-    default: token::Default,
+    _default: token::Default,
+    _arrow: token::FatArrow,
     function: Ident,
 }
 
 impl Parse for DefaultFunction {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(Self {
-            default: input.parse()?,
+            _default: input.parse()?,
+            _arrow: input.parse()?,
             function: input.parse()?,
         })
     }
 }
 
 struct SpecializeBlock {
-    specialize: Ident,
-    arch: Architecture,
-    brace: token::Brace,
+    _specialize: Ident,
+    _paren: token::Paren,
+    arch: Punctuated<LitStr, token::Comma>,
+    _brace: token::Brace,
     arms: Punctuated<FunctionArm, token::Comma>,
+    default_fn: Option<DefaultFunction>,
 }
 
 impl Parse for SpecializeBlock {
     fn parse(input: ParseStream) -> Result<Self> {
-        let content;
+        let arch_content;
+        let arms_content;
+        let specialize: Ident = expect_token(&input, "specialize")?;
+        let paren = parenthesized!(arch_content in input);
+        let arch: Punctuated<LitStr, token::Comma> = Punctuated::parse_terminated(&arch_content)?;
+
+        let brace = braced!(arms_content in input);
+        let mut arms: Punctuated<FunctionArm, token::Comma> = Punctuated::new();
+        while !arms_content.is_empty() && !arms_content.peek(Token![default]) {
+            arms.push_value(arms_content.parse()?);
+            arms.push_punct(arms_content.parse()?);
+        }
+        let default_fn: Option<DefaultFunction> =
+            if !arms_content.is_empty() && arms_content.peek(Token![default]) {
+                Some(arms_content.parse()?)
+            } else {
+                None
+            };
+        if !arms_content.is_empty() {
+            let _trailing_comma: token::Comma = arms_content.parse()?;
+        }
+
         Ok(Self {
-            specialize: expect_token(&input, "specialize")?,
-            arch: input.parse()?,
-            brace: braced!(content in input),
-            arms: Punctuated::parse_terminated(&content)?,
+            _specialize: specialize,
+            _paren: paren,
+            arch: arch,
+            _brace: brace,
+            arms: arms,
+            default_fn: default_fn,
         })
     }
 }
@@ -103,13 +116,17 @@ struct Dispatcher {
 impl Parse for Dispatcher {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut specializations: Punctuated<SpecializeBlock, token::Comma> = Punctuated::new();
-        while !input.peek(Token![default]) {
+        while !input.is_empty() && !input.peek(Token![default]) {
             specializations.push_value(input.parse()?);
             specializations.push_punct(input.parse()?);
         }
+        let default_fn: DefaultFunction = input.parse()?;
+        if !input.is_empty() {
+            let _trailing_comma: token::Comma = input.parse()?;
+        }
         Ok(Self {
             specializations: specializations,
-            default_fn: input.parse()?,
+            default_fn: default_fn,
         })
     }
 }
@@ -118,36 +135,66 @@ impl Dispatcher {
     fn to_tokens_from_signature(&self, signature: &Signature) -> TokenStream {
         let mut feature_detection = TokenStream::new();
         for s in &self.specializations {
-            let (cfg, has_feature) = match s.arch {
-                Architecture::X86 => (
-                    quote! {
-                        #[cfg(any(target_arch = "x86", target_arch = "x86_64")) ]
-                    },
-                    quote! { is_x86_feature_detected! },
-                ),
-            };
             let mut arms = TokenStream::new();
             for f in &s.arms {
-                let first_feature = f
-                    .feature
-                    .features
-                    .iter()
-                    .nth(0)
-                    .expect("empty feature list");
-                let rest_features = f.feature.features.iter().skip(1);
                 let function = &f.function;
-                arms.extend(quote! {
-                        if #has_feature(#first_feature) #( && #has_feature(#rest_features) )* {
-                            return #function
-                        }
-                });
+                if f.feature.features.is_empty() {
+                    arms.extend(quote! { return #function });
+                } else {
+                    for (arch, detect) in vec![
+                        (
+                            quote! { any(target_arch = "x86", target_arch = "x86_64") },
+                            quote! { is_x86_feature_detected! },
+                        ),
+                        (
+                            quote! { target_arch = "arm" },
+                            quote! { is_arm_feature_detected! },
+                        ),
+                        (
+                            quote! { target_arch = "aarch64" },
+                            quote! { is_aarch64_feature_detected! },
+                        ),
+                        (
+                            quote! { target_arch = "mips" },
+                            quote! { is_mips_feature_detected! },
+                        ),
+                        (
+                            quote! { target_arch = "mips64" },
+                            quote! { is_mips64_feature_detected! },
+                        ),
+                        (
+                            quote! { target_arch = "powerpc" },
+                            quote! { is_powerpc_feature_detected! },
+                        ),
+                        (
+                            quote! { target_arch = "powerpc64" },
+                            quote! { is_powerpc64_feature_detected! },
+                        ),
+                    ] {
+                        let first_feature = f.feature.features.first().unwrap();
+                        let rest_features = f.feature.features.iter().skip(1);
+                        arms.extend(quote! {
+                            #[cfg(#arch)]
+                            {
+                                if #detect(#first_feature) #( && #detect(#rest_features) )* {
+                                    return #function
+                                }
+                            }
+                        });
+                    }
+                }
             }
+            if let Some(default_fn) = &s.default_fn {
+                let function = &default_fn.function;
+                arms.extend(quote! { return #function });
+            }
+            let arch = s.arch.iter();
             feature_detection.extend(quote! {
-                #cfg
+                #[cfg(any(#(target_arch = #arch),*))]
                 {
                     #arms
                 }
-            })
+            });
         }
         let default_function = &self.default_fn.function;
         feature_detection.extend(quote! { return #default_function });

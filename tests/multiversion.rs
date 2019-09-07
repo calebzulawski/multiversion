@@ -1,27 +1,64 @@
 use function_multiversioning::multiversion;
 
-struct Foo(i64);
-
 multiversion! {
-    fn test(a: Foo, b: &Foo, c: &mut Foo, d: &mut [Foo]) -> (Foo, Foo)
-    specialize x86 {
-        ("avx", "sse2") => test_avx,
-        ("popcnt") => test_popcnt,
+    fn test_fn(x: i64) -> i64
+
+    // the specialize blocks are provided in no particular order, but the feature order indicates
+    // priority
+    specialize ("x86", "x86_64") {    // match multiple architectures, equivalent to any(target_arch = "x86", target_arch = "x86_64")
+        ("avx512f") => test_avx512,   // require single features, runtime equivalent to target_feature = "avx512f"
+        ("avx", "xsave") => test_avx, // or require multiple features, like all(target_feature = "avx", target_feature = "xsave")
     },
-    default test_fallback
+
+    // specialize blocks can contain an architecture default implementation, which requires no
+    // features
+    specialize ("arm", "aarch64") {
+        ("neon") => test_neon,
+        default => test_arm,
+    },
+
+    // a specialize block might only contain the default
+    specialize ("mips") {
+        default => test_mips,
+    },
+
+    // and finally, an architecture-agnostic default must be provided
+    default => test_fallback,
 }
 
-fn test_avx(_a: Foo, _b: &Foo, _c: &mut Foo, _d: &mut [Foo]) -> (Foo, Foo) {
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+fn test_avx512(a: i64) -> i64 {
+    println!("avx512");
+    a
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+fn test_avx(a: i64) -> i64 {
     println!("avx");
-    (Foo(0), Foo(0))
+    a
 }
-fn test_popcnt(_a: Foo, _b: &Foo, _c: &mut Foo, _d: &mut [Foo]) -> (Foo, Foo) {
-    println!("popcnt");
-    (Foo(0), Foo(0))
+
+#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+fn test_neon(a: i64) -> i64 {
+    println!("neon");
+    a
 }
-fn test_fallback(_a: Foo, _b: &Foo, _c: &mut Foo, _d: &mut [Foo]) -> (Foo, Foo) {
+
+#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+fn test_arm(a: i64) -> i64 {
+    println!("arm");
+    a
+}
+
+#[cfg(target_arch = "mips")]
+fn test_mips(a: i64) -> i64 {
+    println!("mips");
+    a
+}
+
+fn test_fallback(a: i64) -> i64 {
     println!("fallback");
-    (Foo(0), Foo(0))
+    a
 }
 
 mod test {
@@ -29,10 +66,6 @@ mod test {
 
     #[test]
     fn call_test() {
-        let a = Foo(1);
-        let b = Foo(2);
-        let mut c = Foo(3);
-        let mut d = vec![Foo(4)];
-        test(a, &b, &mut c, &mut d);
+        assert_eq!(test_fn(0), 0);
     }
 }
