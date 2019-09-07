@@ -119,26 +119,21 @@ impl ToTokens for MultiVersion {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let signature = &self.signature;
         let dispatcher = Dispatcher {
-            signature: signature.clone(),
+            signature: signature,
             specializations: self
                 .specializations
                 .iter()
                 .map(|s| Specialization {
-                    architectures: s.arch.iter().map(|x| x.clone()).collect(),
+                    architectures: s.arch.iter().collect(),
                     functions: s
                         .arms
                         .iter()
-                        .map(|a| {
-                            (
-                                a.feature.features.iter().map(|x| x.clone()).collect(),
-                                a.function.clone(),
-                            )
-                        })
+                        .map(|a| (a.feature.features.iter().collect(), &a.function))
                         .collect(),
-                    default: s.default_fn.as_ref().map(|x| x.function.clone()),
+                    default: s.default_fn.as_ref().map(|x| &x.function),
                 })
                 .collect(),
-            default: self.default_fn.function.clone(),
+            default: &self.default_fn.function,
         };
         tokens.extend(quote! {
             #signature {

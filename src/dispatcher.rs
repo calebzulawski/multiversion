@@ -2,19 +2,19 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{FnArg, Ident, LitStr, Signature};
 
-pub(crate) struct Dispatcher {
-    pub signature: Signature,
-    pub specializations: Vec<Specialization>,
-    pub default: Ident,
+pub(crate) struct Dispatcher<'a> {
+    pub signature: &'a Signature,
+    pub specializations: Vec<Specialization<'a>>,
+    pub default: &'a Ident,
 }
 
-pub(crate) struct Specialization {
-    pub architectures: Vec<LitStr>,
-    pub functions: Vec<(Vec<LitStr>, Ident)>,
-    pub default: Option<Ident>,
+pub(crate) struct Specialization<'a> {
+    pub architectures: Vec<&'a LitStr>,
+    pub functions: Vec<(Vec<&'a LitStr>, &'a Ident)>,
+    pub default: Option<&'a Ident>,
 }
 
-impl ToTokens for Specialization {
+impl ToTokens for Specialization<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let mut arms = TokenStream::new();
         for f in &self.functions {
@@ -78,7 +78,7 @@ impl ToTokens for Specialization {
     }
 }
 
-impl ToTokens for Dispatcher {
+impl ToTokens for Dispatcher<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let specializations = &self.specializations;
         let default = &self.default;
