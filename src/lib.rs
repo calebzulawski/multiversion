@@ -121,11 +121,12 @@ impl Dispatcher {
             let (cfg, has_feature) = match s.arch {
                 Architecture::X86 => (
                     quote! {
-                        #[cfg(any(target_arch == "x86", target_arch == "x86_64")) ]
+                        #[cfg(any(target_arch = "x86", target_arch = "x86_64")) ]
                     },
                     quote! { is_x86_feature_detected! },
                 ),
             };
+            let mut arms = TokenStream::new();
             for f in &s.arms {
                 let first_feature = f
                     .feature
@@ -135,18 +136,21 @@ impl Dispatcher {
                     .expect("empty feature list");
                 let rest_features = f.feature.features.iter().skip(1);
                 let function = &f.function;
-                feature_detection.extend(quote! {
-                    #cfg
-                    {
+                arms.extend(quote! {
                         if #has_feature(#first_feature) #( && #has_feature(#rest_features) )* {
                             return #function
                         }
-                    }
                 });
             }
-            let default_function = &self.default_fn.function;
-            feature_detection.extend(quote! { return #default_function });
+            feature_detection.extend(quote! {
+                #cfg
+                {
+                    #arms
+                }
+            })
         }
+        let default_function = &self.default_fn.function;
+        feature_detection.extend(quote! { return #default_function });
         let argument_names = signature
             .inputs
             .iter()
@@ -171,20 +175,22 @@ impl Dispatcher {
             .collect::<Vec<_>>();
         let returns = &signature.output;
         let function_type = quote! {
-            fn (#(#argument_ty),*) -> #returns
+            fn (#(#argument_ty),*) #returns
         };
         quote! {
-            fn __get_fn() -> #function_type {
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            type __fn_ty = #function_type;
+            fn __get_fn() -> __fn_ty {
                 #feature_detection
             }
-            static mut __dispatched_fn: crate::atomic::Atomic<Option<#function_type>> = Atomic::new(None);
-            if let Some(__current_fn) = __dispatched_fn.load(crate::atomic::Ordering::SeqCst) {
-                __current_fn(#(#argument_names),*)
-            } else {
-                let __current_fn = __get_fn();
-                __dispatched_fn.store(__current_fn, crate::atomic::Ordering::SeqCst);
-                __current_fn(#(#argument_names).*)
+            static __DISPATCHED_FN: AtomicUsize = AtomicUsize::new(0usize);
+            let mut __current_ptr = __DISPATCHED_FN.load(Ordering::SeqCst);
+            if __current_ptr == 0 {
+                __current_ptr = unsafe { std::mem::transmute(__get_fn()) };
+                __DISPATCHED_FN.store(__current_ptr, Ordering::SeqCst);
             }
+            let __current_fn = unsafe { std::mem::transmute::<usize, __fn_ty>(__current_ptr) };
+            __current_fn(#(#argument_names),*)
         }
     }
 }

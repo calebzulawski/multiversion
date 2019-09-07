@@ -11,12 +11,28 @@ multiversion! {
     default test_fallback
 }
 
-fn test_avx(a: Foo, b: &Foo, c: &mut Foo, d: &mut [Foo]) -> (Foo, Foo) {
+fn test_avx(_a: Foo, _b: &Foo, _c: &mut Foo, _d: &mut [Foo]) -> (Foo, Foo) {
+    println!("avx");
     (Foo(0), Foo(0))
 }
-fn test_popcnt(a: Foo, b: &Foo, c: &mut Foo, d: &mut [Foo]) -> (Foo, Foo) {
+fn test_popcnt(_a: Foo, _b: &Foo, _c: &mut Foo, _d: &mut [Foo]) -> (Foo, Foo) {
+    println!("popcnt");
     (Foo(0), Foo(0))
 }
-fn test_fallback(a: Foo, b: &Foo, c: &mut Foo, d: &mut [Foo]) -> (Foo, Foo) {
+fn test_fallback(_a: Foo, _b: &Foo, _c: &mut Foo, _d: &mut [Foo]) -> (Foo, Foo) {
+    println!("fallback");
     (Foo(0), Foo(0))
+}
+
+mod test {
+    use super::*;
+
+    #[test]
+    fn call_test() {
+        let a = Foo(1);
+        let b = Foo(2);
+        let mut c = Foo(3);
+        let mut d = vec![Foo(4)];
+        test(a, &b, &mut c, &mut d);
+    }
 }
