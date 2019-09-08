@@ -82,9 +82,18 @@ impl ToTokens for Dispatcher<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let specializations = &self.specializations;
         let default = &self.default;
+        let mut defaulted_arches = Vec::<&LitStr>::new();
+        for s in &self.specializations {
+            if s.default.is_some() {
+                defaulted_arches.extend(&s.architectures)
+            }
+        }
         let feature_detection = quote! {
             #(#specializations)*
-            return #default
+            #[cfg(not(any(#(target_arch = #defaulted_arches),*)))]
+            {
+                return #default
+            }
         };
         let argument_names = &self
             .signature

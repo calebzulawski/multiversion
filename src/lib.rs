@@ -21,7 +21,7 @@ pub fn multiclones(
 ) -> proc_macro::TokenStream {
     let config = parse_macro_input!(attr as multiclones::Config);
     let func = parse_macro_input!(input as ItemFn);
-    let out = multiclones::MultiClones::new(&config, &func).into_token_stream();
-    println!("{}", out.to_string());
-    out.into()
+    multiclones::MultiClones::new(&config, &func)
+        .into_token_stream()
+        .into()
 }

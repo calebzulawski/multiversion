@@ -162,19 +162,11 @@ impl<'a> MultiClones<'a> {
                 functions.push((features, clones.last().unwrap().signature.ident.clone()));
             }
 
-            // push default
-            clones.push(FunctionClone::<'a> {
-                architectures: Some(architectures.clone()),
-                features: None,
-                signature: new_signature(),
-                body: func.block.as_ref(),
-            });
-
             // push specialization
             specializations.push(Specialization {
                 architectures: architectures,
                 functions: functions,
-                default: Some(clones.last().unwrap().signature.ident.clone()),
+                default: None,
             });
         }
         // push global default
