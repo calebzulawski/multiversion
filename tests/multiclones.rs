@@ -1,4 +1,4 @@
-use function_multiversioning::multiclones;
+use multiversion::multiclones;
 
 #[multiclones(
     specialize ("x86", "x86_64") {

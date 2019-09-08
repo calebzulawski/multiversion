@@ -1,4 +1,4 @@
-use function_multiversioning::multiversion;
+use multiversion::multiversion;
 
 multiversion! {
     fn test_fn(x: i64) -> i64
