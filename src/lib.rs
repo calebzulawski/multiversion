@@ -1,8 +1,9 @@
 extern crate proc_macro;
 
 mod dispatcher;
-mod multiclones;
 mod multiversion;
+mod target;
+mod target_clones;
 
 use quote::ToTokens;
 use syn::{parse_macro_input, ItemFn};
@@ -15,13 +16,13 @@ pub fn multiversion(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn multiclones(
+pub fn target_clones(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let config = parse_macro_input!(attr as multiclones::Config);
+    let config = parse_macro_input!(attr as target_clones::Config);
     let func = parse_macro_input!(input as ItemFn);
-    multiclones::MultiClones::new(&config, &func)
+    target_clones::TargetClones::new(config, &func)
         .into_token_stream()
         .into()
 }

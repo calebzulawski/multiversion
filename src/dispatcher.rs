@@ -1,98 +1,43 @@
+use crate::target::Target;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{FnArg, Ident, LitStr, Signature};
+use syn::{FnArg, Ident, Signature};
 
-pub(crate) struct Dispatcher<'a> {
-    pub signature: &'a Signature,
-    pub specializations: Vec<Specialization<'a>>,
+pub(crate) struct Dispatcher {
+    pub signature: Signature,
+    pub functions: Vec<(Target, Ident)>,
     pub default: Ident,
 }
 
-pub(crate) struct Specialization<'a> {
-    pub architectures: Vec<&'a LitStr>,
-    pub functions: Vec<(Vec<&'a LitStr>, Ident)>,
-    pub default: Option<Ident>,
-}
-
-impl ToTokens for Specialization<'_> {
+impl ToTokens for Dispatcher {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let mut arms = TokenStream::new();
-        for f in &self.functions {
-            let function = &f.1;
-            if f.0.is_empty() {
-                arms.extend(quote! { return #function });
-            } else {
-                for (arch, detect) in vec![
-                    (
-                        quote! { any(target_arch = "x86", target_arch = "x86_64") },
-                        quote! { is_x86_feature_detected! },
-                    ),
-                    (
-                        quote! { target_arch = "arm" },
-                        quote! { is_arm_feature_detected! },
-                    ),
-                    (
-                        quote! { target_arch = "aarch64" },
-                        quote! { is_aarch64_feature_detected! },
-                    ),
-                    (
-                        quote! { target_arch = "mips" },
-                        quote! { is_mips_feature_detected! },
-                    ),
-                    (
-                        quote! { target_arch = "mips64" },
-                        quote! { is_mips64_feature_detected! },
-                    ),
-                    (
-                        quote! { target_arch = "powerpc" },
-                        quote! { is_powerpc_feature_detected! },
-                    ),
-                    (
-                        quote! { target_arch = "powerpc64" },
-                        quote! { is_powerpc64_feature_detected! },
-                    ),
-                ] {
-                    let first_feature = f.0.first().unwrap();
-                    let rest_features = f.0.iter().skip(1);
-                    arms.extend(quote! {
-                        #[cfg(#arch)]
-                        {
-                            if #detect(#first_feature) #( && #detect(#rest_features) )* {
-                                return #function
-                            }
-                        }
-                    });
+        let feature_detection = {
+            let defaulted_arches = self.functions.iter().filter_map(|(target, _)| {
+                if !target.has_features_specified() {
+                    Some(target.arch_as_str())
+                } else {
+                    None
                 }
-            }
-        }
-        if let Some(default) = &self.default {
-            arms.extend(quote! { return #default });
-        }
-        let arch = &self.architectures;
-        tokens.extend(quote! {
-            #[cfg(any(#(target_arch = #arch),*))]
-            {
-                #arms
-            }
-        });
-    }
-}
-
-impl ToTokens for Dispatcher<'_> {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let specializations = &self.specializations;
-        let default = &self.default;
-        let mut defaulted_arches = Vec::<&LitStr>::new();
-        for s in &self.specializations {
-            if s.default.is_some() {
-                defaulted_arches.extend(&s.architectures)
-            }
-        }
-        let feature_detection = quote! {
-            #(#specializations)*
-            #[cfg(not(any(#(target_arch = #defaulted_arches),*)))]
-            {
-                return #default
+            });
+            let return_if_detected = self.functions.iter().map(|(target, function)| {
+                let target_arch = target.target_arch();
+                let features_detected = target.features_detected();
+                quote! {
+                    #target_arch
+                    {
+                        if #features_detected {
+                            return #function
+                        }
+                    }
+                }
+            });
+            let default = &self.default;
+            quote! {
+                #(#return_if_detected)*
+                #[cfg(not(any(#(target_arch = #defaulted_arches),*)))]
+                {
+                    return #default
+                }
             }
         };
         let argument_names = &self
@@ -120,12 +65,9 @@ impl ToTokens for Dispatcher<'_> {
             })
             .collect::<Vec<_>>();
         let returns = &self.signature.output;
-        let function_type = quote! {
-            fn (#(#argument_ty),*) #returns
-        };
         tokens.extend(quote! {
             use std::sync::atomic::{AtomicUsize, Ordering};
-            type __fn_ty = #function_type;
+            type __fn_ty = fn (#(#argument_ty),*) #returns;
             fn __get_fn() -> __fn_ty {
                 #feature_detection
             }

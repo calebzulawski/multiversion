@@ -2,28 +2,12 @@ use multiversion::multiversion;
 
 multiversion! {
     fn test_fn(x: i64) -> i64
-
-    // the specialize blocks are provided in no particular order, but the feature order indicates
-    // priority
-    specialize ("x86", "x86_64") {    // match multiple architectures, equivalent to any(target_arch = "x86", target_arch = "x86_64")
-        ("avx512f") => test_avx512,   // require single features, runtime equivalent to target_feature = "avx512f"
-        ("avx", "xsave") => test_avx, // or require multiple features, like all(target_feature = "avx", target_feature = "xsave")
-    },
-
-    // specialize blocks can contain an architecture default implementation, which requires no
-    // features
-    specialize ("arm", "aarch64") {
-        ("neon") => test_neon,
-        default => test_arm,
-    },
-
-    // a specialize block might only contain the default
-    specialize ("mips") {
-        default => test_mips,
-    },
-
-    // and finally, an architecture-agnostic default must be provided
-    default => test_fallback,
+    "[x86|x86_64]+avx512f" => test_avx512,
+    "[x86|x86_64]+avx+xsave" => test_avx,
+    "[arm|aarch64]+neon" => test_neon,
+    "[arm|aarch64]" => test_arm,
+    "mips" => test_mips,
+    default => test_fallback
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -66,6 +50,6 @@ mod test {
 
     #[test]
     fn call_test() {
-        assert_eq!(test_fn(0), 0);
+        assert_eq!(test_fn(123), 123);
     }
 }

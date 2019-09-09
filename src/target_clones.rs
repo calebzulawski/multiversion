@@ -1,0 +1,130 @@
+extern crate proc_macro;
+
+use crate::dispatcher::Dispatcher;
+use crate::target::{parse_target_string, Target};
+use proc_macro2::{Span, TokenStream};
+use quote::{quote, ToTokens};
+use syn::parse::{Parse, ParseStream, Result};
+use syn::punctuated::Punctuated;
+use syn::{token, Block, FnArg, Ident, ItemFn, LitStr, Signature, Token};
+
+pub(crate) struct Config {
+    targets: Vec<Target>,
+}
+
+impl Parse for Config {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut targets = Vec::new();
+        for target_string in Punctuated::<LitStr, Token![,]>::parse_terminated(&input)? {
+            targets.extend(parse_target_string(&target_string)?)
+        }
+        Ok(Self { targets: targets })
+    }
+}
+
+struct FunctionClone<'a> {
+    target: Option<Target>,
+    signature: Signature,
+    body: &'a Block,
+}
+
+impl ToTokens for FunctionClone<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let target_arch = self
+            .target
+            .as_ref()
+            .map_or(TokenStream::new(), |x| x.target_arch());
+        let target_features = self
+            .target
+            .as_ref()
+            .map_or(TokenStream::new(), |x| x.target_features());
+        let signature = &self.signature;
+        let body = &self.body;
+        tokens.extend(if signature.unsafety.is_some() || self.target.is_none() {
+            quote! { #target_arch #target_features #signature #body }
+        } else {
+            let mut unsafe_signature = signature.clone();
+            unsafe_signature.unsafety = Some(token::Unsafe {
+                span: Span::call_site(),
+            });
+            unsafe_signature.ident = Ident::new("__unsafe_fn", Span::call_site());
+            let argument_names = &signature
+                .inputs
+                .iter()
+                .map(|x| {
+                    if let FnArg::Typed(p) = x {
+                        p.pat.as_ref()
+                    } else {
+                        unimplemented!("member fn not supported")
+                    }
+                })
+                .collect::<Vec<_>>();
+            quote! {
+                #target_arch
+                #signature {
+                    #target_features #unsafe_signature #body
+                    unsafe {
+                        __unsafe_fn(#(#argument_names),*)
+                    }
+                }
+            }
+        });
+    }
+}
+
+pub(crate) struct TargetClones<'a> {
+    clones: Vec<FunctionClone<'a>>,
+    dispatcher: Dispatcher,
+}
+
+impl ToTokens for TargetClones<'_> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let signature = &self.dispatcher.signature;
+        let clones = (&self.clones).iter();
+        let dispatcher = &self.dispatcher;
+        tokens.extend(quote! {
+            #signature {
+                #(#clones)*
+                #dispatcher
+            }
+        });
+    }
+}
+
+impl<'a> TargetClones<'a> {
+    pub fn new(config: Config, func: &'a ItemFn) -> Self {
+        let mut clones = Vec::new();
+        let mut functions = Vec::new();
+        let mut id: u64 = 0;
+        let mut new_signature = move || {
+            let mut signature = func.sig.clone();
+            signature.ident = Ident::new(&format!("__clone_{}", id), Span::call_site());
+            id += 1;
+            signature
+        };
+        for target in config.targets {
+            clones.push(FunctionClone {
+                target: Some(target.clone()),
+                signature: new_signature(),
+                body: func.block.as_ref(),
+            });
+            functions.push((target, clones.last().unwrap().signature.ident.clone()));
+        }
+        // push default
+        clones.push(FunctionClone {
+            target: None,
+            signature: new_signature(),
+            body: func.block.as_ref(),
+        });
+        let default = clones.last().unwrap().signature.ident.clone();
+
+        Self {
+            clones: clones,
+            dispatcher: Dispatcher {
+                signature: func.sig.clone(),
+                functions: functions,
+                default: default,
+            },
+        }
+    }
+}

@@ -1,13 +1,6 @@
-use multiversion::multiclones;
+use multiversion::target_clones;
 
-#[multiclones(
-    specialize ("x86", "x86_64") {
-        ("avx"), ("sse")
-    },
-    specialize ("arm", "aarch64") {
-        ("neon")
-    },
-)]
+#[target_clones("[x86|x86_64]+avx", "[x86|x86_64]+sse", "[arm|aarch64]+neon")]
 fn add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a = *a + b);
 }
