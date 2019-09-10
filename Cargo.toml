@@ -24,7 +24,6 @@ proc-macro = true
 syn = { version = "1", features = ["full"] }
 quote = "1"
 proc-macro2 = "1"
-atomic = "0.4"
 lazy_static = "1"
 regex = "1"
 
