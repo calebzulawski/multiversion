@@ -6,7 +6,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::parse::{Parse, ParseStream, Result};
 use syn::punctuated::Punctuated;
-use syn::{token, Attribute, Block, FnArg, Ident, ItemFn, LitStr, Signature, Token, Visibility};
+use syn::{token, Attribute, Block, Ident, ItemFn, LitStr, Signature, Token, Visibility};
 
 pub(crate) struct Config {
     targets: Vec<Target>,
@@ -39,36 +39,12 @@ impl ToTokens for FunctionClone<'_> {
             .as_ref()
             .map_or(TokenStream::new(), |x| x.target_features());
         let signature = &self.signature;
-        let body = &self.body;
-        tokens.extend(if signature.unsafety.is_some() || self.target.is_none() {
-            quote! { #target_arch #target_features #signature #body }
-        } else {
-            let mut unsafe_signature = signature.clone();
-            unsafe_signature.unsafety = Some(token::Unsafe {
-                span: Span::call_site(),
-            });
-            unsafe_signature.ident = Ident::new("__unsafe_fn", Span::call_site());
-            let argument_names = &signature
-                .inputs
-                .iter()
-                .map(|x| {
-                    if let FnArg::Typed(p) = x {
-                        p.pat.as_ref()
-                    } else {
-                        unimplemented!("member fn not supported")
-                    }
-                })
-                .collect::<Vec<_>>();
-            quote! {
-                #target_arch
-                #signature {
-                    #target_features #unsafe_signature #body
-                    unsafe {
-                        __unsafe_fn(#(#argument_names),*)
-                    }
-                }
-            }
+        let mut unsafe_signature = signature.clone();
+        unsafe_signature.unsafety = Some(token::Unsafe {
+            span: Span::call_site(),
         });
+        let body = &self.body;
+        tokens.extend(quote! { #target_arch #target_features #unsafe_signature #body });
     }
 }
 

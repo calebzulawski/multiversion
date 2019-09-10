@@ -11,7 +11,7 @@ pub(crate) struct Dispatcher {
 
 impl ToTokens for Dispatcher {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let function_arguments = &self.signature.inputs.iter();
+        let function_arguments = self.signature.inputs.iter();
         let argument_names = &self
             .signature
             .inputs
@@ -48,50 +48,41 @@ impl ToTokens for Dispatcher {
             let return_if_detected = self.functions.iter().map(|(target, function)| {
                 let target_arch = target.target_arch();
                 let features_detected = target.features_detected();
-                let function_arguments = function_arguments.clone();
-                let argument_names = argument_names.clone();
                 quote! {
                     #target_arch
                     {
-                        // wrap the function in an unsafe function with the same signature
-                        unsafe fn unsafe_wrapper(#(#function_arguments),*) #returns {
-                            #function(#(#argument_names),*)
-                        }
                         if #features_detected {
-                            return unsafe_wrapper
+                            return #function
                         }
                     }
                 }
             });
             let default = &self.default;
-            let function_arguments = function_arguments.clone();
-            let argument_names = argument_names.clone();
             quote! {
                 #(#return_if_detected)*
                 #[cfg(not(any(#(target_arch = #defaulted_arches),*)))]
                 {
-                    unsafe fn unsafe_wrapper(#(#function_arguments),*) #returns {
-                        #default(#(#argument_names),*)
-                    }
-                    return unsafe_wrapper
+                    return #default
                 }
             }
         };
         tokens.extend(quote! {
-            use std::sync::atomic::{AtomicUsize, Ordering};
+            use std::sync::atomic::{AtomicPtr, Ordering};
             type __fn_ty = unsafe fn (#(#argument_ty),*) #returns;
             #[cold]
             fn __get_fn() -> __fn_ty {
                 #feature_detection
             }
-            static __DISPATCHED_FN: AtomicUsize = AtomicUsize::new(0usize);
-            let mut __current_ptr = __DISPATCHED_FN.load(Ordering::SeqCst);
-            if __current_ptr == 0 {
-                __current_ptr = unsafe { std::mem::transmute(__get_fn()) };
-                __DISPATCHED_FN.store(__current_ptr, Ordering::SeqCst);
+            #[cold]
+            unsafe fn __resolver_fn (#(#function_arguments),*) #returns {
+                let __current_fn = __get_fn();
+                __DISPATCHED_FN.store(__current_fn as *mut (), Ordering::SeqCst);
+                __current_fn(#(#argument_names),*)
             }
+            static __DISPATCHED_FN: AtomicPtr<()> = AtomicPtr::new(__resolver_fn as *mut ());
+            let __current_ptr = __DISPATCHED_FN.load(Ordering::SeqCst);
             unsafe {
-                let __current_fn = std::mem::transmute::<usize, __fn_ty>(__current_ptr);
+                let __current_fn = std::mem::transmute::<*mut (), __fn_ty>(__current_ptr);
                 __current_fn(#(#argument_names),*)
             }
         });
