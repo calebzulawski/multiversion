@@ -2,6 +2,19 @@
 name = "multiversion"
 version = "0.1.0"
 authors = ["Caleb Zulawski <caleb.zulawski@gmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "Easy function multiversioning"
+repository = "https://github.com/calebzulawski/multiversion"
+categories = ["hardware-support"]
+readme = "README.md"
+include = [
+    "/Cargo.toml",
+    "/LICENSE-APACHE",
+    "/LICENSE-MIT",
+    "/README.md",
+    "/src/**",
+    "/tests/**",
+]
 edition = "2018"
 
 [lib]
@@ -14,3 +27,6 @@ proc-macro2 = "1"
 atomic = "0.4"
 lazy_static = "1"
 regex = "1"
+
+[badges]
+travis-ci = { repository = "calebzulawski/multiversion" }
