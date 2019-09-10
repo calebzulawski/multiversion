@@ -80,6 +80,7 @@ impl ToTokens for Dispatcher {
         tokens.extend(quote! {
             use std::sync::atomic::{AtomicUsize, Ordering};
             type __fn_ty = unsafe fn (#(#argument_ty),*) #returns;
+            #[cold]
             fn __get_fn() -> __fn_ty {
                 #feature_detection
             }

@@ -32,7 +32,7 @@ multiversion! {
 
 #[cfg(target_arch = "x86_64")]
 unsafe fn test_fn_unsafe(a: i64) -> i64 {
-    println!("avx512");
+    println!("avx2");
     a
 }
 
