@@ -54,8 +54,6 @@ fn square_generic(x: &mut [f32]) {
         *v *= *v;
     }
 }
-
-# fn main() {}
 ```
 
 ## License
