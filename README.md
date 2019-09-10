@@ -7,13 +7,13 @@ Multiversion
 [![Crates.io](https://img.shields.io/crates/v/multiversion)](https://crates.io/crates/multiversion)
 [![Rust Documentation](https://img.shields.io/badge/api-rustdoc-blue.svg)](https://docs.rs/multiversion/0.1.0/multiversion/)
 
-Multiversion provides function multiversioning for Rust.
+Function multiversioning macro/attribute for Rust.
 
 ## Usage
 Add the following to your dependencies in Cargo.toml:
 ```toml
 [dependencies]
-multiversion = { git = "https://github.com/calebzulawski/multiversion" }
+multiversion = "0.1"
 ```
 
 ## Example

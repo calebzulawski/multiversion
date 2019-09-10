@@ -3,7 +3,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! multiversion = { git = "https://github.com/calebzulawski/multiversion" }
+//! multiversion = "0.1"
 //! ```
 //!
 //! Many CPU architectures have a variety of instruction set extensions that provide additional
