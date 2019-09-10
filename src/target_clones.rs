@@ -6,7 +6,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::parse::{Parse, ParseStream, Result};
 use syn::punctuated::Punctuated;
-use syn::{token, Block, FnArg, Ident, ItemFn, LitStr, Signature, Token};
+use syn::{token, Attribute, Block, FnArg, Ident, ItemFn, LitStr, Signature, Token, Visibility};
 
 pub(crate) struct Config {
     targets: Vec<Target>,
@@ -73,17 +73,22 @@ impl ToTokens for FunctionClone<'_> {
 }
 
 pub(crate) struct TargetClones<'a> {
+    attributes: &'a Vec<Attribute>,
+    visibility: &'a Visibility,
     clones: Vec<FunctionClone<'a>>,
     dispatcher: Dispatcher,
 }
 
 impl ToTokens for TargetClones<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let attributes = (&self.attributes).iter();
+        let visibility = &self.visibility;
         let signature = &self.dispatcher.signature;
         let clones = (&self.clones).iter();
         let dispatcher = &self.dispatcher;
         tokens.extend(quote! {
-            #signature {
+            #(#attributes)*
+            #visibility #signature {
                 #(#clones)*
                 #dispatcher
             }
@@ -119,6 +124,8 @@ impl<'a> TargetClones<'a> {
         let default = clones.last().unwrap().signature.ident.clone();
 
         Self {
+            attributes: &func.attrs,
+            visibility: &func.vis,
             clones: clones,
             dispatcher: Dispatcher {
                 signature: func.sig.clone(),

@@ -1,42 +1,44 @@
 use multiversion::multiversion;
 
 multiversion! {
-    fn test_fn(x: i64) -> i64
-    "[x86|x86_64]+avx512f" => test_avx512,
-    "[x86|x86_64]+avx+xsave" => test_avx,
-    "[arm|aarch64]+neon" => test_neon,
-    "[arm|aarch64]" => test_arm,
-    "mips" => test_mips,
+    pub fn pub_test_fn(x: i64) -> i64
+    "x86_64+avx2" => test_fn_unsafe,
+    "x86_64+avx" => test_fn_safe,
     default => test_fallback
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-fn test_avx512(a: i64) -> i64 {
+multiversion! {
+    fn priv_test_fn(x: i64) -> i64
+    "x86_64+avx2" => test_fn_unsafe,
+    "x86_64+avx" => test_fn_safe,
+    default => test_fallback
+}
+
+#[inline]
+multiversion! {
+    pub unsafe fn pub_test_unsafe_fn(x: i64) -> i64
+    "x86_64+avx2" => test_fn_unsafe,
+    "x86_64+avx" => test_fn_safe,
+    default => test_fallback
+}
+
+#[inline]
+multiversion! {
+    unsafe fn priv_test_unsafe_fn(x: i64) -> i64
+    "x86_64+avx2" => test_fn_unsafe,
+    "x86_64+avx" => test_fn_safe,
+    default => test_fallback
+}
+
+#[cfg(target_arch = "x86_64")]
+unsafe fn test_fn_unsafe(a: i64) -> i64 {
     println!("avx512");
     a
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-fn test_avx(a: i64) -> i64 {
+#[cfg(target_arch = "x86_64")]
+fn test_fn_safe(a: i64) -> i64 {
     println!("avx");
-    a
-}
-
-#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-fn test_neon(a: i64) -> i64 {
-    println!("neon");
-    a
-}
-
-#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-fn test_arm(a: i64) -> i64 {
-    println!("arm");
-    a
-}
-
-#[cfg(target_arch = "mips")]
-fn test_mips(a: i64) -> i64 {
-    println!("mips");
     a
 }
 
@@ -50,6 +52,9 @@ mod test {
 
     #[test]
     fn call_test() {
-        assert_eq!(test_fn(123), 123);
+        assert_eq!(pub_test_fn(123), 123);
+        assert_eq!(priv_test_fn(123), 123);
+        assert_eq!(unsafe { pub_test_unsafe_fn(123) }, 123);
+        assert_eq!(unsafe { priv_test_unsafe_fn(123) }, 123);
     }
 }

@@ -141,6 +141,7 @@ pub(crate) fn parse_target_string(s: &LitStr) -> Result<Vec<Target>> {
     }
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
 

@@ -4,18 +4,20 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::parse::{Parse, ParseStream, Result};
 use syn::punctuated::Punctuated;
-use syn::{parenthesized, Ident, LitStr, Signature, Token};
+use syn::{parenthesized, Ident, LitStr, Signature, Token, Visibility};
 
 pub(crate) struct MultiVersion {
+    visibility: Visibility,
     dispatcher: Dispatcher,
 }
 
 impl ToTokens for MultiVersion {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        let visibility = &self.visibility;
         let signature = &self.dispatcher.signature;
         let dispatcher = &self.dispatcher;
         tokens.extend(quote! {
-            #signature {
+            #visibility #signature {
                 #dispatcher
             }
         });
@@ -25,6 +27,7 @@ impl ToTokens for MultiVersion {
 impl Parse for MultiVersion {
     fn parse(input: ParseStream) -> Result<Self> {
         let content;
+        let visibility: Visibility = input.parse()?;
         let signature = Signature {
             constness: None,
             asyncness: None,
@@ -57,6 +60,7 @@ impl Parse for MultiVersion {
             let _trailing_comma: Token![,] = input.parse()?;
         }
         Ok(Self {
+            visibility: visibility,
             dispatcher: Dispatcher {
                 signature: signature,
                 functions: functions,
