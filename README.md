@@ -1,4 +1,4 @@
-# Multiversion [![Build Status](https://api.travis-ci.org/calebzulawski/multiversion.svg?branch=master)](https://travis-ci.org/calebzulawski/multiversion) [![Rustc Version 1.31+](https://img.shields.io/badge/rustc-1.31+-lightgray.svg)](https://blog.rust-lang.org/2018/12/06/Rust-1.31-and-rust-2018.html)
+# Multiversion [![Build Status](https://api.travis-ci.org/calebzulawski/multiversion.svg?branch=master)](https://travis-ci.org/calebzulawski/multiversion) [![Build status](https://ci.appveyor.com/api/projects/status/vy6xkr2073dpf4xu/branch/master?svg=true)](https://ci.appveyor.com/project/calebzulawski/multiversion/branch/master) [![Rustc Version 1.31+](https://img.shields.io/badge/rustc-1.31+-lightgray.svg)](https://blog.rust-lang.org/2018/12/06/Rust-1.31-and-rust-2018.html)
 
 Multiversion provides function multiversioning for Rust.
 
@@ -43,7 +43,7 @@ unsafe fn square_avx(x: &mut [f32]) {
 
 #[cfg(target_arch = "x86")]
 #[target_feature(enable = "sse")]
-unsafe fn square_avx(x: &mut [f32]) {
+unsafe fn square_sse(x: &mut [f32]) {
     for v in x {
         *v *= *v;
     }

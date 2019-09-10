@@ -29,4 +29,5 @@ lazy_static = "1"
 regex = "1"
 
 [badges]
+appveyor = { repository = "calebzulawski/multiversion" }
 travis-ci = { repository = "calebzulawski/multiversion" }

@@ -80,7 +80,7 @@
 //!
 //! #[cfg(target_arch = "x86")]
 //! #[target_feature(enable = "sse")]
-//! unsafe fn square_avx(x: &mut [f32]) {
+//! unsafe fn square_sse(x: &mut [f32]) {
 //!     for v in x {
 //!         *v *= *v;
 //!     }
