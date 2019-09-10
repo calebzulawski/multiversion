@@ -19,41 +19,41 @@ enum Architecture {
 impl Architecture {
     fn new(name: &str, span: Span) -> Result<Self> {
         match name {
-            "x86" => Ok(Self::X86),
-            "x86_64" => Ok(Self::X86_64),
-            "arm" => Ok(Self::Arm),
-            "aarch64" => Ok(Self::Aarch64),
-            "mips" => Ok(Self::Mips),
-            "mips64" => Ok(Self::Mips64),
-            "powerpc" => Ok(Self::PowerPC),
-            "powerpc64" => Ok(Self::PowerPC64),
+            "x86" => Ok(Architecture::X86),
+            "x86_64" => Ok(Architecture::X86_64),
+            "arm" => Ok(Architecture::Arm),
+            "aarch64" => Ok(Architecture::Aarch64),
+            "mips" => Ok(Architecture::Mips),
+            "mips64" => Ok(Architecture::Mips64),
+            "powerpc" => Ok(Architecture::PowerPC),
+            "powerpc64" => Ok(Architecture::PowerPC64),
             _ => Err(Error::new(span, format!("unknown architecture '{}'", name))),
         }
     }
 
     fn as_str(&self) -> &'static str {
         match self {
-            Self::X86 => "x86",
-            Self::X86_64 => "x86_64",
-            Self::Arm => "arm",
-            Self::Aarch64 => "aarch64",
-            Self::Mips => "mips",
-            Self::Mips64 => "mips64",
-            Self::PowerPC => "powerpc",
-            Self::PowerPC64 => "powerpc64",
+            Architecture::X86 => "x86",
+            Architecture::X86_64 => "x86_64",
+            Architecture::Arm => "arm",
+            Architecture::Aarch64 => "aarch64",
+            Architecture::Mips => "mips",
+            Architecture::Mips64 => "mips64",
+            Architecture::PowerPC => "powerpc",
+            Architecture::PowerPC64 => "powerpc64",
         }
     }
 
     fn feature_detector(&self) -> TokenStream {
         match self {
-            Self::X86 => quote! { is_x86_feature_detected! },
-            Self::X86_64 => quote! { is_x86_feature_detected! },
-            Self::Arm => quote! { is_arm_feature_detected! },
-            Self::Aarch64 => quote! { is_aarch64_feature_detected! },
-            Self::Mips => quote! { is_mips_feature_detected! },
-            Self::Mips64 => quote! { is_mips64_feature_detected! },
-            Self::PowerPC => quote! { is_powerpc_feature_detected! },
-            Self::PowerPC64 => quote! { is_powerpc64_feature_detected! },
+            Architecture::X86 => quote! { is_x86_feature_detected! },
+            Architecture::X86_64 => quote! { is_x86_feature_detected! },
+            Architecture::Arm => quote! { is_arm_feature_detected! },
+            Architecture::Aarch64 => quote! { is_aarch64_feature_detected! },
+            Architecture::Mips => quote! { is_mips_feature_detected! },
+            Architecture::Mips64 => quote! { is_mips64_feature_detected! },
+            Architecture::PowerPC => quote! { is_powerpc_feature_detected! },
+            Architecture::PowerPC64 => quote! { is_powerpc64_feature_detected! },
         }
     }
 }
