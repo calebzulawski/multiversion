@@ -1,4 +1,4 @@
-# Multiversion: [![Build Status](https://api.travis-ci.org/calebzulawski/multiversion.svg?branch=master)](https://travis-ci.org/calebzulawski/multiversion) [![Rustc Version 1.31+](https://img.shields.io/badge/rustc-1.31+-lightgray.svg)](https://blog.rust-lang.org/2018/12/06/Rust-1.31-and-rust-2018.html)
+# Multiversion [![Build Status](https://api.travis-ci.org/calebzulawski/multiversion.svg?branch=master)](https://travis-ci.org/calebzulawski/multiversion) [![Rustc Version 1.31+](https://img.shields.io/badge/rustc-1.31+-lightgray.svg)](https://blog.rust-lang.org/2018/12/06/Rust-1.31-and-rust-2018.html)
 
 Multiversion provides function multiversioning for Rust.
 
@@ -23,7 +23,7 @@ fn square(x: &mut [f32]) {
 ```
 
 Manual function multiversioning with the `multiversion!` macro:
-```
+```rust
 use multiversion::multiversion;
 
 multiversion!{
