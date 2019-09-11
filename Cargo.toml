@@ -27,6 +27,17 @@ proc-macro2 = "1"
 lazy_static = "1"
 regex = "1"
 
+[dev-dependencies]
+criterion = "0.3"
+rand = "0.7"
+
+[[bench]]
+name = "square"
+harness = false
+
+[profile.bench]
+opt-level = 3
+
 [badges]
 appveyor = { repository = "calebzulawski/multiversion" }
 travis-ci = { repository = "calebzulawski/multiversion" }
