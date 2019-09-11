@@ -70,17 +70,16 @@ impl ToTokens for Dispatcher {
             use std::sync::atomic::{AtomicPtr, Ordering};
             type __fn_ty = unsafe fn (#(#argument_ty),*) #returns;
             #[cold]
-            fn __get_fn() -> __fn_ty {
-                #feature_detection
-            }
-            #[cold]
             unsafe fn __resolver_fn (#(#function_arguments),*) #returns {
+                fn __get_fn() -> __fn_ty {
+                    #feature_detection
+                }
                 let __current_fn = __get_fn();
-                __DISPATCHED_FN.store(__current_fn as *mut (), Ordering::SeqCst);
+                __DISPATCHED_FN.store(__current_fn as *mut (), Ordering::Relaxed);
                 __current_fn(#(#argument_names),*)
             }
             static __DISPATCHED_FN: AtomicPtr<()> = AtomicPtr::new(__resolver_fn as *mut ());
-            let __current_ptr = __DISPATCHED_FN.load(Ordering::SeqCst);
+            let __current_ptr = __DISPATCHED_FN.load(Ordering::Relaxed);
             unsafe {
                 let __current_fn = std::mem::transmute::<*mut (), __fn_ty>(__current_ptr);
                 __current_fn(#(#argument_names),*)
