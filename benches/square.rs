@@ -1,57 +1,52 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, Bencher, Criterion, Fun};
 use multiversion::target_clones;
 use rand::distributions::Standard;
 use rand::Rng;
 
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx")]
-unsafe fn square_avx_impl(x: &mut [f32]) {
-    for v in x {
-        *v *= *v;
+unsafe fn square_avx(i: &[f32], o: &mut [f32]) {
+    for (i, o) in i.iter().zip(o) {
+        *o = i * i;
     }
 }
 
-#[cfg(target_arch = "x86_64")]
-fn square_avx(x: &mut [f32]) {
-    assert!(is_x86_feature_detected!("avx"));
-    unsafe {
-        square_avx_impl(x);
-    }
-}
-
-fn square_generic(x: &mut [f32]) {
-    for v in x {
-        *v *= *v;
+fn square_generic(i: &[f32], o: &mut [f32]) {
+    for (i, o) in i.iter().zip(o) {
+        *o = i * i;
     }
 }
 
 #[target_clones("x86_64+avx")]
-fn square_fmv(x: &mut [f32]) {
-    for v in x {
-        *v *= *v;
+fn square_fmv(i: &[f32], o: &mut [f32]) {
+    for (i, o) in i.iter().zip(o) {
+        *o = i * i;
     }
 }
 
 fn bench_square(c: &mut Criterion) {
-    let mut group = c.benchmark_group("In-place square");
     for i in [4usize, 1000usize, 1000000usize].iter() {
-        let mut generic_input: Vec<f32> = rand::thread_rng()
+        let input: Vec<f32> = rand::thread_rng()
             .sample_iter(&Standard)
             .take(*i)
             .collect::<Vec<_>>();
-        let mut avx_input = generic_input.clone();
-        let mut fmv_input = generic_input.clone();
-        group.bench_function(BenchmarkId::new("Generic", i), |b| {
-            b.iter(|| square_generic(&mut generic_input))
-        });
-        group.bench_function(BenchmarkId::new("AVX (direct)", i), |b| {
-            b.iter(|| square_avx(&mut avx_input))
-        });
-        group.bench_function(BenchmarkId::new("AVX (via FMV)", i), |b| {
-            b.iter(|| square_fmv(&mut fmv_input))
-        });
+        let functions = vec![
+            Fun::new("generic", |b: &mut Bencher, i: &Vec<f32>| {
+                let mut o = vec![0f32; i.len()];
+                b.iter(|| square_generic(i.as_slice(), o.as_mut_slice()))
+            }),
+            Fun::new("AVX (direct)", |b: &mut Bencher, i: &Vec<f32>| {
+                let mut o = vec![0f32; i.len()];
+                assert!(is_x86_feature_detected!("avx"));
+                b.iter(|| unsafe { square_avx(i.as_slice(), o.as_mut_slice()) })
+            }),
+            Fun::new("AVX (via FMV)", |b: &mut Bencher, i: &Vec<f32>| {
+                let mut o = vec![0f32; i.len()];
+                b.iter(|| square_fmv(i.as_slice(), o.as_mut_slice()))
+            }),
+        ];
+        c.bench_functions(&format!("square {} values", i), functions, input);
     }
-    group.finish();
 }
 
 criterion_group!(benches, bench_square);

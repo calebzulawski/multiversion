@@ -28,8 +28,8 @@ lazy_static = "1"
 regex = "1"
 
 [dev-dependencies]
-criterion = "0.3"
-rand = "0.7"
+criterion = "0.2.11"
+rand = "0.5"
 
 [[bench]]
 name = "square"
