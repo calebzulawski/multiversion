@@ -69,6 +69,10 @@ impl Target {
         return self.architecture.as_str();
     }
 
+    pub fn features_as_str(&self) -> impl Iterator<Item = &str> {
+        self.features.iter().map(|s| s.as_str())
+    }
+
     pub fn has_features_specified(&self) -> bool {
         return !self.features.is_empty();
     }
