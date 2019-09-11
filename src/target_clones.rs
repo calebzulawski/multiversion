@@ -129,18 +129,27 @@ impl<'a> TargetClones<'a> {
     pub fn new(config: Config, func: &'a ItemFn) -> Self {
         let mut clones = Vec::new();
         let mut functions = Vec::new();
-        let mut id: u64 = 0;
         let real_function_ident = func.sig.ident.clone();
-        let mut new_signature = move || {
+        let new_signature = move |target: Option<&Target>| {
             let mut signature = func.sig.clone();
-            signature.ident = Ident::new(&format!("__clone_{}", id), Span::call_site());
-            id += 1;
+            let mut name = signature.ident.to_string();
+            if let Some(target) = target {
+                name.push('_');
+                name.push_str(target.arch_as_str());
+                for feature in target.features_as_str() {
+                    name.push('_');
+                    name.push_str(&feature);
+                }
+            } else {
+                name.push_str("_default");
+            }
+            signature.ident = Ident::new(&name, Span::call_site());
             signature
         };
         for target in config.targets {
             clones.push(FunctionClone {
                 target: Some(target.clone()),
-                signature: new_signature(),
+                signature: new_signature(Some(&target)),
                 real_function_ident: real_function_ident.clone(),
                 body: func.block.as_ref(),
             });
@@ -149,7 +158,7 @@ impl<'a> TargetClones<'a> {
         // push default
         clones.push(FunctionClone {
             target: None,
-            signature: new_signature(),
+            signature: new_signature(None),
             real_function_ident,
             body: func.block.as_ref(),
         });
