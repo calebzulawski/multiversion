@@ -97,13 +97,14 @@
 //!
 //! # Implementation details
 //! The function version dispatcher consists of a function selector and an atomic function pointer.
-//! On the first invocation of a multiversioned function, the dispatcher loads the atomic and since
-//! it's null, invokes the function selector. The result of the function selector is stored in the
-//! atomic, then invoked. On subsequent calls, the atomic is not null and the contents are invoked.
+//! Initially the function pointer will point to the function selector. On invocation, this selector
+//! will then choose an implementation, store a pointer to it in the atomic function pointer for later
+//! use and then pass on control to the chosen function. On subsequent calls, the chosen function
+//! will be called without invoking the function selector.
 //!
 //! Some comments on the benefits of this implementation:
-//! * The function selector is only invoked once. Subsequent calls are reduced to an atomic load,
-//! branch, and indirect function call.
+//! * The function selector is only invoked once. Subsequent calls are reduced to an atomic load
+//! and indirect function call.
 //! * If called in multiple threads, there is no contention. It is possible for two threads to hit
 //! the same function before function selection has completed, which results in each thread
 //! invoking the function selector, but the atomic ensures that these are synchronized correctly.
