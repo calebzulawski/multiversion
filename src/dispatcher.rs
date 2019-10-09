@@ -1,12 +1,12 @@
 use crate::target::Target;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{FnArg, Ident, Signature};
+use syn::{Expr, FnArg, Signature};
 
 pub(crate) struct Dispatcher {
     pub signature: Signature,
-    pub functions: Vec<(Target, Ident)>,
-    pub default: Ident,
+    pub functions: Vec<(Target, Expr)>,
+    pub default: Expr,
 }
 
 impl ToTokens for Dispatcher {
