@@ -69,8 +69,8 @@ impl Target {
         return self.architecture.as_str();
     }
 
-    pub fn features_as_str(&self) -> impl Iterator<Item = &str> {
-        self.features.iter().map(|s| s.as_str())
+    pub fn features_string(&self) -> String {
+        self.features.join("_")
     }
 
     pub fn has_features_specified(&self) -> bool {
@@ -118,11 +118,15 @@ pub(crate) fn parse_target_string(s: &LitStr) -> Result<Vec<Target>> {
         .captures(&owned)
         .ok_or(Error::new(s.span(), "invalid target string"))?;
     let features = captures.name("features").map_or(Vec::new(), |x| {
-        x.as_str()
+        let mut v = x
+            .as_str()
             .split('+')
             .skip(1)
             .map(|x| x.to_string())
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+        v.sort_unstable();
+        v.dedup();
+        v
     });
     if let Some(arch) = captures.name("arch") {
         Ok(vec![Target {

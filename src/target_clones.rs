@@ -135,11 +135,7 @@ impl<'a> TargetClones<'a> {
             let mut name = signature.ident.to_string();
             if let Some(target) = target {
                 name.push('_');
-                name.push_str(target.arch_as_str());
-                for feature in target.features_as_str() {
-                    name.push('_');
-                    name.push_str(&feature);
-                }
+                name.push_str(&target.features_string());
             } else {
                 name.push_str("_default");
             }
