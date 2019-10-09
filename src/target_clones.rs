@@ -25,8 +25,33 @@ impl Parse for Config {
 struct FunctionClone<'a> {
     target: Option<Target>,
     signature: Signature,
-    real_function_ident: Ident,
     body: &'a Block,
+}
+
+impl FunctionClone<'_> {
+    pub fn name(&self) -> Ident {
+        Ident::new(
+            &if self.target.is_some() && self.target.as_ref().unwrap().has_features_specified() {
+                format!(
+                    "feature_{}",
+                    self.target.as_ref().unwrap().features_string()
+                )
+            } else {
+                "default".to_string()
+            },
+            Span::call_site(),
+        )
+    }
+
+    pub fn unsafety(&self) -> Option<token::Unsafe> {
+        if self.target.is_some() && self.target.as_ref().unwrap().has_features_specified() {
+            Some(token::Unsafe {
+                span: Span::call_site(),
+            })
+        } else {
+            self.signature.unsafety
+        }
+    }
 }
 
 impl ToTokens for FunctionClone<'_> {
@@ -40,17 +65,16 @@ impl ToTokens for FunctionClone<'_> {
             .as_ref()
             .map_or(TokenStream::new(), |x| x.target_features());
         let signature = &self.signature;
-        let mut inner_signature = signature.clone();
-        let mut recursion_helper_signature = signature.clone();
+
+        // Inner fn signature matches the original fn signature
+        let inner_signature = signature.clone();
+
+        // Outer fn has a descriptive name and is unsafe if features are specified
         let mut outer_signature = signature.clone();
-        inner_signature.ident =
-            Ident::new(&format!("{}_safe", self.signature.ident), Span::call_site());
-        recursion_helper_signature.ident = self.real_function_ident.clone();
-        outer_signature.unsafety = Some(token::Unsafe {
-            span: Span::call_site(),
-        });
+        outer_signature.ident = self.name();
+        outer_signature.unsafety = self.unsafety();
+
         let inner_function_ident = &inner_signature.ident;
-        let outer_function_ident = &outer_signature.ident;
         let body = &self.body;
         let argument_names = &outer_signature
             .inputs
@@ -63,34 +87,21 @@ impl ToTokens for FunctionClone<'_> {
                 }
             })
             .collect::<Vec<_>>();
-        // We create 3 different functions here: outer, inner, recursion_helper.
-        // The outer function is the main one and in principle do not need
-        // anything more than that one. The other two functions solve specific
-        // problems.
-        // The reason for the function inner is that we have to mark the outer
-        // funtion as unsafe to be able to use target_feature, however to do not
-        // not necessarily want the body to be unsafe. The solution is to place
-        // it in an inner function, mark that function as inline(always) and
-        // only ever call it from a single location.
-        // The only remaining problem is now that of recursion. We would like
-        // recursion to work as expected, without breaking the optimizations
-        // above. We would also like it to call this function without going
-        // through the dispatcher. The solution is to create a function in
-        // scope with the same name and signature. This function will simply
-        // call ourselves.
+
+        // We create an inner and an outer function here.
+        //
+        // The outer function is invoked by the dispatcher. It must be marked unsafe since it uses
+        // the `target_feature` attribute.
+        //
+        // The inner function contains the actual implementation of the function. This solves two
+        // problems. First, this function has the same safety as the outermost function, allowing
+        // normal safety guarantees within the unsafe outer function. Second, this function has the
+        // same name as the outermost function, allowing recursion to skip nested feature
+        // detection.
         tokens.extend(quote! {
             #target_arch
             #target_features
             #outer_signature {
-                #target_arch
-                #[inline(always)]
-                #recursion_helper_signature {
-                    unsafe {
-                        #outer_function_ident(#(#argument_names),*)
-                    }
-                }
-
-                #target_arch
                 #[inline(always)]
                 #inner_signature
                 #body
@@ -129,36 +140,21 @@ impl<'a> TargetClones<'a> {
     pub fn new(config: Config, func: &'a ItemFn) -> Self {
         let mut clones = Vec::new();
         let mut functions = Vec::new();
-        let real_function_ident = func.sig.ident.clone();
-        let new_signature = move |target: Option<&Target>| {
-            let mut signature = func.sig.clone();
-            let mut name = signature.ident.to_string();
-            if let Some(target) = target {
-                name.push('_');
-                name.push_str(&target.features_string());
-            } else {
-                name.push_str("_default");
-            }
-            signature.ident = Ident::new(&name, Span::call_site());
-            signature
-        };
         for target in config.targets {
             clones.push(FunctionClone {
                 target: Some(target.clone()),
-                signature: new_signature(Some(&target)),
-                real_function_ident: real_function_ident.clone(),
+                signature: func.sig.clone(),
                 body: func.block.as_ref(),
             });
-            functions.push((target, clones.last().unwrap().signature.ident.clone()));
+            functions.push((target, clones.last().unwrap().name()));
         }
         // push default
         clones.push(FunctionClone {
             target: None,
-            signature: new_signature(None),
-            real_function_ident,
+            signature: func.sig.clone(),
             body: func.block.as_ref(),
         });
-        let default = clones.last().unwrap().signature.ident.clone();
+        let default = clones.last().unwrap().name();
 
         Self {
             attributes: &func.attrs,
