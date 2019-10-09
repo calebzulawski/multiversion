@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::parse::{Parse, ParseStream, Result};
 use syn::punctuated::Punctuated;
-use syn::{parenthesized, Ident, LitStr, Signature, Token, Visibility};
+use syn::{parenthesized, Expr, Ident, LitStr, Signature, Token, Visibility};
 
 pub(crate) struct MultiVersion {
     visibility: Visibility,
@@ -50,12 +50,12 @@ impl Parse for MultiVersion {
             functions.extend(
                 parse_target_string(&target_string)?
                     .drain(..)
-                    .map(|t| (t, function.clone())),
+                    .map(|t| (t, syn::parse2::<Expr>(function.to_token_stream()).unwrap())),
             );
         }
         let _default: Token![default] = input.parse()?;
         let _arrow: Token![=>] = input.parse()?;
-        let default: Ident = input.parse()?;
+        let default: Expr = input.parse()?;
         if !input.is_empty() {
             let _trailing_comma: Token![,] = input.parse()?;
         }

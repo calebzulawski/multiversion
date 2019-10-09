@@ -6,7 +6,9 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::parse::{Parse, ParseStream, Result};
 use syn::punctuated::Punctuated;
-use syn::{token, Attribute, Block, FnArg, Ident, ItemFn, LitStr, Signature, Token, Visibility};
+use syn::{
+    token, Attribute, Block, Expr, FnArg, Ident, ItemFn, LitStr, Signature, Token, Visibility,
+};
 
 pub(crate) struct Config {
     targets: Vec<Target>,
@@ -66,14 +68,13 @@ impl ToTokens for FunctionClone<'_> {
             .map_or(TokenStream::new(), |x| x.target_features());
         let signature = &self.signature;
 
-        // Inner fn signature matches the original fn signature
-        let inner_signature = signature.clone();
-
         // Outer fn has a descriptive name and is unsafe if features are specified
         let mut outer_signature = signature.clone();
         outer_signature.ident = self.name();
         outer_signature.unsafety = self.unsafety();
 
+        // Inner fn signature matches the original fn signature
+        let inner_signature = signature.clone();
         let inner_function_ident = &inner_signature.ident;
         let body = &self.body;
         let argument_names = &outer_signature
@@ -101,7 +102,7 @@ impl ToTokens for FunctionClone<'_> {
         tokens.extend(quote! {
             #target_arch
             #target_features
-            #outer_signature {
+            pub #outer_signature {
                 #[inline(always)]
                 #inner_signature
                 #body
@@ -124,12 +125,16 @@ impl ToTokens for TargetClones<'_> {
         let attributes = (&self.attributes).iter();
         let visibility = &self.visibility;
         let signature = &self.dispatcher.signature;
+        let name = &signature.ident;
         let clones = (&self.clones).iter();
         let dispatcher = &self.dispatcher;
         tokens.extend(quote! {
+            #visibility mod #name {
+                use super::*;
+                #(#clones)*
+            }
             #(#attributes)*
             #visibility #signature {
-                #(#clones)*
                 #dispatcher
             }
         });
@@ -138,6 +143,8 @@ impl ToTokens for TargetClones<'_> {
 
 impl<'a> TargetClones<'a> {
     pub fn new(config: Config, func: &'a ItemFn) -> Self {
+        let module = func.sig.ident.clone();
+        let prepend_module = move |name| syn::parse2::<Expr>(quote! { #module::#name }).unwrap();
         let mut clones = Vec::new();
         let mut functions = Vec::new();
         for target in config.targets {
@@ -146,7 +153,7 @@ impl<'a> TargetClones<'a> {
                 signature: func.sig.clone(),
                 body: func.block.as_ref(),
             });
-            functions.push((target, clones.last().unwrap().name()));
+            functions.push((target, prepend_module(clones.last().unwrap().name())));
         }
         // push default
         clones.push(FunctionClone {
@@ -154,7 +161,7 @@ impl<'a> TargetClones<'a> {
             signature: func.sig.clone(),
             body: func.block.as_ref(),
         });
-        let default = clones.last().unwrap().name();
+        let default = prepend_module(clones.last().unwrap().name());
 
         Self {
             attributes: &func.attrs,
