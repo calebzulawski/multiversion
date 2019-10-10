@@ -69,13 +69,19 @@ impl ToTokens for FunctionClone<'_> {
         let signature = &self.signature;
 
         // Outer fn has a descriptive name and is unsafe if features are specified
-        let mut outer_signature = signature.clone();
-        outer_signature.ident = self.name();
-        outer_signature.unsafety = self.unsafety();
+        let outer_signature = Signature {
+            ident: self.name(),
+            unsafety: self.unsafety(),
+            ..signature.clone()
+        };
+        let outer_function_ident = &outer_signature.ident;
 
-        // Inner fn signature matches the original fn signature
-        let inner_signature = signature.clone();
-        let inner_function_ident = &inner_signature.ident;
+        // Implementation fn signature matches the original fn signature, but with a different name
+        let impl_signature = Signature {
+            ident: Ident::new("__fn_impl", Span::call_site()),
+            ..signature.clone()
+        };
+        let impl_function_ident = &impl_signature.ident;
         let body = &self.body;
         let argument_names = &outer_signature
             .inputs
@@ -89,25 +95,39 @@ impl ToTokens for FunctionClone<'_> {
             })
             .collect::<Vec<_>>();
 
-        // We create an inner and an outer function here.
+        // Recursion helper fn signature matches the original function signature
+        let recursion_helper_signature = signature.clone();
+
+        // We create the outer function here, containing two inner functions, the implementation
+        // and the recursion helper.
         //
         // The outer function is invoked by the dispatcher. It must be marked unsafe since it uses
         // the `target_feature` attribute.
         //
-        // The inner function contains the actual implementation of the function. This solves two
-        // problems. First, this function has the same safety as the outermost function, allowing
-        // normal safety guarantees within the unsafe outer function. Second, this function has the
-        // same name as the outermost function, allowing recursion to skip nested feature
-        // detection.
+        // The implementation function contains the actual implementation of the function. This
+        // function has the same safety as the original function, maintaining normal safety
+        // guarantees inside the unsafe fn required by the `target_feature` attribute.
+        //
+        // The recursion helper function has the same name as the original function, allowing
+        // recursive functions to skip runtime dispatch.  This function must be separate from the
+        // implementation function, since recursion must call the outer function marked with the
+        // `target_feature` attribute. See Rust #53117 for more info.
         tokens.extend(quote! {
             #target_arch
             #target_features
             pub #outer_signature {
                 #[inline(always)]
-                #inner_signature
+                #recursion_helper_signature {
+                    unsafe {
+                        #outer_function_ident(#(#argument_names),*)
+                    }
+                }
+
+                #[inline(always)]
+                #impl_signature
                 #body
 
-                #inner_function_ident(#(#argument_names),*)
+                #impl_function_ident(#(#argument_names),*)
             }
         });
     }
