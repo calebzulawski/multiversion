@@ -66,7 +66,7 @@ pub(crate) struct Target {
 
 impl Target {
     pub fn arch_as_str(&self) -> &str {
-        return self.architecture.as_str();
+        self.architecture.as_str()
     }
 
     pub fn features_string(&self) -> String {
@@ -74,7 +74,7 @@ impl Target {
     }
 
     pub fn has_features_specified(&self) -> bool {
-        return !self.features.is_empty();
+        !self.features.is_empty()
     }
 
     pub fn target_arch(&self) -> TokenStream {
@@ -116,7 +116,7 @@ pub(crate) fn parse_target_string(s: &LitStr) -> Result<Vec<Target>> {
     let owned = s.value();
     let captures = RE
         .captures(&owned)
-        .ok_or(Error::new(s.span(), "invalid target string"))?;
+        .ok_or_else(|| Error::new(s.span(), "invalid target string"))?;
     let features = captures.name("features").map_or(Vec::new(), |x| {
         let mut v = x
             .as_str()

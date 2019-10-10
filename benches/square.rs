@@ -25,7 +25,7 @@ fn square_fmv(i: &[f32], o: &mut [f32]) {
 }
 
 fn bench_square(c: &mut Criterion) {
-    for i in [4usize, 1000usize, 1000000usize].iter() {
+    for i in [4usize, 1000usize, 1_000_000usize].iter() {
         let input: Vec<f32> = rand::thread_rng()
             .sample_iter(&Standard)
             .take(*i)

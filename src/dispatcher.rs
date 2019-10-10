@@ -62,7 +62,7 @@ impl ToTokens for Dispatcher {
                 #(#return_if_detected)*
                 #[cfg(not(any(#(target_arch = #defaulted_arches),*)))]
                 {
-                    return #default
+                    #default
                 }
             }
         };

@@ -60,11 +60,11 @@ impl Parse for MultiVersion {
             let _trailing_comma: Token![,] = input.parse()?;
         }
         Ok(Self {
-            visibility: visibility,
+            visibility,
             dispatcher: Dispatcher {
-                signature: signature,
-                functions: functions,
-                default: default,
+                signature,
+                functions,
+                default,
             },
         })
     }

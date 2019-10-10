@@ -20,7 +20,7 @@ impl Parse for Config {
         for target_string in Punctuated::<LitStr, Token![,]>::parse_terminated(&input)? {
             targets.extend(parse_target_string(&target_string)?)
         }
-        Ok(Self { targets: targets })
+        Ok(Self { targets })
     }
 }
 
@@ -186,11 +186,11 @@ impl<'a> TargetClones<'a> {
         Self {
             attributes: &func.attrs,
             visibility: &func.vis,
-            clones: clones,
+            clones,
             dispatcher: Dispatcher {
                 signature: func.sig.clone(),
-                functions: functions,
-                default: default,
+                functions,
+                default,
             },
         }
     }

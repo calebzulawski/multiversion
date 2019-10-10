@@ -2,24 +2,24 @@ use multiversion::target_clones;
 
 #[target_clones("[x86|x86_64]+avx", "[x86|x86_64]+sse", "[arm|aarch64]+neon")]
 pub fn pub_add(a: &mut [f32], b: &[f32]) {
-    a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a = *a + b);
+    a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
 
 #[target_clones("[x86|x86_64]+avx", "[x86|x86_64]+sse", "[arm|aarch64]+neon")]
 fn priv_add(a: &mut [f32], b: &[f32]) {
-    a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a = *a + b);
+    a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
 
 #[target_clones("[x86|x86_64]+avx", "[x86|x86_64]+sse", "[arm|aarch64]+neon")]
 #[inline]
 pub unsafe fn pub_unsafe_add(a: &mut [f32], b: &[f32]) {
-    a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a = *a + b);
+    a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
 
 #[target_clones("[x86|x86_64]+avx", "[x86|x86_64]+sse", "[arm|aarch64]+neon")]
 #[inline]
 unsafe fn priv_unsafe_add(a: &mut [f32], b: &[f32]) {
-    a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a = *a + b);
+    a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
 
 mod test {
