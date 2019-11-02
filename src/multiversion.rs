@@ -1,71 +1,63 @@
 use crate::dispatcher::Dispatcher;
-use crate::target::parse_target_string;
+use crate::target::Target;
+use crate::util;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
-use syn::parse::{Parse, ParseStream, Result};
-use syn::punctuated::Punctuated;
-use syn::{parenthesized, Expr, Ident, LitStr, Signature, Token, Visibility};
+use quote::ToTokens;
+use syn::{
+    parse::Parse, parse::ParseStream, parse_quote, punctuated::Punctuated, token, ItemFn, LitStr,
+    Path, Result,
+};
 
-pub(crate) struct MultiVersion {
-    visibility: Visibility,
-    dispatcher: Dispatcher,
+pub(crate) struct Specialization {
+    target: Target,
+    _fat_arrow_token: token::FatArrow,
+    path: Path,
 }
 
-impl ToTokens for MultiVersion {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let visibility = &self.visibility;
-        let signature = &self.dispatcher.signature;
-        let dispatcher = &self.dispatcher;
-        tokens.extend(quote! {
-            #visibility #signature {
-                #dispatcher
-            }
-        });
-    }
-}
-
-impl Parse for MultiVersion {
+impl Parse for Specialization {
     fn parse(input: ParseStream) -> Result<Self> {
-        let content;
-        let visibility: Visibility = input.parse()?;
-        let signature = Signature {
-            constness: None,
-            asyncness: None,
-            unsafety: input.parse().ok(),
-            abi: input.parse().ok(),
-            fn_token: input.parse()?,
-            ident: input.parse()?,
-            generics: input.parse()?,
-            paren_token: parenthesized!(content in input),
-            inputs: Punctuated::parse_terminated(&content)?,
-            variadic: None,
-            output: input.parse()?,
-        };
-        let mut functions = Vec::new();
-        while !input.is_empty() && !input.peek(Token![default]) {
-            let target_string: LitStr = input.parse()?;
-            let _arrow: Token![=>] = input.parse()?;
-            let function: Ident = input.parse()?;
-            let _comma: Token![,] = input.parse()?;
-            functions.extend(
-                parse_target_string(&target_string)?
-                    .drain(..)
-                    .map(|t| (t, syn::parse2::<Expr>(function.to_token_stream()).unwrap())),
-            );
-        }
-        let _default: Token![default] = input.parse()?;
-        let _arrow: Token![=>] = input.parse()?;
-        let default: Expr = input.parse()?;
-        if !input.is_empty() {
-            let _trailing_comma: Token![,] = input.parse()?;
-        }
+        let target_str = input.parse::<LitStr>()?;
         Ok(Self {
-            visibility,
-            dispatcher: Dispatcher {
-                signature,
-                functions,
-                default,
-            },
+            target: Target::parse(&target_str)?,
+            _fat_arrow_token: input.parse()?,
+            path: input.parse()?,
         })
     }
+}
+
+pub(crate) struct Config {
+    specializations: Punctuated<Specialization, token::Comma>,
+}
+
+impl Parse for Config {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(Self {
+            specializations: input.parse_terminated(Specialization::parse)?,
+        })
+    }
+}
+
+pub(crate) fn make_multiversioned_fn(config: Config, func: ItemFn) -> Result<TokenStream> {
+    let args = util::args_from_signature(&func.sig)?;
+    Ok(Dispatcher {
+        attrs: func.attrs,
+        vis: func.vis,
+        sig: func.sig.clone(),
+        specializations: config
+            .specializations
+            .iter()
+            .map(
+                |Specialization { target, path, .. }| crate::dispatcher::Specialization {
+                    target: target.clone(),
+                    block: parse_quote! {
+                        {
+                            unsafe { #path(#(#args)*) }
+                        }
+                    },
+                },
+            )
+            .collect(),
+        default: *func.block,
+    }
+    .to_token_stream())
 }

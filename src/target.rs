@@ -1,10 +1,14 @@
+use crate::dispatcher::StaticDispatchVisitor;
 use lazy_static::lazy_static;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use regex::Regex;
-use syn::{Error, LitStr, Result};
+use syn::{
+    parse::Parse, parse::ParseStream, parse_quote, spanned::Spanned, visit_mut::VisitMut,
+    Attribute, Error, Ident, ItemFn, LitStr, Result, Signature,
+};
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 enum Architecture {
     X86,
     X86_64,
@@ -60,13 +64,78 @@ impl Architecture {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Target {
-    architecture: Architecture,
+    architectures: Vec<Architecture>,
     features: Vec<String>,
 }
 
 impl Target {
-    pub fn arch_as_str(&self) -> &str {
-        self.architecture.as_str()
+    pub(crate) fn parse(s: &LitStr) -> Result<Self> {
+        lazy_static! {
+            static ref RE: Regex = Regex::new(
+                r"^(?:\[(?P<arches>\w+(?:\|\w+)*)\]|(?P<arch>\w+))(?P<features>(?:\+\w+)+)?$"
+            )
+            .unwrap();
+        }
+        let owned = s.value();
+        let captures = RE
+            .captures(&owned)
+            .ok_or_else(|| Error::new(s.span(), "invalid target string"))?;
+        let features = captures.name("features").map_or(Vec::new(), |x| {
+            let mut v = x
+                .as_str()
+                .split('+')
+                .skip(1)
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>();
+            v.sort_unstable();
+            v.dedup();
+            v
+        });
+        if let Some(arch) = captures.name("arch") {
+            Ok(Self {
+                architectures: vec![Architecture::new(arch.as_str(), s.span())?],
+                features,
+            })
+        } else {
+            let mut arches = captures
+                .name("arches")
+                .unwrap()
+                .as_str()
+                .split('|')
+                .map(|arch| Architecture::new(arch, s.span()))
+                .collect::<Result<Vec<_>>>()?;
+            arches.sort_unstable();
+            arches.dedup();
+            Ok(Self {
+                architectures: arches,
+                features,
+            })
+        }
+    }
+
+    pub fn target_string(&self) -> LitStr {
+        let arches = if self.architectures.len() > 1 {
+            format!(
+                "[{}]",
+                self.architectures
+                    .iter()
+                    .map(|x| x.as_str())
+                    .collect::<Vec<_>>()
+                    .join("|")
+            )
+        } else {
+            self.architectures.first().unwrap().as_str().to_string()
+        };
+        let string = if self.features.is_empty() {
+            arches
+        } else {
+            format!("{}+{}", arches, self.features.join("+"))
+        };
+        LitStr::new(&string, Span::call_site())
+    }
+
+    pub fn arches_as_str(&self) -> Vec<&'static str> {
+        self.architectures.iter().map(|x| x.as_str()).collect()
     }
 
     pub fn features_string(&self) -> String {
@@ -77,75 +146,118 @@ impl Target {
         !self.features.is_empty()
     }
 
-    pub fn target_arch(&self) -> TokenStream {
-        let arch = self.architecture.as_str();
-        quote! {
-            #[cfg(target_arch = #arch)]
+    pub fn target_arch(&self) -> Attribute {
+        let arch = self.architectures.iter().map(|x| x.as_str());
+        parse_quote! {
+            #[cfg(any(#(target_arch = #arch),*))]
         }
     }
 
-    pub fn target_features(&self) -> TokenStream {
-        let features = self.features.iter();
-        quote! {
-            #(#[target_feature(enable = #features)])*
-        }
+    pub fn target_feature(&self) -> Vec<Attribute> {
+        self.features
+            .iter()
+            .map(|feature| {
+                parse_quote! {
+                    #[target_feature(enable = #feature)]
+                }
+            })
+            .collect()
     }
 
     pub fn features_detected(&self) -> TokenStream {
-        if let Some(first_feature) = self.features.first() {
-            let rest_features = self.features.iter().skip(1);
-            let feature_detector = self.architecture.feature_detector();
-            quote! {
-                #feature_detector(#first_feature) #( && #feature_detector(#rest_features) )*
-            }
-        } else {
+        if self.features.is_empty() {
             quote! {
                 true
             }
+        } else {
+            let arches = self.architectures.iter().map(|x| {
+                let arch = x.as_str();
+                let features = self.features.iter();
+                let feature_detector = x.feature_detector();
+                quote! {
+                    #[cfg(target_arch = #arch)]
+                    {
+                        #( #feature_detector(#features) )&&*
+                    }
+                }
+            });
+            quote! { { #(#arches)* } }
         }
     }
 }
 
-pub(crate) fn parse_target_string(s: &LitStr) -> Result<Vec<Target>> {
-    lazy_static! {
-        static ref RE: Regex = Regex::new(
-            r"^(?:\[(?P<arches>\w+(?:\|\w+)*)\]|(?P<arch>\w+))(?P<features>(?:\+\w+)+)?$"
-        )
-        .unwrap();
+pub(crate) struct Config {
+    target: Target,
+}
+
+impl Parse for Config {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let target_string = input.parse::<LitStr>()?;
+        Ok(Self {
+            target: Target::parse(&target_string)?,
+        })
     }
-    let owned = s.value();
-    let captures = RE
-        .captures(&owned)
-        .ok_or_else(|| Error::new(s.span(), "invalid target string"))?;
-    let features = captures.name("features").map_or(Vec::new(), |x| {
-        let mut v = x
-            .as_str()
-            .split('+')
-            .skip(1)
-            .map(|x| x.to_string())
-            .collect::<Vec<_>>();
-        v.sort_unstable();
-        v.dedup();
-        v
-    });
-    if let Some(arch) = captures.name("arch") {
-        Ok(vec![Target {
-            architecture: Architecture::new(arch.as_str(), s.span())?,
-            features: features,
-        }])
+}
+
+pub(crate) fn make_target_fn(config: Config, mut func: ItemFn) -> Result<TokenStream> {
+    // Rewrite static dispatches
+    StaticDispatchVisitor {
+        target: Some(config.target.clone()),
+    }
+    .visit_block_mut(&mut func.block);
+
+    // Create the function
+    let target_arch = config.target.target_arch();
+    let target_feature = config.target.target_feature();
+    let safe_inner_span = {
+        if let Some((idx, attr)) = func
+            .attrs
+            .iter()
+            .enumerate()
+            .find(|(_, attr)| **attr == parse_quote! { #[safe_inner] })
+        {
+            if func.sig.unsafety.is_none() {
+                Err(Error::new(
+                    attr.span(),
+                    "#[safe_inner] may only be used on unsafe fn",
+                ))
+            } else {
+                let span = attr.span();
+                func.attrs.remove(idx);
+                Ok(Some(span))
+            }
+        } else {
+            Ok(None)
+        }
+    }?;
+    if let Some(safe_inner_span) = safe_inner_span {
+        let attrs = func.attrs;
+        let vis = func.vis;
+        let unsafe_sig = &func.sig;
+        let safe_sig = Signature {
+            unsafety: None,
+            ident: Ident::new("__safe_inner_fn", safe_inner_span),
+            ..func.sig.clone()
+        };
+        let block = func.block;
+        let safe_ident = &safe_sig.ident;
+        let args = crate::util::args_from_signature(&unsafe_sig)?;
+        Ok(quote! {
+            #target_arch
+            #(#target_feature)*
+            #(#attrs)*
+            #vis #unsafe_sig {
+                #[inline(always)]
+                #safe_sig #block
+                #safe_ident(#(#args),*)
+            }
+        })
     } else {
-        captures
-            .name("arches")
-            .unwrap()
-            .as_str()
-            .split('|')
-            .map(|arch| {
-                Ok(Target {
-                    architecture: Architecture::new(arch, s.span())?,
-                    features: features.clone(),
-                })
-            })
-            .collect()
+        Ok(quote! {
+            #target_arch
+            #(#target_feature)*
+            #func
+        })
     }
 }
 
@@ -156,102 +268,126 @@ mod test {
     #[test]
     fn parse_single_arch_no_features() {
         let s = LitStr::new("x86", Span::call_site());
-        let targets = parse_target_string(&s).unwrap();
-        assert_eq!(targets.len(), 1);
-        assert_eq!(targets[0].architecture, Architecture::X86);
-        assert_eq!(targets[0].features.len(), 0);
+        let target = Target::parse(&s).unwrap();
+        assert_eq!(target.architectures, vec![Architecture::X86]);
+        assert_eq!(target.features.is_empty(), true);
     }
 
     #[test]
     fn parse_multiple_arch_no_features() {
         let s = LitStr::new("[arm|aarch64|mips|mips64]", Span::call_site());
-        let targets = parse_target_string(&s).unwrap();
-        assert_eq!(targets.len(), 4);
-        assert_eq!(targets[0].architecture, Architecture::Arm);
-        assert_eq!(targets[0].features.len(), 0);
-        assert_eq!(targets[1].architecture, Architecture::Aarch64);
-        assert_eq!(targets[1].features.len(), 0);
-        assert_eq!(targets[2].architecture, Architecture::Mips);
-        assert_eq!(targets[2].features.len(), 0);
-        assert_eq!(targets[3].architecture, Architecture::Mips64);
-        assert_eq!(targets[3].features.len(), 0);
+        let target = Target::parse(&s).unwrap();
+        assert_eq!(
+            target.architectures,
+            vec![
+                Architecture::Arm,
+                Architecture::Aarch64,
+                Architecture::Mips,
+                Architecture::Mips64
+            ]
+        );
+        assert_eq!(target.features.len(), 0);
     }
 
     #[test]
     fn parse_single_arch_with_features() {
         let s = LitStr::new("x86_64+avx2+xsave", Span::call_site());
-        let targets = parse_target_string(&s).unwrap();
-        assert_eq!(targets.len(), 1);
-        assert_eq!(targets[0].architecture, Architecture::X86_64);
-        assert_eq!(targets[0].features.len(), 2);
-        assert_eq!(targets[0].features[0], "avx2");
-        assert_eq!(targets[0].features[1], "xsave");
+        let target = Target::parse(&s).unwrap();
+        assert_eq!(target.architectures, vec![Architecture::X86_64]);
+        assert_eq!(target.features, vec!["avx2", "xsave"]);
     }
 
     #[test]
     fn parse_multiple_arch_with_features() {
         let s = LitStr::new("[powerpc|powerpc64]+altivec+power8", Span::call_site());
-        let targets = parse_target_string(&s).unwrap();
-        assert_eq!(targets.len(), 2);
-        assert_eq!(targets[0].architecture, Architecture::PowerPC);
-        assert_eq!(targets[0].features.len(), 2);
-        assert_eq!(targets[0].features[0], "altivec");
-        assert_eq!(targets[0].features[1], "power8");
-        assert_eq!(targets[1].architecture, Architecture::PowerPC64);
-        assert_eq!(targets[1].features.len(), 2);
-        assert_eq!(targets[1].features[0], "altivec");
-        assert_eq!(targets[1].features[1], "power8");
+        let target = Target::parse(&s).unwrap();
+        assert_eq!(
+            target.architectures,
+            vec![Architecture::PowerPC, Architecture::PowerPC64]
+        );
+        assert_eq!(target.features, vec!["altivec", "power8"]);
     }
 
     #[test]
-    fn generate_target_arch() {
+    fn generate_single_target_arch() {
         let s = LitStr::new("x86+avx", Span::call_site());
-        let target = parse_target_string(&s).unwrap().pop().unwrap();
+        let target = Target::parse(&s).unwrap();
         assert_eq!(
-            target.target_arch().to_string(),
-            quote! { #[cfg(target_arch = "x86")] }.to_string()
+            target.target_arch(),
+            parse_quote! { #[cfg(any(target_arch = "x86"))] }
+        );
+    }
+
+    #[test]
+    fn generate_multiple_target_arch() {
+        let s = LitStr::new("[x86|x86_64]+avx", Span::call_site());
+        let target = Target::parse(&s).unwrap();
+        assert_eq!(
+            target.target_arch(),
+            parse_quote! { #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] }
         );
     }
 
     #[test]
     fn generate_single_target_feature() {
         let s = LitStr::new("x86+avx", Span::call_site());
-        let target = parse_target_string(&s).unwrap().pop().unwrap();
+        let target = Target::parse(&s).unwrap();
         assert_eq!(
-            target.target_features().to_string(),
-            quote! { #[target_feature(enable = "avx")] }.to_string()
+            target.target_feature(),
+            vec![parse_quote! { #[target_feature(enable = "avx")] }]
         );
     }
 
     #[test]
     fn generate_multiple_target_feature() {
         let s = LitStr::new("x86+avx+xsave", Span::call_site());
-        let target = parse_target_string(&s).unwrap().pop().unwrap();
+        let target = Target::parse(&s).unwrap();
         assert_eq!(
-            target.target_features().to_string(),
-            quote! { #[target_feature(enable = "avx")] #[target_feature(enable = "xsave")] }
-                .to_string()
+            target.target_feature(),
+            vec![
+                parse_quote! { #[target_feature(enable = "avx")] },
+                parse_quote! { #[target_feature(enable = "xsave")] }
+            ]
         );
     }
 
     #[test]
     fn generate_single_features_detect() {
         let s = LitStr::new("x86+avx", Span::call_site());
-        let target = parse_target_string(&s).unwrap().pop().unwrap();
+        let target = Target::parse(&s).unwrap();
         assert_eq!(
             target.features_detected().to_string(),
-            quote! { is_x86_feature_detected!("avx") }.to_string()
+            quote! {
+                {
+                    #[cfg(target_arch = "x86")]
+                    {
+                        is_x86_feature_detected!("avx")
+                    }
+                }
+            }
+            .to_string()
         );
     }
 
     #[test]
     fn generate_multiple_features_detect() {
-        let s = LitStr::new("x86+avx+xsave", Span::call_site());
-        let target = parse_target_string(&s).unwrap().pop().unwrap();
+        let s = LitStr::new("[x86|x86_64]+avx+xsave", Span::call_site());
+        let target = Target::parse(&s).unwrap();
         assert_eq!(
             target.features_detected().to_string(),
-            quote! { is_x86_feature_detected!("avx") && is_x86_feature_detected!("xsave") }
-                .to_string()
+            quote! {
+                {
+                    #[cfg(target_arch = "x86")]
+                    {
+                        is_x86_feature_detected!("avx") && is_x86_feature_detected!("xsave")
+                    }
+                    #[cfg(target_arch = "x86_64")]
+                    {
+                        is_x86_feature_detected!("avx") && is_x86_feature_detected!("xsave")
+                    }
+                }
+            }
+            .to_string()
         );
     }
 }
