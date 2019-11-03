@@ -127,7 +127,7 @@
 //! #[target_clones("[x86|x86_64]+avx", "x86+sse")]
 //! fn square_plus_one(x: &mut [f32]) {
 //!     #[static_dispatch]
-//!     use square;
+//!     use self::square; // or just `use square` in with Rust 1.32.0+
 //!     square(x); // this function call bypasses feature detection
 //!     for v in x {
 //!         *v += 1.0;
