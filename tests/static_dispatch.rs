@@ -8,7 +8,7 @@ fn mul(x: f32, y: f32) -> f32 {
 #[target_clones("[x86|x86_64]+avx", "x86+sse")]
 fn square(x: &mut [f32]) {
     #[static_dispatch]
-    use mul;
+    use self::mul;
     for v in x {
         *v = mul(*v, *v);
     }
