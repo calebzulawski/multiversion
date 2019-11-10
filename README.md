@@ -7,14 +7,23 @@ Multiversion
 [![Crates.io](https://img.shields.io/crates/v/multiversion)](https://crates.io/crates/multiversion)
 [![Rust Documentation](https://img.shields.io/badge/api-rustdoc-blue.svg)](https://docs.rs/multiversion/0.1.1/multiversion/)
 
-Function multiversioning macro/attribute for Rust.
+Function multiversioning attribute macros for Rust.
 
-## Usage
-Add the following to your dependencies in Cargo.toml:
-```toml
-[dependencies]
-multiversion = "0.1"
-```
+## What is function multiversioning?
+Many CPU architectures have a variety of instruction set extensions that provide additional functionality.
+Common examples are single instruction, multiple data (SIMD) extensions such as SSE and AVX on x86/x86-64 and NEON on ARM/AArch64.
+When available, these extended features can provide significant speed improvements to some functions.
+These optional features cannot be haphazardly compiled into programs--executing an unsupported instruction will result in a crash.
+Function multiversioning is the practice of compiling multiple versions of a function with various features enabled and safely detecting which version to use at runtime.
+
+## Features
+* Automatic dynamic dispatching, using runtime CPU feature detection
+* Static dispatching, allowing nested multiversioned functions to avoid repeating feature detection (and can be inlined!)
+
+## Limitations
+* No support for member functions or associated functions (or any other functions not at module-level)
+* No support for `async` functions or any other function returning `impl Trait`
+Please see the documentation for more information and possible workarounds.
 
 ## Example
 Automatic function multiversioning with the `target_clones` attribute, similar to GCC's `target_clones` attribute:
@@ -29,34 +38,29 @@ fn square(x: &mut [f32]) {
 }
 ```
 
-Manual function multiversioning with the `multiversion!` macro:
+Manual function multiversioning with the `multiversion` and `target` attributes:
 ```rust
-use multiversion::multiversion;
+use multiversion::{multiversion, target};
 
-multiversion!{
-    fn square(x: &mut [f32])
-    "[x86|x86_64]+avx" => square_avx,
-    "x86+sse" => square_sse,
-    default => square_generic,
-}
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[target_feature(enable = "avx")]
+#[target("[x86|x86_64]+avx")]
 unsafe fn square_avx(x: &mut [f32]) {
     for v in x {
         *v *= *v;
     }
 }
 
-#[cfg(target_arch = "x86")]
-#[target_feature(enable = "sse")]
+#[target("x86+sse")]
 unsafe fn square_sse(x: &mut [f32]) {
     for v in x {
         *v *= *v;
     }
 }
 
-fn square_generic(x: &mut [f32]) {
+#[multiversion(
+    "[x86|x86_64]+avx" => square_avx,
+    "x86+sse" => square_sse
+)]
+fn square(x: &mut [f32]) {
     for v in x {
         *v *= *v;
     }
