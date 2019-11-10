@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Bencher, Criterion, Fun};
+use criterion::{criterion_group, Bencher, Criterion, Fun};
 use multiversion::target_clones;
 use rand::distributions::Standard;
 use rand::Rng;
@@ -24,7 +24,7 @@ fn square_fmv(i: &[f32], o: &mut [f32]) {
     }
 }
 
-fn bench_square(c: &mut Criterion) {
+pub fn bench(c: &mut Criterion) {
     for i in [4usize, 1000usize, 1_000_000usize].iter() {
         let input: Vec<f32> = rand::thread_rng()
             .sample_iter(&Standard)
@@ -49,5 +49,4 @@ fn bench_square(c: &mut Criterion) {
     }
 }
 
-criterion_group!(benches, bench_square);
-criterion_main!(benches);
+criterion_group!(bench_square, bench);

@@ -1,3 +1,4 @@
+#![allow(clippy::needless_doctest_main)]
 //! This crate provides the [`target`], [`target_clones`], and [`multiversion`] attributes for
 //! implementing function multiversioning.
 //!
@@ -17,6 +18,17 @@
 //! If you are unsure where to start, the [`target_clones`] attribute requires no knowledge of SIMD
 //! beyond understanding the available instruction set extensions for your architecture.  For more
 //! advanced usage, hand-written SIMD code can be dispatched with [`target`] and [`multiversion`].
+//!
+//! # Capabilities
+//! Most functions can be multiversioned.  The following are notable exceptions that are
+//! unsupported:
+//! * Methods, associated functions, inner functions, or any other function not at module level.
+//! In these cases, create a multiversioned function at module level and call it from the desired
+//! location.
+//! * `async` functions or any other function returning `impl Trait`.  Return a boxed future/trait
+//! instead (and use an `async` block, if desired).
+//!
+//! If any other functions do not work, please file an bug report.
 //!
 //! # Target specification strings
 //! Targets for the [`target`], [`target_clones`], and [`multiversion`] attributes are specified
@@ -146,10 +158,12 @@
 //!
 //! Some comments on the benefits of this implementation:
 //! * The function selector is only invoked once. Subsequent calls are reduced to an atomic load
-//! and indirect function call.
+//! and indirect function call (for non-generic functions).
 //! * If called in multiple threads, there is no contention. It is possible for two threads to hit
 //! the same function before function selection has completed, which results in each thread
 //! invoking the function selector, but the atomic ensures that these are synchronized correctly.
+//! * Generic functions cannot be stored in the atomic function pointer, which may result in
+//! additional branches.
 //!
 //! [`target`]: attr.target.html
 //! [`target_clones`]: attr.target_clones.html

@@ -1,5 +1,5 @@
 use crate::dispatcher::StaticDispatchVisitor;
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use regex::Regex;
@@ -70,12 +70,12 @@ pub(crate) struct Target {
 
 impl Target {
     pub(crate) fn parse(s: &LitStr) -> Result<Self> {
-        lazy_static! {
-            static ref RE: Regex = Regex::new(
-                r"^(?:\[(?P<arches>\w+(?:\|\w+)*)\]|(?P<arch>\w+))(?P<features>(?:\+\w+)+)?$"
+        static RE: Lazy<Regex> = Lazy::new(|| {
+            Regex::new(
+                r"^(?:\[(?P<arches>\w+(?:\|\w+)*)\]|(?P<arch>\w+))(?P<features>(?:\+\w+)+)?$",
             )
-            .unwrap();
-        }
+            .unwrap()
+        });
         let owned = s.value();
         let captures = RE
             .captures(&owned)

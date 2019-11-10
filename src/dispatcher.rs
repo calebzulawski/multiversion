@@ -171,6 +171,7 @@ impl Dispatcher {
 
     fn dispatcher_fn(&self) -> Result<ItemFn> {
         let fn_ty = util::fn_type_from_signature(&self.sig);
+        let fn_ty_params = self.sig.generics.type_params().collect::<Vec<_>>();
         let feature_detection = {
             let feature_mod_name = feature_mod_name(&self.sig.ident);
             let return_if_detected =
@@ -192,13 +193,13 @@ impl Dispatcher {
             let cfg_if_not_defaulted = self.cfg_if_not_defaulted();
             let default_fn = feature_fn_name(None);
             quote! {
-                fn __get_fn() -> __fn_ty {
+                fn __get_fn<#(#fn_ty_params),*>() -> #fn_ty {
                     #(#return_if_detected)*
                     #cfg_if_not_defaulted
                     {
                         #feature_mod_name::#default_fn
                     }
-                }
+                };
             }
         };
         let resolver_signature = Signature {
@@ -206,21 +207,32 @@ impl Dispatcher {
             ..self.sig.clone()
         };
         let argument_names = util::args_from_signature(&self.sig)?;
-        let block: Block = parse_quote! {
-            {
-                use std::sync::atomic::{AtomicPtr, Ordering};
-                type __fn_ty = #fn_ty;
-                #[cold]
-                #resolver_signature {
+        let block: Block = if fn_ty_params.is_empty() {
+            // Not a generic fn, so use a static atomic ptr
+            parse_quote! {
+                {
+                    use std::sync::atomic::{AtomicPtr, Ordering};
+                    #[cold]
+                    #resolver_signature {
+                        #feature_detection
+                        let __current_fn = __get_fn();
+                        __DISPATCHED_FN.store(__current_fn as *mut (), Ordering::Relaxed);
+                        __current_fn(#(#argument_names),*)
+                    }
+                    static __DISPATCHED_FN: AtomicPtr<()> = AtomicPtr::new(__resolver_fn as *mut ());
+                    let __current_ptr = __DISPATCHED_FN.load(Ordering::Relaxed);
+                    unsafe {
+                        let __current_fn = std::mem::transmute::<*mut (), #fn_ty>(__current_ptr);
+                        __current_fn(#(#argument_names),*)
+                    }
+                }
+            }
+        } else {
+            // A generic, so just call it directly
+            parse_quote! {
+                {
                     #feature_detection
                     let __current_fn = __get_fn();
-                    __DISPATCHED_FN.store(__current_fn as *mut (), Ordering::Relaxed);
-                    __current_fn(#(#argument_names),*)
-                }
-                static __DISPATCHED_FN: AtomicPtr<()> = AtomicPtr::new(__resolver_fn as *mut ());
-                let __current_ptr = __DISPATCHED_FN.load(Ordering::Relaxed);
-                unsafe {
-                    let __current_fn = std::mem::transmute::<*mut (), __fn_ty>(__current_ptr);
                     __current_fn(#(#argument_names),*)
                 }
             }

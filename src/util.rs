@@ -1,4 +1,7 @@
-use syn::{parse_quote, Error, FnArg, Pat, Result, Signature, TypeBareFn};
+use syn::{
+    parse_quote, visit_mut::VisitMut, Error, FnArg, Ident, Lifetime, Pat, Result, Signature,
+    TypeBareFn,
+};
 
 pub(crate) fn args_from_signature<'a>(sig: &'a Signature) -> Result<Vec<&'a Pat>> {
     sig.inputs
@@ -10,14 +13,22 @@ pub(crate) fn args_from_signature<'a>(sig: &'a Signature) -> Result<Vec<&'a Pat>
         .collect::<Result<Vec<_>>>()
 }
 
+struct LifetimeRenamer;
+
+impl VisitMut for LifetimeRenamer {
+    fn visit_lifetime_mut(&mut self, i: &mut Lifetime) {
+        i.ident = Ident::new(&format!("__mv_inner_{}", i.ident), i.ident.span());
+    }
+}
+
 pub(crate) fn fn_type_from_signature(sig: &Signature) -> TypeBareFn {
     let lifetimes = sig.generics.lifetimes().collect::<Vec<_>>();
     let args = sig.inputs.iter();
-    TypeBareFn {
+    let mut fn_ty = TypeBareFn {
         lifetimes: if lifetimes.is_empty() {
             None
         } else {
-            Some(parse_quote! { <#(#lifetimes),*> })
+            Some(parse_quote! { for<#(#lifetimes),*> })
         },
         unsafety: sig.unsafety,
         abi: sig.abi.clone(),
@@ -26,5 +37,7 @@ pub(crate) fn fn_type_from_signature(sig: &Signature) -> TypeBareFn {
         inputs: parse_quote! { #(#args),* },
         variadic: sig.variadic.clone(),
         output: sig.output.clone(),
-    }
+    };
+    LifetimeRenamer {}.visit_type_bare_fn_mut(&mut fn_ty);
+    fn_ty
 }
