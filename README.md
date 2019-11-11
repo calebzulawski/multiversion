@@ -14,11 +14,12 @@ Many CPU architectures have a variety of instruction set extensions that provide
 Common examples are single instruction, multiple data (SIMD) extensions such as SSE and AVX on x86/x86-64 and NEON on ARM/AArch64.
 When available, these extended features can provide significant speed improvements to some functions.
 These optional features cannot be haphazardly compiled into programs--executing an unsupported instruction will result in a crash.
-Function multiversioning is the practice of compiling multiple versions of a function with various features enabled and safely detecting which version to use at runtime.
+
+**Function multiversioning** is the practice of compiling multiple versions of a function with various features enabled and safely detecting which version to use at runtime.
 
 ## Features
-* Automatic dynamic dispatching, using runtime CPU feature detection
-* Static dispatching, allowing nested multiversioned functions to avoid repeating feature detection (and can be inlined!)
+* Dynamic dispatching, using runtime CPU feature detection
+* Static dispatching, avoiding repeated feature detection for nested multiversioned functions (and allowing inlining!)
 * Support for generic and `async` functions
 
 ## Limitations
