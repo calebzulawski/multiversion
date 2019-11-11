@@ -5,7 +5,7 @@ Multiversion
 [![Rustc Version 1.31+](https://img.shields.io/badge/rustc-1.31+-lightgray.svg)](https://blog.rust-lang.org/2018/12/06/Rust-1.31-and-rust-2018.html)
 [![License](https://img.shields.io/crates/l/multiversion)](https://crates.io/crates/multiversion)
 [![Crates.io](https://img.shields.io/crates/v/multiversion)](https://crates.io/crates/multiversion)
-[![Rust Documentation](https://img.shields.io/badge/api-rustdoc-blue.svg)](https://docs.rs/multiversion/0.1.1/multiversion/)
+[![Rust Documentation](https://img.shields.io/badge/api-rustdoc-blue.svg)](https://docs.rs/multiversion/0.2.0/multiversion/)
 
 Function multiversioning attribute macros for Rust.
 
