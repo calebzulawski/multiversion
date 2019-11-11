@@ -4,6 +4,7 @@ async fn async_add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
 
+/*
 mod test {
     #[rustversion::since(1.39)]
     #[test]
@@ -14,3 +15,4 @@ mod test {
         assert_eq!(a, vec![1f32, 3f32, 5f32]);
     }
 }
+*/

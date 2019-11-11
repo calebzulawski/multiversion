@@ -1,4 +1,5 @@
 use crate::dispatcher::StaticDispatchVisitor;
+use crate::util;
 use once_cell::sync::Lazy;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
@@ -209,7 +210,7 @@ pub(crate) fn make_target_fn(config: Config, mut func: ItemFn) -> Result<TokenSt
     // Create the function
     let target_arch = config.target.target_arch();
     let target_feature = config.target.target_feature();
-    let maybe_await = func.sig.asyncness.map(|_| quote! { .await });
+    let maybe_await = func.sig.asyncness.map(|_| util::await_tokens());
     let safe_inner_span = {
         if let Some((idx, attr)) = func
             .attrs

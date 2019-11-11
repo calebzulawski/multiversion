@@ -1,3 +1,5 @@
+use proc_macro2::{Span, TokenStream};
+use quote::quote;
 use syn::{
     parse_quote, visit_mut::VisitMut, Error, FnArg, Ident, Lifetime, Pat, Result, Signature,
     TypeBareFn,
@@ -40,4 +42,9 @@ pub(crate) fn fn_type_from_signature(sig: &Signature) -> TypeBareFn {
     };
     LifetimeRenamer {}.visit_type_bare_fn_mut(&mut fn_ty);
     fn_ty
+}
+
+pub(crate) fn await_tokens() -> TokenStream {
+    let kw = Ident::new("await", Span::call_site());
+    quote! { .#kw }
 }

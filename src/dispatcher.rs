@@ -56,7 +56,7 @@ impl Specialization {
                 })
             } else {
                 // If the function isn't unsafe, nest an unsafe fn in it
-                let maybe_await = sig.asyncness.map(|_| quote! { .await });
+                let maybe_await = sig.asyncness.map(|_| util::await_tokens());
                 let unsafe_sig = Signature {
                     ident: Ident::new("__unsafe_fn", Span::call_site()),
                     unsafety: parse_quote! { unsafe },
@@ -230,7 +230,7 @@ impl Dispatcher {
             }
         } else {
             // A generic, async, or impl Trait, so just call it directly
-            let maybe_await = self.sig.asyncness.map(|_| quote! { .await });
+            let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
             let feature_mod_name = feature_mod_name(&self.sig.ident);
             let return_if_detected =
                 self.specializations
