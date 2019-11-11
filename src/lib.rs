@@ -25,8 +25,7 @@
 //! * Methods, associated functions, inner functions, or any other function not at module level.
 //! In these cases, create a multiversioned function at module level and call it from the desired
 //! location.
-//! * `async` functions or any other function returning `impl Trait`.  Return a boxed future/trait
-//! instead (and use an `async` block, if desired).
+//! * Functions that take or return `impl Trait` (other than `async`, which is supported).
 //!
 //! If any other functions do not work, please file an bug report.
 //!

@@ -209,6 +209,7 @@ pub(crate) fn make_target_fn(config: Config, mut func: ItemFn) -> Result<TokenSt
     // Create the function
     let target_arch = config.target.target_arch();
     let target_feature = config.target.target_feature();
+    let maybe_await = func.sig.asyncness.map(|_| quote! { .await });
     let safe_inner_span = {
         if let Some((idx, attr)) = func
             .attrs
@@ -249,7 +250,7 @@ pub(crate) fn make_target_fn(config: Config, mut func: ItemFn) -> Result<TokenSt
             #vis #unsafe_sig {
                 #[inline(always)]
                 #safe_sig #block
-                #safe_ident(#(#args),*)
+                #safe_ident(#(#args),*)#maybe_await
             }
         })
     } else {

@@ -56,6 +56,7 @@ impl Specialization {
                 })
             } else {
                 // If the function isn't unsafe, nest an unsafe fn in it
+                let maybe_await = sig.asyncness.map(|_| quote! { .await });
                 let unsafe_sig = Signature {
                     ident: Ident::new("__unsafe_fn", Span::call_site()),
                     unsafety: parse_quote! { unsafe },
@@ -83,7 +84,7 @@ impl Specialization {
                             #[safe_inner]
                             #unsafe_sig
                             #block
-                            unsafe { __unsafe_fn(#(#args),*) }
+                            unsafe { __unsafe_fn(#(#args),*)#maybe_await }
                         }
                     }),
                 })
@@ -170,44 +171,44 @@ impl Dispatcher {
     }
 
     fn dispatcher_fn(&self) -> Result<ItemFn> {
-        let fn_ty = util::fn_type_from_signature(&self.sig);
         let fn_ty_params = self.sig.generics.type_params().collect::<Vec<_>>();
-        let feature_detection = {
-            let feature_mod_name = feature_mod_name(&self.sig.ident);
-            let return_if_detected =
-                self.specializations
-                    .iter()
-                    .map(|Specialization { target, .. }| {
-                        let target_arch = target.target_arch();
-                        let features_detected = target.features_detected();
-                        let function = feature_fn_name(Some(&target));
-                        quote! {
-                            #target_arch
-                            {
-                                if #features_detected {
-                                    return #feature_mod_name::#function
+        let argument_names = util::args_from_signature(&self.sig)?;
+        let block: Block = if fn_ty_params.is_empty() && self.sig.asyncness.is_none() {
+            let fn_ty = util::fn_type_from_signature(&self.sig);
+            let feature_detection = {
+                let feature_mod_name = feature_mod_name(&self.sig.ident);
+                let return_if_detected =
+                    self.specializations
+                        .iter()
+                        .map(|Specialization { target, .. }| {
+                            let target_arch = target.target_arch();
+                            let features_detected = target.features_detected();
+                            let function = feature_fn_name(Some(&target));
+                            quote! {
+                                #target_arch
+                                {
+                                    if #features_detected {
+                                        return #feature_mod_name::#function
+                                    }
                                 }
                             }
+                        });
+                let cfg_if_not_defaulted = self.cfg_if_not_defaulted();
+                let default_fn = feature_fn_name(None);
+                quote! {
+                    fn __get_fn<#(#fn_ty_params),*>() -> #fn_ty {
+                        #(#return_if_detected)*
+                        #cfg_if_not_defaulted
+                        {
+                            #feature_mod_name::#default_fn
                         }
-                    });
-            let cfg_if_not_defaulted = self.cfg_if_not_defaulted();
-            let default_fn = feature_fn_name(None);
-            quote! {
-                fn __get_fn<#(#fn_ty_params),*>() -> #fn_ty {
-                    #(#return_if_detected)*
-                    #cfg_if_not_defaulted
-                    {
-                        #feature_mod_name::#default_fn
-                    }
-                };
-            }
-        };
-        let resolver_signature = Signature {
-            ident: Ident::new("__resolver_fn", Span::call_site()),
-            ..self.sig.clone()
-        };
-        let argument_names = util::args_from_signature(&self.sig)?;
-        let block: Block = if fn_ty_params.is_empty() {
+                    };
+                }
+            };
+            let resolver_signature = Signature {
+                ident: Ident::new("__resolver_fn", Span::call_site()),
+                ..self.sig.clone()
+            };
             // Not a generic fn, so use a static atomic ptr
             parse_quote! {
                 {
@@ -228,12 +229,34 @@ impl Dispatcher {
                 }
             }
         } else {
-            // A generic, so just call it directly
+            // A generic, async, or impl Trait, so just call it directly
+            let maybe_await = self.sig.asyncness.map(|_| quote! { .await });
+            let feature_mod_name = feature_mod_name(&self.sig.ident);
+            let return_if_detected =
+                self.specializations
+                    .iter()
+                    .map(|Specialization { target, .. }| {
+                        let target_arch = target.target_arch();
+                        let features_detected = target.features_detected();
+                        let function = feature_fn_name(Some(&target));
+                        quote! {
+                            #target_arch
+                            {
+                                if #features_detected {
+                                    return #feature_mod_name::#function(#(#argument_names),*)#maybe_await
+                                }
+                            }
+                        }
+                    });
+            let cfg_if_not_defaulted = self.cfg_if_not_defaulted();
+            let default_fn = feature_fn_name(None);
             parse_quote! {
                 {
-                    #feature_detection
-                    let __current_fn = __get_fn();
-                    __current_fn(#(#argument_names),*)
+                    #(#return_if_detected)*
+                    #cfg_if_not_defaulted
+                    {
+                        #feature_mod_name::#default_fn(#(#argument_names),*)#maybe_await
+                    }
                 }
             }
         };
