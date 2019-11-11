@@ -35,6 +35,7 @@ rustversion = "1"
 [[bench]]
 name = "bench_main"
 harness = false
+path = "benches"
 
 [profile.bench]
 opt-level = 3
