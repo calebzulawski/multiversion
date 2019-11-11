@@ -2,18 +2,17 @@
 //! This crate provides the [`target`], [`target_clones`], and [`multiversion`] attributes for
 //! implementing function multiversioning.
 //!
-//! ```toml
-//! [dependencies]
-//! multiversion = "0.1"
-//! ```
-//!
 //! Many CPU architectures have a variety of instruction set extensions that provide additional
 //! functionality. Common examples are single instruction, multiple data (SIMD) extensions such as
 //! SSE and AVX on x86/x86-64 and NEON on ARM/AArch64. When available, these extended features can
 //! provide significant speed improvements to some functions. These optional features cannot be
 //! haphazardly compiled into programs–executing an unsupported instruction will result in a
-//! crash.  Function multiversioning is the practice of compiling multiple versions of a function
+//! crash.
+//!
+//! **Function multiversioning** is the practice of compiling multiple versions of a function
 //! with various features enabled and safely detecting which version to use at runtime.
+//!
+//! # Getting started
 //!
 //! If you are unsure where to start, the [`target_clones`] attribute requires no knowledge of SIMD
 //! beyond understanding the available instruction set extensions for your architecture.  For more
@@ -27,7 +26,7 @@
 //! location.
 //! * Functions that take or return `impl Trait` (other than `async`, which is supported).
 //!
-//! If any other functions do not work, please file an bug report.
+//! If any other functions do not work, please file a bug report.
 //!
 //! # Target specification strings
 //! Targets for the [`target`], [`target_clones`], and [`multiversion`] attributes are specified
@@ -94,7 +93,7 @@
 //!
 //! #[multiversion(
 //!     "[x86|x86_64]+avx" => square_avx,
-//!     "x86+sse" => square_sse
+//!     "x86+sse" => square_sse,
 //! )]
 //! fn square(x: &mut [f32]) {
 //!     for v in x {
@@ -157,12 +156,11 @@
 //!
 //! Some comments on the benefits of this implementation:
 //! * The function selector is only invoked once. Subsequent calls are reduced to an atomic load
-//! and indirect function call (for non-generic functions).
+//! and indirect function call (for non-generic, non-`async` functions). Generic and `async` functions
+//! cannot be stored in the atomic function pointer, which may result in additional branches.
 //! * If called in multiple threads, there is no contention. It is possible for two threads to hit
 //! the same function before function selection has completed, which results in each thread
 //! invoking the function selector, but the atomic ensures that these are synchronized correctly.
-//! * Generic functions cannot be stored in the atomic function pointer, which may result in
-//! additional branches.
 //!
 //! [`target`]: attr.target.html
 //! [`target_clones`]: attr.target_clones.html
