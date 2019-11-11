@@ -19,11 +19,11 @@ Function multiversioning is the practice of compiling multiple versions of a fun
 ## Features
 * Automatic dynamic dispatching, using runtime CPU feature detection
 * Static dispatching, allowing nested multiversioned functions to avoid repeating feature detection (and can be inlined!)
+* Support for generic and `async` functions
 
 ## Limitations
 * No support for member functions or associated functions (or any other functions not at module-level)
-* No support for `async` functions or any other function returning `impl Trait`
-Please see the documentation for more information and possible workarounds.
+* No support for `impl Trait`
 
 ## Example
 Automatic function multiversioning with the `target_clones` attribute, similar to GCC's `target_clones` attribute:
