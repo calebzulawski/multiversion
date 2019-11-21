@@ -51,7 +51,7 @@ pub(crate) fn make_multiversioned_fn(config: Config, func: ItemFn) -> Result<Tok
                     target: target.clone(),
                     block: parse_quote! {
                         {
-                            unsafe { #path(#(#args)*) }
+                            unsafe { #path(#(#args),*) }
                         }
                     },
                 },

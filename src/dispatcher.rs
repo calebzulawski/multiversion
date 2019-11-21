@@ -44,7 +44,7 @@ impl Specialization {
                         parse_quote! { #[doc(hidden)] },
                         target_attr,
                     ],
-                    vis: parse_quote! { pub },
+                    vis: parse_quote! { pub(super) },
                     sig: Signature {
                         ident: Ident::new(
                             &format!("__feature_{}", self.target.features_string()),
@@ -70,7 +70,7 @@ impl Specialization {
                         parse_quote! { #[doc(hidden)] },
                         self.target.target_arch(),
                     ],
-                    vis: parse_quote! { pub },
+                    vis: parse_quote! { pub(super) },
                     sig: Signature {
                         ident: Ident::new(
                             &format!("__feature_{}", self.target.features_string()),
@@ -97,7 +97,7 @@ impl Specialization {
                     parse_quote! { #[doc(hidden)] },
                     target_attr,
                 ],
-                vis: parse_quote! { pub },
+                vis: parse_quote! { pub(super) },
                 sig: Signature {
                     ident: feature_fn_name(None),
                     ..sig.clone()
@@ -153,7 +153,7 @@ impl Dispatcher {
                     parse_quote! { #[doc(hidden)] },
                     self.cfg_if_not_defaulted(),
                 ],
-                vis: parse_quote! { pub },
+                vis: parse_quote! { pub(super) },
                 sig: Signature {
                     ident: feature_fn_name(None),
                     ..self.sig.clone()
