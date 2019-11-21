@@ -6,23 +6,29 @@ use syn::{
     UseName, UsePath, UseRename, UseTree, Visibility,
 };
 
-fn feature_fn_name(target: Option<&Target>) -> Ident {
+fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
     if let Some(target) = target {
         if target.has_features_specified() {
             Ident::new(
-                &format!("__feature_{}", target.features_string()),
+                &format!(
+                    "__multiversion_{}_feature_{}",
+                    ident,
+                    target.features_string()
+                ),
                 Span::call_site(),
             )
         } else {
-            Ident::new("__default", Span::call_site())
+            Ident::new(
+                &format!("__multiversion_{}_default", ident),
+                Span::call_site(),
+            )
         }
     } else {
-        Ident::new("__default", Span::call_site())
+        Ident::new(
+            &format!("__multiversion_{}_default", ident),
+            Span::call_site(),
+        )
     }
-}
-
-fn feature_mod_name(ident: &Ident) -> Ident {
-    Ident::new(&format!("__static_dispatch_{}", ident), Span::call_site())
 }
 
 pub(crate) struct Specialization {
@@ -31,7 +37,7 @@ pub(crate) struct Specialization {
 }
 
 impl Specialization {
-    fn make_fn(&self, sig: &Signature) -> Result<ItemFn> {
+    fn make_fn(&self, vis: &Visibility, sig: &Signature) -> Result<ItemFn> {
         let target_string = self.target.target_string();
         let target_attr: Attribute = parse_quote! { #[multiversion::target(#target_string)] };
         // If features are specified, this isn't a default function
@@ -44,10 +50,14 @@ impl Specialization {
                         parse_quote! { #[doc(hidden)] },
                         target_attr,
                     ],
-                    vis: parse_quote! { pub(super) },
+                    vis: vis.clone(),
                     sig: Signature {
                         ident: Ident::new(
-                            &format!("__feature_{}", self.target.features_string()),
+                            &format!(
+                                "__multiversion_{}_feature_{}",
+                                &sig.ident,
+                                self.target.features_string()
+                            ),
                             Span::call_site(),
                         ),
                         ..sig.clone()
@@ -70,10 +80,14 @@ impl Specialization {
                         parse_quote! { #[doc(hidden)] },
                         self.target.target_arch(),
                     ],
-                    vis: parse_quote! { pub(super) },
+                    vis: vis.clone(),
                     sig: Signature {
                         ident: Ident::new(
-                            &format!("__feature_{}", self.target.features_string()),
+                            &format!(
+                                "__multiversion_{}_feature_{}",
+                                &sig.ident,
+                                self.target.features_string()
+                            ),
                             Span::call_site(),
                         ),
                         ..sig.clone()
@@ -97,9 +111,9 @@ impl Specialization {
                     parse_quote! { #[doc(hidden)] },
                     target_attr,
                 ],
-                vis: parse_quote! { pub(super) },
+                vis: vis.clone(),
                 sig: Signature {
-                    ident: feature_fn_name(None),
+                    ident: feature_fn_name(&sig.ident, None),
                     ..sig.clone()
                 },
                 block: Box::new(self.block.clone()),
@@ -142,7 +156,7 @@ impl Dispatcher {
         let mut fns = self
             .specializations
             .iter()
-            .map(|x| x.make_fn(&self.sig))
+            .map(|x| x.make_fn(&self.vis, &self.sig))
             .collect::<Result<Vec<_>>>()?;
 
         // Create default fn
@@ -153,9 +167,9 @@ impl Dispatcher {
                     parse_quote! { #[doc(hidden)] },
                     self.cfg_if_not_defaulted(),
                 ],
-                vis: parse_quote! { pub(super) },
+                vis: self.vis.clone(),
                 sig: Signature {
-                    ident: feature_fn_name(None),
+                    ident: feature_fn_name(&self.sig.ident, None),
                     ..self.sig.clone()
                 },
                 block: Box::new({
@@ -173,34 +187,34 @@ impl Dispatcher {
     fn dispatcher_fn(&self) -> Result<ItemFn> {
         let fn_ty_params = self.sig.generics.type_params().collect::<Vec<_>>();
         let argument_names = util::args_from_signature(&self.sig)?;
-        let block: Block = if fn_ty_params.is_empty() && self.sig.asyncness.is_none() {
+        let block: Block = if false {
+            //let block: Block = if fn_ty_params.is_empty() && self.sig.asyncness.is_none() {
             let fn_ty = util::fn_type_from_signature(&self.sig);
             let feature_detection = {
-                let feature_mod_name = feature_mod_name(&self.sig.ident);
                 let return_if_detected =
                     self.specializations
                         .iter()
                         .map(|Specialization { target, .. }| {
                             let target_arch = target.target_arch();
                             let features_detected = target.features_detected();
-                            let function = feature_fn_name(Some(&target));
+                            let function = feature_fn_name(&self.sig.ident, Some(&target));
                             quote! {
                                 #target_arch
                                 {
                                     if #features_detected {
-                                        return #feature_mod_name::#function
+                                        return #function
                                     }
                                 }
                             }
                         });
                 let cfg_if_not_defaulted = self.cfg_if_not_defaulted();
-                let default_fn = feature_fn_name(None);
+                let default_fn = feature_fn_name(&self.sig.ident, None);
                 quote! {
                     fn __get_fn<#(#fn_ty_params),*>() -> #fn_ty {
                         #(#return_if_detected)*
                         #cfg_if_not_defaulted
                         {
-                            #feature_mod_name::#default_fn
+                            #default_fn
                         }
                     };
                 }
@@ -231,31 +245,30 @@ impl Dispatcher {
         } else {
             // A generic, async, or impl Trait, so just call it directly
             let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
-            let feature_mod_name = feature_mod_name(&self.sig.ident);
             let return_if_detected =
                 self.specializations
                     .iter()
                     .map(|Specialization { target, .. }| {
                         let target_arch = target.target_arch();
                         let features_detected = target.features_detected();
-                        let function = feature_fn_name(Some(&target));
+                        let function = feature_fn_name(&self.sig.ident, Some(&target));
                         quote! {
                             #target_arch
                             {
                                 if #features_detected {
-                                    return #feature_mod_name::#function(#(#argument_names),*)#maybe_await
+                                    return #function(#(#argument_names),*)#maybe_await
                                 }
                             }
                         }
                     });
             let cfg_if_not_defaulted = self.cfg_if_not_defaulted();
-            let default_fn = feature_fn_name(None);
+            let default_fn = feature_fn_name(&self.sig.ident, None);
             parse_quote! {
                 {
                     #(#return_if_detected)*
                     #cfg_if_not_defaulted
                     {
-                        #feature_mod_name::#default_fn(#(#argument_names),*)#maybe_await
+                        #default_fn(#(#argument_names),*)#maybe_await
                     }
                 }
             }
@@ -271,16 +284,10 @@ impl Dispatcher {
 
 impl ToTokens for Dispatcher {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let vis = &self.vis;
-        let mod_name = feature_mod_name(&self.sig.ident);
         let feature_fns = self.feature_fns().unwrap();
         let dispatcher_fn = self.dispatcher_fn().unwrap();
         tokens.extend(quote! {
-            #[doc(hidden)]
-            #vis mod #mod_name {
-                use super::*;
-                #(#feature_fns)*
-            }
+            #(#feature_fns)*
             #dispatcher_fn
         });
     }
@@ -298,12 +305,11 @@ impl StaticDispatchVisitor {
             rename: &Ident,
             target: Option<&Target>,
         ) -> ItemUse {
-            let mod_name = feature_mod_name(&name);
-            let fn_name = feature_fn_name(target);
+            let fn_name = feature_fn_name(&name, target);
             if idents.is_empty() {
-                parse_quote! { use #mod_name::#fn_name as #rename; }
+                parse_quote! { use #fn_name as #rename; }
             } else {
-                parse_quote! { use #(#idents)::*::#mod_name::#fn_name as #rename; }
+                parse_quote! { use #(#idents)::*::#fn_name as #rename; }
             }
         }
         fn detail<'a>(
