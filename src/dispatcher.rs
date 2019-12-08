@@ -66,6 +66,7 @@ impl Specialization {
                 })
             } else {
                 // If the function isn't unsafe, nest an unsafe fn in it
+                let fn_params = crate::util::fn_params(&sig);
                 let maybe_await = sig.asyncness.map(|_| util::await_tokens());
                 let unsafe_sig = Signature {
                     ident: Ident::new("__unsafe_fn", Span::call_site()),
@@ -98,7 +99,7 @@ impl Specialization {
                             #[safe_inner]
                             #unsafe_sig
                             #block
-                            unsafe { __unsafe_fn(#(#args),*)#maybe_await }
+                            unsafe { __unsafe_fn::<#(#fn_params),*>(#(#args),*)#maybe_await }
                         }
                     }),
                 })
@@ -185,10 +186,9 @@ impl Dispatcher {
     }
 
     fn dispatcher_fn(&self) -> Result<ItemFn> {
-        let fn_ty_params = self.sig.generics.type_params().collect::<Vec<_>>();
+        let fn_params = crate::util::fn_params(&self.sig);
         let argument_names = util::args_from_signature(&self.sig)?;
-        let block: Block = if false {
-            //let block: Block = if fn_ty_params.is_empty() && self.sig.asyncness.is_none() {
+        let block: Block = if fn_params.is_empty() && self.sig.asyncness.is_none() {
             let fn_ty = util::fn_type_from_signature(&self.sig);
             let feature_detection = {
                 let return_if_detected =
@@ -210,7 +210,7 @@ impl Dispatcher {
                 let cfg_if_not_defaulted = self.cfg_if_not_defaulted();
                 let default_fn = feature_fn_name(&self.sig.ident, None);
                 quote! {
-                    fn __get_fn<#(#fn_ty_params),*>() -> #fn_ty {
+                    fn __get_fn<#(#fn_params),*>() -> #fn_ty {
                         #(#return_if_detected)*
                         #cfg_if_not_defaulted
                         {
@@ -256,7 +256,7 @@ impl Dispatcher {
                             #target_arch
                             {
                                 if #features_detected {
-                                    return #function(#(#argument_names),*)#maybe_await
+                                    return #function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
                                 }
                             }
                         }
@@ -268,7 +268,7 @@ impl Dispatcher {
                     #(#return_if_detected)*
                     #cfg_if_not_defaulted
                     {
-                        #default_fn(#(#argument_names),*)#maybe_await
+                        #default_fn::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
                     }
                 }
             }

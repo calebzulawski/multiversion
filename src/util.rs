@@ -1,8 +1,8 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    parse_quote, visit_mut::VisitMut, Error, FnArg, Ident, Lifetime, Pat, Result, Signature,
-    TypeBareFn,
+    parse_quote, visit_mut::VisitMut, Error, FnArg, GenericParam, Ident, Lifetime, Pat, Result,
+    Signature, TypeBareFn,
 };
 
 pub(crate) fn args_from_signature<'a>(sig: &'a Signature) -> Result<Vec<&'a Pat>> {
@@ -42,6 +42,18 @@ pub(crate) fn fn_type_from_signature(sig: &Signature) -> TypeBareFn {
     };
     LifetimeRenamer {}.visit_type_bare_fn_mut(&mut fn_ty);
     fn_ty
+}
+
+pub(crate) fn fn_params(sig: &Signature) -> Vec<Ident> {
+    sig.generics
+        .params
+        .iter()
+        .filter_map(|x| match x {
+            GenericParam::Type(ty) => Some(ty.ident.clone()),
+            GenericParam::Const(c) => Some(c.ident.clone()),
+            _ => None,
+        })
+        .collect()
 }
 
 pub(crate) fn await_tokens() -> TokenStream {

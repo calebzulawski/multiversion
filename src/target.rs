@@ -244,6 +244,7 @@ pub(crate) fn make_target_fn(config: Config, mut func: ItemFn) -> Result<TokenSt
         let block = func.block;
         let safe_ident = &safe_sig.ident;
         let args = crate::util::args_from_signature(&unsafe_sig)?;
+        let fn_params = crate::util::fn_params(&unsafe_sig);
         Ok(quote! {
             #target_arch
             #(#target_feature)*
@@ -251,7 +252,7 @@ pub(crate) fn make_target_fn(config: Config, mut func: ItemFn) -> Result<TokenSt
             #vis #unsafe_sig {
                 #[inline(always)]
                 #safe_sig #block
-                #safe_ident(#(#args),*)#maybe_await
+                #safe_ident::<#(#fn_params),*>(#(#args),*)#maybe_await
             }
         })
     } else {

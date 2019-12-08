@@ -39,6 +39,7 @@ impl Parse for Config {
 
 pub(crate) fn make_multiversioned_fn(config: Config, func: ItemFn) -> Result<TokenStream> {
     let args = util::args_from_signature(&func.sig)?;
+    let fn_params = util::fn_params(&func.sig);
     Ok(Dispatcher {
         attrs: func.attrs,
         vis: func.vis,
@@ -51,7 +52,7 @@ pub(crate) fn make_multiversioned_fn(config: Config, func: ItemFn) -> Result<Tok
                     target: target.clone(),
                     block: parse_quote! {
                         {
-                            unsafe { #path(#(#args),*) }
+                            unsafe { #path::<#(#fn_params),*>(#(#args),*) }
                         }
                     },
                 },
