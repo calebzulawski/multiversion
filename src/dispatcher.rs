@@ -41,89 +41,58 @@ impl Specialization {
     fn make_fn(&self, vis: &Visibility, sig: &Signature) -> Result<ItemFn> {
         let target_string = self.target.target_string();
         let target_attr: Attribute = parse_quote! { #[multiversion::target(#target_string)] };
-        // If features are specified, this isn't a default function
-        if self.target.has_features_specified() {
-            if sig.unsafety.is_some() {
-                // If the function is already unsafe, just tag it with the target attribute
-                Ok(ItemFn {
-                    attrs: vec![
-                        parse_quote! { #[inline] },
-                        parse_quote! { #[doc(hidden)] },
-                        target_attr,
-                    ],
-                    vis: vis.clone(),
-                    sig: Signature {
-                        ident: Ident::new(
-                            &format!(
-                                "__multiversion_{}_feature_{}",
-                                &sig.ident,
-                                self.target.features_string()
-                            ),
-                            Span::call_site(),
-                        ),
-                        ..sig.clone()
-                    },
-                    block: Box::new(self.block.clone()),
-                })
-            } else {
-                // If the function isn't unsafe, nest an unsafe fn in it
-                let fn_params = crate::util::fn_params(&sig);
-                let maybe_await = sig.asyncness.map(|_| util::await_tokens());
-                let unsafe_sig = Signature {
-                    ident: Ident::new("__unsafe_fn", Span::call_site()),
-                    unsafety: parse_quote! { unsafe },
-                    ..if self.normalize {
-                        crate::util::normalize_signature(sig)?
-                    } else {
-                        sig.clone()
-                    }
-                };
-                let outer_sig = Signature {
-                    ident: Ident::new(
-                        &format!(
-                            "__multiversion_{}_feature_{}",
-                            &sig.ident,
-                            self.target.features_string()
-                        ),
-                        Span::call_site(),
-                    ),
-                    ..crate::util::normalize_signature(sig)?
-                };
-                let args = util::args_from_signature(&outer_sig)?;
-                let block = &self.block;
-                Ok(ItemFn {
-                    attrs: vec![
-                        parse_quote! { #[inline(always)] },
-                        parse_quote! { #[doc(hidden)] },
-                        self.target.target_arch(),
-                    ],
-                    vis: vis.clone(),
-                    block: Box::new(parse_quote! {
-                        {
-                            #target_attr
-                            #[safe_inner]
-                            #unsafe_sig
-                            #block
-                            unsafe { __unsafe_fn::<#(#fn_params),*>(#(#args),*)#maybe_await }
-                        }
-                    }),
-                    sig: outer_sig,
-                })
-            }
-        } else {
-            // If no features are specified, this is just a default fn for a specific arch
+        let fn_name = feature_fn_name(&sig.ident, Some(&self.target));
+        if sig.unsafety.is_some() {
+            // If the function is already unsafe, just tag it with the target attribute
             Ok(ItemFn {
                 attrs: vec![
-                    parse_quote! { #[inline(always)] },
+                    parse_quote! { #[inline] },
                     parse_quote! { #[doc(hidden)] },
                     target_attr,
                 ],
                 vis: vis.clone(),
                 sig: Signature {
-                    ident: feature_fn_name(&sig.ident, None),
+                    ident: fn_name,
                     ..sig.clone()
                 },
                 block: Box::new(self.block.clone()),
+            })
+        } else {
+            // If the function isn't unsafe, nest an unsafe fn in it
+            let fn_params = crate::util::fn_params(&sig);
+            let maybe_await = sig.asyncness.map(|_| util::await_tokens());
+            let unsafe_sig = Signature {
+                ident: Ident::new("__unsafe_fn", Span::call_site()),
+                unsafety: parse_quote! { unsafe },
+                ..if self.normalize {
+                    crate::util::normalize_signature(sig)?
+                } else {
+                    sig.clone()
+                }
+            };
+            let outer_sig = Signature {
+                ident: fn_name,
+                ..crate::util::normalize_signature(sig)?
+            };
+            let args = util::args_from_signature(&outer_sig)?;
+            let block = &self.block;
+            Ok(ItemFn {
+                attrs: vec![
+                    parse_quote! { #[inline(always)] },
+                    parse_quote! { #[doc(hidden)] },
+                    self.target.target_arch(),
+                ],
+                vis: vis.clone(),
+                block: Box::new(parse_quote! {
+                    {
+                        #target_attr
+                        #[safe_inner]
+                        #unsafe_sig
+                        #block
+                        unsafe { __unsafe_fn::<#(#fn_params),*>(#(#args),*)#maybe_await }
+                    }
+                }),
+                sig: outer_sig,
             })
         }
     }
@@ -201,17 +170,21 @@ impl Dispatcher {
                 let return_if_detected =
                     self.specializations
                         .iter()
-                        .map(|Specialization { target, .. }| {
-                            let target_arch = target.target_arch();
-                            let features_detected = target.features_detected();
-                            let function = feature_fn_name(&self.sig.ident, Some(&target));
-                            quote! {
-                                #target_arch
-                                {
-                                    if #features_detected {
-                                        return #function
+                        .filter_map(|Specialization { target, .. }| {
+                            if target.has_features_specified() {
+                                let target_arch = target.target_arch();
+                                let features_detected = target.features_detected();
+                                let function = feature_fn_name(&self.sig.ident, Some(&target));
+                                Some(quote! {
+                                    #target_arch
+                                    {
+                                        if #features_detected {
+                                            return #function
+                                        }
                                     }
-                                }
+                                })
+                            } else {
+                                None
                             }
                         });
                 let default_fn = feature_fn_name(&self.sig.ident, None);
@@ -251,28 +224,28 @@ impl Dispatcher {
             let return_if_detected =
                 self.specializations
                     .iter()
-                    .map(|Specialization { target, .. }| {
-                        let target_arch = target.target_arch();
-                        let features_detected = target.features_detected();
-                        let function = feature_fn_name(&self.sig.ident, Some(&target));
-                        quote! {
-                            #target_arch
-                            {
-                                if #features_detected {
-                                    return #function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
+                    .filter_map(|Specialization { target, .. }| {
+                        if target.has_features_specified() {
+                            let target_arch = target.target_arch();
+                            let features_detected = target.features_detected();
+                            let function = feature_fn_name(&self.sig.ident, Some(&target));
+                            Some(quote! {
+                                #target_arch
+                                {
+                                    if #features_detected {
+                                        return #function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
+                                    }
                                 }
-                            }
+                            })
+                        } else {
+                            None
                         }
                     });
-            let cfg_if_not_defaulted = self.cfg_if_not_defaulted();
             let default_fn = feature_fn_name(&self.sig.ident, None);
             parse_quote! {
                 {
                     #(#return_if_detected)*
-                    #cfg_if_not_defaulted
-                    {
-                        #default_fn::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
-                    }
+                    #default_fn::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
                 }
             }
         };
