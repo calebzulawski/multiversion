@@ -12,7 +12,7 @@ fn test_fn_safe(a: i64) -> i64 {
 }
 
 #[multiversion(
-    "x86_64+avx2" => test_fn_unsafe,
+    "x86_64+avx2" => unsafe test_fn_unsafe,
     "x86_64" => test_fn_safe
 )]
 pub fn pub_test_fn(a: i64) -> i64 {
@@ -21,7 +21,7 @@ pub fn pub_test_fn(a: i64) -> i64 {
 }
 
 #[multiversion(
-    "x86_64+avx2" => test_fn_unsafe,
+    "x86_64+avx2" => unsafe test_fn_unsafe,
     "x86_64" => test_fn_safe
 )]
 fn priv_test_fn(a: i64) -> i64 {

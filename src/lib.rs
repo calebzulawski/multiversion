@@ -92,8 +92,8 @@
 //! }
 //!
 //! #[multiversion(
-//!     "[x86|x86_64]+avx" => square_avx,
-//!     "x86+sse" => square_sse,
+//!     "[x86|x86_64]+avx" => unsafe square_avx,
+//!     "x86+sse" => unsafe square_sse,
 //! )]
 //! fn square(x: &mut [f32]) {
 //!     for v in x {
@@ -189,10 +189,12 @@ use syn::{parse_macro_input, ItemFn};
 ///
 /// # Safety
 /// Functions compiled with the `target_feature` attribute must be marked unsafe, since calling
-/// them on an unsupported CPU results in a crash.  The `multiversion` attribute will produce a safe
-/// function that calls `unsafe` function versions, and the safety contract is fulfilled as long as
-/// your specified targets are correct.  If your function versions are `unsafe` for any other
-/// reason, you must remember to mark your tagged function `unsafe` as well.
+/// them on an unsupported CPU results in a crash.  To dispatch an `unsafe` function version from a
+/// safe function using the `multiversion` macro, the `unsafe` functions must be tagged as such. The
+/// `multiversion` attribute will produce a safe function that calls `unsafe` function versions, and
+/// the safety contract is fulfilled as long as your specified targets are correct.  If your
+/// function versions are `unsafe` for any other reason, you must remember to mark your
+/// multiversioned function `unsafe` as well.
 ///
 /// # Examples
 /// ## A simple feature-specific function
@@ -247,9 +249,9 @@ use syn::{parse_macro_input, ItemFn};
 /// }
 ///
 /// #[multiversion(
-///     "[x86|x86_64]+avx" => where_am_i_avx,
-///     "x86+sse" => where_am_i_sse,
-///     "[arm|aarch64]+neon" => where_am_i_neon
+///     "[x86|x86_64]+avx" => unsafe where_am_i_avx,
+///     "x86+sse" => unsafe where_am_i_sse,
+///     "[arm|aarch64]+neon" => unsafe where_am_i_neon
 /// )]
 /// fn where_am_i() {
 ///     println!("generic");

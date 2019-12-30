@@ -9,7 +9,7 @@ unsafe fn destructure_tuple_avx((x, y): (i64, i64)) -> (i64, i64) {
 }
 
 #[multiversion::multiversion(
-    "[x86|x86_64]+avx" => destructure_tuple_avx
+    "[x86|x86_64]+avx" => unsafe destructure_tuple_avx
 )]
 fn destructure_tuple_multiversion((x, y): (i64, i64)) -> (i64, i64) {
     (x, y)
@@ -21,7 +21,7 @@ unsafe fn destructure_struct_avx(Foo { bar, baz }: Foo) -> (i64, i64) {
 }
 
 #[multiversion::multiversion(
-    "[x86|x86_64]+avx" => destructure_struct_avx
+    "[x86|x86_64]+avx" => unsafe destructure_struct_avx
 )]
 fn destructure_struct_multiversion(Foo { bar, baz }: Foo) -> (i64, i64) {
     (bar, baz)

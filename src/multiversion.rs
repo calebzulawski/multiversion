@@ -11,6 +11,7 @@ use syn::{
 pub(crate) struct Specialization {
     target: Target,
     _fat_arrow_token: token::FatArrow,
+    unsafety: Option<token::Unsafe>,
     path: Path,
 }
 
@@ -20,6 +21,7 @@ impl Parse for Specialization {
         Ok(Self {
             target: Target::parse(&target_str)?,
             _fat_arrow_token: input.parse()?,
+            unsafety: input.parse()?,
             path: input.parse()?,
         })
     }
@@ -49,11 +51,24 @@ pub(crate) fn make_multiversioned_fn(config: Config, func: ItemFn) -> Result<Tok
             .specializations
             .iter()
             .map(
-                |Specialization { target, path, .. }| crate::dispatcher::Specialization {
+                |Specialization {
+                     target,
+                     path,
+                     unsafety,
+                     ..
+                 }| crate::dispatcher::Specialization {
                     target: target.clone(),
-                    block: parse_quote! {
-                        {
-                            unsafe { #path::<#(#fn_params),*>(#(#args),*) }
+                    block: if unsafety.is_some() {
+                        parse_quote! {
+                            {
+                                unsafe { #path::<#(#fn_params),*>(#(#args),*) }
+                            }
+                        }
+                    } else {
+                        parse_quote! {
+                            {
+                                #path::<#(#fn_params),*>(#(#args),*)
+                            }
                         }
                     },
                     normalize: true,
