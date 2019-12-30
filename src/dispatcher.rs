@@ -2,8 +2,8 @@ use crate::{target::Target, util};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
-    parse_quote, visit_mut::VisitMut, Attribute, Block, Ident, ItemFn, ItemUse, Result, Signature,
-    UseName, UsePath, UseRename, UseTree, Visibility,
+    parse_quote, visit_mut::VisitMut, Attribute, Block, Ident, ItemFn, ItemUse, Lit, Meta,
+    MetaNameValue, NestedMeta, Result, Signature, UseName, UsePath, UseRename, UseTree, Visibility,
 };
 
 fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
@@ -151,7 +151,7 @@ impl Dispatcher {
                 block: Box::new({
                     // Rewrite static dispatches, since this doesn't use the target attribute
                     let mut block = self.default.clone();
-                    StaticDispatchVisitor { target: None }.visit_block_mut(&mut block);
+                    HelperAttributeVisitor { target: None }.visit_block_mut(&mut block);
                     block
                 }),
             }
@@ -269,11 +269,11 @@ impl ToTokens for Dispatcher {
     }
 }
 
-pub(crate) struct StaticDispatchVisitor {
+pub(crate) struct HelperAttributeVisitor {
     pub target: Option<Target>,
 }
 
-impl StaticDispatchVisitor {
+impl HelperAttributeVisitor {
     fn rebuild_use_tree(&self, tree: &UseTree) -> ItemUse {
         fn finish(
             idents: Vec<&Ident>,
@@ -307,15 +307,69 @@ impl StaticDispatchVisitor {
         }
         detail(tree, Vec::new(), self.target.as_ref())
     }
+
+    fn target_cfg_value(&self, nested: &NestedMeta) -> bool {
+        match nested {
+            NestedMeta::Meta(meta) => match meta {
+                Meta::Path(_) => panic!("not expecting path"),
+                Meta::NameValue(MetaNameValue { path, lit, .. }) => {
+                    if path.is_ident("target") {
+                        if let Lit::Str(s) = lit {
+                            let test_target = Some(Target::parse(s).unwrap());
+                            test_target == self.target
+                        } else {
+                            panic!("expected string literal")
+                        }
+                    } else {
+                        panic!("unknown key");
+                    }
+                }
+                Meta::List(list) => {
+                    if list.path.is_ident("not") {
+                        assert_eq!(
+                            list.nested.len(),
+                            1,
+                            "expected a single target_cfg predicate"
+                        );
+                        !self.target_cfg_value(list.nested.first().unwrap())
+                    } else if list.path.is_ident("any") {
+                        list.nested.iter().any(|x| self.target_cfg_value(x))
+                    } else if list.path.is_ident("all") {
+                        list.nested.iter().all(|x| self.target_cfg_value(x))
+                    } else {
+                        panic!("unknown path");
+                    }
+                }
+            },
+            NestedMeta::Lit(_) => panic!("not expecting literal"),
+        }
+    }
 }
 
-impl VisitMut for StaticDispatchVisitor {
+impl VisitMut for HelperAttributeVisitor {
     fn visit_item_use_mut(&mut self, i: &mut ItemUse) {
         let before = i.attrs.len();
         i.attrs
             .retain(|attr| *attr != parse_quote! { #[static_dispatch] });
         if i.attrs.len() < before {
             *i = self.rebuild_use_tree(&i.tree);
+        }
+    }
+
+    fn visit_attribute_mut(&mut self, i: &mut Attribute) {
+        if let Ok(Meta::List(list)) = i.parse_meta() {
+            if list.path.is_ident("target_cfg") {
+                assert_eq!(
+                    list.nested.len(),
+                    1,
+                    "expected a single target_cfg predicate"
+                );
+                *i = if self.target_cfg_value(list.nested.first().unwrap()) {
+                    parse_quote! { #[cfg(not(any()))] }
+                } else {
+                    parse_quote! { #[cfg(any())] }
+                };
+            }
         }
     }
 }

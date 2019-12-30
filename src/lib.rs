@@ -147,6 +147,31 @@
 //! # }
 //! ```
 //!
+//! # Conditional compilation
+//! The `#[cfg]` attribute allows conditional compilation based on the target architecture and
+//! features, however this does not take into account additional features specified by
+//! `#[target_feature]`.  In this scenario, the `#[target_cfg]` helper attribute provides
+//! conditional compilation in functions tagged with [`target_clones`] or [`target`].
+//!
+//! The `#[target_cfg]` supports `all`, `any`, and `not` (just like `#[cfg]`) and supports the
+//! following keys:
+//! * `target`: takes a target specification string as a value and is true if the target matches
+//! the function's target
+//!
+//! ```
+//! #[multiversion::target_clones("[x86|x86_64]+avx", "[arm|aarch64]+neon")]
+//! fn print_arch() {
+//!     #[target_cfg(target = "[x86|x86_64]+avx")]
+//!     println!("avx");
+//!
+//!     #[target_cfg(target = "[arm|aarch64]+neon")]
+//!     println!("neon");
+//!
+//!     #[target_cfg(not(any(target = "[x86|x86_64]+avx", target = "[arm|aarch64]+neon")))]
+//!     println!("generic");
+//! }
+//! ```
+//!
 //! # Implementation details
 //! The function version dispatcher consists of a function selector and an atomic function pointer.
 //! Initially the function pointer will point to the function selector. On invocation, this selector
@@ -312,10 +337,16 @@ pub fn multiversion(
 /// Additionally, functions called inside the function may be statically dispatched. See
 /// [static dispatching] for more information.
 ///
+/// # Conditional compilation
+/// The [`target_clones`] attribute supports the `#[target_cfg]` helper macro to provide
+/// conditional compilation for each function clone.  See [conditional compilation] for more
+/// information.
+///
 /// [`target`]: attr.target.html
 /// [`target_clones`]: attr.target_clones.html
 /// [`multiversion`]: attr.multiversion.html
 /// [static dispatching]: index.html#static-dispatching
+/// [conditional compilation]: index.html#conditional-compilation
 #[proc_macro_attribute]
 pub fn target_clones(
     attr: proc_macro::TokenStream,
@@ -343,10 +374,15 @@ pub fn target_clones(
 /// The [`target`] attribute allows functions called inside the function to be statically dispatched.
 /// See [static dispatching] for more information.
 ///
+/// # Conditional compilation
+/// The [`target`] attribute supports conditional compilation with the `#[target_cfg]` helper
+/// attribute. See [conditional compilation] for more information.
+///
 /// [`target`]: attr.target.html
 /// [`target_clones`]: attr.target_clones.html
 /// [`multiversion`]: attr.multiversion.html
 /// [static dispatching]: index.html#static-dispatching
+/// [conditional compilation]: index.html#conditional-compilation
 #[proc_macro_attribute]
 pub fn target(
     attr: proc_macro::TokenStream,

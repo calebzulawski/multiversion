@@ -1,4 +1,4 @@
-use crate::dispatcher::StaticDispatchVisitor;
+use crate::dispatcher::HelperAttributeVisitor;
 use crate::util;
 use once_cell::sync::Lazy;
 use proc_macro2::{Span, TokenStream};
@@ -63,7 +63,7 @@ impl Architecture {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Target {
     architectures: Vec<Architecture>,
     features: Vec<String>,
@@ -202,7 +202,7 @@ impl Parse for Config {
 
 pub(crate) fn make_target_fn(config: Config, mut func: ItemFn) -> Result<TokenStream> {
     // Rewrite static dispatches
-    StaticDispatchVisitor {
+    HelperAttributeVisitor {
         target: Some(config.target.clone()),
     }
     .visit_block_mut(&mut func.block);
