@@ -34,6 +34,7 @@ fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
 pub(crate) struct Specialization {
     pub target: Target,
     pub block: Block,
+    pub normalize: bool,
 }
 
 impl Specialization {
@@ -71,9 +72,24 @@ impl Specialization {
                 let unsafe_sig = Signature {
                     ident: Ident::new("__unsafe_fn", Span::call_site()),
                     unsafety: parse_quote! { unsafe },
-                    ..sig.clone()
+                    ..if self.normalize {
+                        crate::util::normalize_signature(sig)?
+                    } else {
+                        sig.clone()
+                    }
                 };
-                let args = util::args_from_signature(sig)?;
+                let outer_sig = Signature {
+                    ident: Ident::new(
+                        &format!(
+                            "__multiversion_{}_feature_{}",
+                            &sig.ident,
+                            self.target.features_string()
+                        ),
+                        Span::call_site(),
+                    ),
+                    ..crate::util::normalize_signature(sig)?
+                };
+                let args = util::args_from_signature(&outer_sig)?;
                 let block = &self.block;
                 Ok(ItemFn {
                     attrs: vec![
@@ -82,17 +98,6 @@ impl Specialization {
                         self.target.target_arch(),
                     ],
                     vis: vis.clone(),
-                    sig: Signature {
-                        ident: Ident::new(
-                            &format!(
-                                "__multiversion_{}_feature_{}",
-                                &sig.ident,
-                                self.target.features_string()
-                            ),
-                            Span::call_site(),
-                        ),
-                        ..sig.clone()
-                    },
                     block: Box::new(parse_quote! {
                         {
                             #target_attr
@@ -102,6 +107,7 @@ impl Specialization {
                             unsafe { __unsafe_fn::<#(#fn_params),*>(#(#args),*)#maybe_await }
                         }
                     }),
+                    sig: outer_sig,
                 })
             }
         } else {
@@ -186,10 +192,11 @@ impl Dispatcher {
     }
 
     fn dispatcher_fn(&self) -> Result<ItemFn> {
-        let fn_params = crate::util::fn_params(&self.sig);
-        let argument_names = util::args_from_signature(&self.sig)?;
+        let fn_params = util::fn_params(&self.sig);
+        let normalized_signature = util::normalize_signature(&self.sig)?;
+        let argument_names = util::args_from_signature(&normalized_signature)?;
         let block: Block = if fn_params.is_empty() && self.sig.asyncness.is_none() {
-            let fn_ty = util::fn_type_from_signature(&self.sig);
+            let fn_ty = util::fn_type_from_signature(&self.sig)?;
             let feature_detection = {
                 let return_if_detected =
                     self.specializations
@@ -207,21 +214,17 @@ impl Dispatcher {
                                 }
                             }
                         });
-                let cfg_if_not_defaulted = self.cfg_if_not_defaulted();
                 let default_fn = feature_fn_name(&self.sig.ident, None);
                 quote! {
                     fn __get_fn<#(#fn_params),*>() -> #fn_ty {
                         #(#return_if_detected)*
-                        #cfg_if_not_defaulted
-                        {
-                            #default_fn
-                        }
+                        #default_fn
                     };
                 }
             };
             let resolver_signature = Signature {
                 ident: Ident::new("__resolver_fn", Span::call_site()),
-                ..self.sig.clone()
+                ..normalized_signature.clone()
             };
             // Not a generic fn, so use a static atomic ptr
             parse_quote! {
@@ -276,7 +279,7 @@ impl Dispatcher {
         Ok(ItemFn {
             attrs: self.attrs.clone(),
             vis: self.vis.clone(),
-            sig: self.sig.clone(),
+            sig: normalized_signature,
             block: Box::new(block),
         })
     }

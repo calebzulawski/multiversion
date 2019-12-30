@@ -28,6 +28,7 @@ pub(crate) fn make_target_clones_fn(config: Config, func: ItemFn) -> TokenStream
         .map(|target| Specialization {
             target: target.clone(),
             block: func.block.as_ref().clone(),
+            normalize: false,
         })
         .collect();
     let dispatcher = Dispatcher {

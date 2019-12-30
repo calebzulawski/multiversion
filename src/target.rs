@@ -235,7 +235,7 @@ pub(crate) fn make_target_fn(config: Config, mut func: ItemFn) -> Result<TokenSt
     if let Some(safe_inner_span) = safe_inner_span {
         let attrs = func.attrs;
         let vis = func.vis;
-        let unsafe_sig = &func.sig;
+        let unsafe_sig = crate::util::normalize_signature(&func.sig)?;
         let safe_sig = Signature {
             unsafety: None,
             ident: Ident::new("__safe_inner_fn", safe_inner_span),
