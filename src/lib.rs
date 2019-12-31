@@ -153,8 +153,8 @@
 //! `#[target_feature]`.  In this scenario, the `#[target_cfg]` helper attribute provides
 //! conditional compilation in functions tagged with [`target_clones`] or [`target`].
 //!
-//! The `#[target_cfg]` supports `all`, `any`, and `not` (just like `#[cfg]`) and supports the
-//! following keys:
+//! The `#[target_cfg]` attribute supports `all`, `any`, and `not` (just like `#[cfg]`) and
+//! supports the following keys:
 //! * `target`: takes a target specification string as a value and is true if the target matches
 //! the function's target
 //!
@@ -338,7 +338,7 @@ pub fn multiversion(
 /// [static dispatching] for more information.
 ///
 /// # Conditional compilation
-/// The [`target_clones`] attribute supports the `#[target_cfg]` helper macro to provide
+/// The [`target_clones`] attribute supports the `#[target_cfg]` helper attribute to provide
 /// conditional compilation for each function clone.  See [conditional compilation] for more
 /// information.
 ///
