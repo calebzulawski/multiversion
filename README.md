@@ -1,7 +1,6 @@
 Multiversion
 ============
-[![Build Status](https://api.travis-ci.org/calebzulawski/multiversion.svg?branch=master)](https://travis-ci.org/calebzulawski/multiversion)
-[![Build Status](https://ci.appveyor.com/api/projects/status/vy6xkr2073dpf4xu/branch/master?svg=true)](https://ci.appveyor.com/project/calebzulawski/multiversion/branch/master)
+[![Build Status](https://img.shields.io/github/workflow/status/calebzulawski/multiversion/CI)](https://github.com/calebzulawski/multiversion/actions)
 [![Rustc Version 1.31+](https://img.shields.io/badge/rustc-1.31+-lightgray.svg)](https://blog.rust-lang.org/2018/12/06/Rust-1.31-and-rust-2018.html)
 [![License](https://img.shields.io/crates/l/multiversion)](https://crates.io/crates/multiversion)
 [![Crates.io](https://img.shields.io/crates/v/multiversion)](https://crates.io/crates/multiversion)
