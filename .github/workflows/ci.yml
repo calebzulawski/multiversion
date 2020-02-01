@@ -1,0 +1,30 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version:
+          - 1.31.0
+          - stable
+          - beta
+          - nightly
+        features:
+          - --all-features
+          - --no-default-features
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.version }}
+        default: true
+        profile: minimal 
+    - name: Build
+      run: cargo build --verbose ${{ matrix.features }}
+    - name: Run tests
+      run: cargo test --verbose ${{ matrix.features }}
