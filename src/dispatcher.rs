@@ -164,7 +164,14 @@ impl Dispatcher {
         let fn_params = util::fn_params(&self.sig);
         let normalized_signature = util::normalize_signature(&self.sig)?;
         let argument_names = util::args_from_signature(&normalized_signature)?;
-        let block: Block = if fn_params.is_empty() && self.sig.asyncness.is_none() {
+        let block: Block = if cfg!(feature = "runtime_dispatch")
+            && fn_params.is_empty()
+            && self.sig.asyncness.is_none()
+        {
+            // Dispatching from an atomic fn pointer occurs when the following is true:
+            //   * runtime-dispatching is enabled
+            //   * the function is not generic
+            //   * the function is not async
             let fn_ty = util::fn_type_from_signature(&self.sig)?;
             let feature_detection = {
                 let return_if_detected =
@@ -199,10 +206,9 @@ impl Dispatcher {
                 ident: Ident::new("__resolver_fn", Span::call_site()),
                 ..normalized_signature.clone()
             };
-            // Not a generic fn, so use a static atomic ptr
             parse_quote! {
                 {
-                    use std::sync::atomic::{AtomicPtr, Ordering};
+                    use core::sync::atomic::{AtomicPtr, Ordering};
                     #[cold]
                     #resolver_signature {
                         #feature_detection
@@ -213,13 +219,14 @@ impl Dispatcher {
                     static __DISPATCHED_FN: AtomicPtr<()> = AtomicPtr::new(__resolver_fn as *mut ());
                     let __current_ptr = __DISPATCHED_FN.load(Ordering::Relaxed);
                     unsafe {
-                        let __current_fn = std::mem::transmute::<*mut (), #fn_ty>(__current_ptr);
+                        let __current_fn = core::mem::transmute::<*mut (), #fn_ty>(__current_ptr);
                         __current_fn(#(#argument_names),*)
                     }
                 }
             }
         } else {
-            // A generic, async, or impl Trait, so just call it directly
+            // Dispatch the function via branching if runtime-dispatching is disabled, or it is
+            // generic/async/impl Trait
             let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
             let return_if_detected =
                 self.specializations

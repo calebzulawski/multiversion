@@ -18,6 +18,13 @@
 //! beyond understanding the available instruction set extensions for your architecture.  For more
 //! advanced usage, hand-written SIMD code can be dispatched with [`target`] and [`multiversion`].
 //!
+//! # Cargo features
+//! There is one cargo feature, `runtime_dispatch`, enabled by default.  When enabled,
+//! [`multiversion`] and [`target_clones`] will use CPU feature detection at runtime to dispatch
+//! the appropriate function, which requires the `std` crate.  Disabling this feature will only
+//! allow compile-time function dispatch using `#[cfg(target_feature)]` and can be used in
+//! `#[no_std]` crates.
+//!
 //! # Capabilities
 //! Most functions can be multiversioned.  The following are notable exceptions that are
 //! unsupported:

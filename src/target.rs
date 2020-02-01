@@ -49,6 +49,7 @@ impl Architecture {
         }
     }
 
+    #[cfg(feature = "runtime_dispatch")]
     fn feature_detector(&self) -> TokenStream {
         match self {
             Architecture::X86 => quote! { is_x86_feature_detected! },
@@ -174,11 +175,21 @@ impl Target {
             let arches = self.architectures.iter().map(|x| {
                 let arch = x.as_str();
                 let features = self.features.iter();
-                let feature_detector = x.feature_detector();
+                #[cfg(feature = "runtime_dispatch")]
+                {
+                    let feature_detector = x.feature_detector();
+                    quote! {
+                        #[cfg(target_arch = #arch)]
+                        {
+                            #( #feature_detector(#features) )&&*
+                        }
+                    }
+                }
+                #[cfg(not(feature = "runtime_dispatch"))]
                 quote! {
                     #[cfg(target_arch = #arch)]
                     {
-                        #( #feature_detector(#features) )&&*
+                        core::cfg!(all(#(target_feature = #features),*))
                     }
                 }
             });
@@ -360,11 +371,27 @@ mod test {
         let target = Target::parse(&s).unwrap();
         assert_eq!(
             target.features_detected().to_string(),
-            quote! {
+            {
+                #[cfg(feature = "runtime_dispatch")]
                 {
-                    #[cfg(target_arch = "x86")]
-                    {
-                        is_x86_feature_detected!("avx")
+                    quote! {
+                        {
+                            #[cfg(target_arch = "x86")]
+                            {
+                                is_x86_feature_detected!("avx")
+                            }
+                        }
+                    }
+                }
+                #[cfg(not(feature = "runtime_dispatch"))]
+                {
+                    quote! {
+                        {
+                            #[cfg(target_arch = "x86")]
+                            {
+                                core::cfg!(all(target_feature = "avx"))
+                            }
+                        }
                     }
                 }
             }
@@ -378,15 +405,35 @@ mod test {
         let target = Target::parse(&s).unwrap();
         assert_eq!(
             target.features_detected().to_string(),
-            quote! {
+            {
+                #[cfg(feature = "runtime_dispatch")]
                 {
-                    #[cfg(target_arch = "x86")]
-                    {
-                        is_x86_feature_detected!("avx") && is_x86_feature_detected!("xsave")
+                    quote! {
+                        {
+                            #[cfg(target_arch = "x86")]
+                            {
+                                is_x86_feature_detected!("avx") && is_x86_feature_detected!("xsave")
+                            }
+                            #[cfg(target_arch = "x86_64")]
+                            {
+                                is_x86_feature_detected!("avx") && is_x86_feature_detected!("xsave")
+                            }
+                        }
                     }
-                    #[cfg(target_arch = "x86_64")]
-                    {
-                        is_x86_feature_detected!("avx") && is_x86_feature_detected!("xsave")
+                }
+                #[cfg(not(feature = "runtime_dispatch"))]
+                {
+                    quote! {
+                        {
+                            #[cfg(target_arch = "x86")]
+                            {
+                                core::cfg!(all(target_feature = "avx", target_feature = "xsave"))
+                            }
+                            #[cfg(target_arch = "x86_64")]
+                            {
+                                core::cfg!(all(target_feature = "avx", target_feature = "xsave"))
+                            }
+                        }
                     }
                 }
             }
