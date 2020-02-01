@@ -189,7 +189,7 @@ impl Target {
                 quote! {
                     #[cfg(target_arch = #arch)]
                     {
-                        core::cfg!(all(#(target_feature = #features),*))
+                        cfg!(all(#(target_feature = #features),*))
                     }
                 }
             });
@@ -389,7 +389,7 @@ mod test {
                         {
                             #[cfg(target_arch = "x86")]
                             {
-                                core::cfg!(all(target_feature = "avx"))
+                                cfg!(all(target_feature = "avx"))
                             }
                         }
                     }
@@ -427,11 +427,11 @@ mod test {
                         {
                             #[cfg(target_arch = "x86")]
                             {
-                                core::cfg!(all(target_feature = "avx", target_feature = "xsave"))
+                                cfg!(all(target_feature = "avx", target_feature = "xsave"))
                             }
                             #[cfg(target_arch = "x86_64")]
                             {
-                                core::cfg!(all(target_feature = "avx", target_feature = "xsave"))
+                                cfg!(all(target_feature = "avx", target_feature = "xsave"))
                             }
                         }
                     }
