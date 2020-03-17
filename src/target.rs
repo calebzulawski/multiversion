@@ -74,7 +74,7 @@ impl Target {
     pub(crate) fn parse(s: &LitStr) -> Result<Self> {
         static RE: Lazy<Regex> = Lazy::new(|| {
             Regex::new(
-                r"^(?:\[(?P<arches>\w+(?:\|\w+)*)\]|(?P<arch>\w+))(?P<features>(?:\+\w+)+)?$",
+                r"^(?:\[(?P<arches>\w+(?:\|\w+)*)\]|(?P<arch>\w+))(?P<features>(?:\+[\w.]+)+)?$",
             )
             .unwrap()
         });
@@ -141,7 +141,7 @@ impl Target {
     }
 
     pub fn features_string(&self) -> String {
-        self.features.join("_")
+        self.features.join("_").replace(".", "")
     }
 
     pub fn has_features_specified(&self) -> bool {
@@ -305,10 +305,10 @@ mod test {
 
     #[test]
     fn parse_single_arch_with_features() {
-        let s = LitStr::new("x86_64+avx2+xsave", Span::call_site());
+        let s = LitStr::new("x86_64+sse4.2+xsave", Span::call_site());
         let target = Target::parse(&s).unwrap();
         assert_eq!(target.architectures, vec![Architecture::X86_64]);
-        assert_eq!(target.features, vec!["avx2", "xsave"]);
+        assert_eq!(target.features, vec!["sse4.2", "xsave"]);
     }
 
     #[test]
