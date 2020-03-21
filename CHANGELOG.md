@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Cargo feature `runtime_dispatch` (enabled by default) which adds runtime CPU feature detection.
+- `#[no_std]` support when the `runtime_dispatch` feature is disabled.
+### Fixed
+- Fixed disallowing features with dots, such as `sse4.2`.
 
 ## [0.3.0] - 2019-12-30
 ### Added
