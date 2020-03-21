@@ -5,7 +5,7 @@ on: [push]
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+
     strategy:
       matrix:
         version:
@@ -13,18 +13,21 @@ jobs:
           - stable
           - beta
           - nightly
+        os:
+          - macos-latest
+          - ubuntu-latest
+          - windows-latest
         features:
           - --all-features
           - --no-default-features
+
+    runs-on: ${{ matrix.os }}
+    
     steps:
     - uses: actions/checkout@v1
     - name: Install toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: ${{ matrix.version }}
-        default: true
-        profile: minimal 
-    - name: Build
-      run: cargo build --verbose ${{ matrix.features }}
+      run: |
+        rustup install --profile minimal ${{ matrix.version }}
+        rustup default ${{ matrix.version }}
     - name: Run tests
       run: cargo test --verbose ${{ matrix.features }}
