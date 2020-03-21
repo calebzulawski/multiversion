@@ -32,18 +32,4 @@ regex = "1"
 once_cell = "1"
 
 [dev-dependencies]
-criterion = "0.2.11"
-rand = "0.5"
 rustversion = "1"
-
-[[bench]]
-name = "bench_main"
-harness = false
-path = "benches"
-
-[profile.bench]
-opt-level = 3
-
-[badges]
-appveyor = { repository = "calebzulawski/multiversion" }
-travis-ci = { repository = "calebzulawski/multiversion" }
