@@ -6,7 +6,7 @@ use quote::quote;
 use regex::Regex;
 use syn::{
     parse::Parse, parse::ParseStream, parse_quote, spanned::Spanned, visit_mut::VisitMut,
-    Attribute, Error, Ident, ItemFn, LitStr, Result, Signature,
+    Attribute, Error, Ident, ItemFn, Lit, LitStr, Result, Signature,
 };
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
@@ -208,6 +208,17 @@ impl Parse for Config {
         Ok(Self {
             target: Target::parse(&target_string)?,
         })
+    }
+}
+
+impl std::convert::TryFrom<&Lit> for Target {
+    type Error = Error;
+
+    fn try_from(lit: &Lit) -> Result<Self> {
+        match lit {
+            Lit::Str(s) => Self::parse(s),
+            _ => Err(Error::new(lit.span(), "expected literal string")),
+        }
     }
 }
 
