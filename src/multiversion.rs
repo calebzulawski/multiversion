@@ -3,38 +3,16 @@ use crate::target::Target;
 use crate::util;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use syn::{
     parse::Parse, parse::ParseStream, parse_quote, punctuated::Punctuated, spanned::Spanned, token,
     Error, Ident, ItemFn, Lit, LitStr, Meta, MetaList, NestedMeta, Path,
 };
 
-enum Specialization2 {
-    Clone {
-        target: Target,
-        func: Option<Ident>,
-    },
-    Override {
-        target: Target,
-        func: Path,
-        is_unsafe: bool,
-    },
-}
-
-enum ParseError {
-    WrongAttr,
-    Invalid(Error),
-}
-
-impl std::convert::From<Error> for ParseError {
-    fn from(e: Error) -> Self {
-        Self::Invalid(e)
-    }
-}
-
+// Parses an attribute meta into Options
 macro_rules! meta_parser {
     {
-        $list:ident = [$($key:literal => $var:ident,)*]
+        $list:expr => [$($key:literal => $var:ident,)*]
     } => {
         $(let mut $var = None;)*
         for element in $list {
@@ -68,41 +46,133 @@ macro_rules! meta_parser {
     }
 }
 
-impl std::convert::TryFrom<Meta> for Specialization2 {
-    type Error = ParseError;
+enum Specialization2 {
+    Clone {
+        target: Target,
+        func: Option<Ident>,
+    },
+    Override {
+        target: Target,
+        func: Path,
+        is_unsafe: bool,
+    },
+}
 
-    fn try_from(meta: Meta) -> Result<Self, Self::Error> {
-        if let Meta::List(MetaList { path, nested, .. }) = &meta {
-            if let Some(attr) = path.get_ident() {
-                match attr.to_string().as_str() {
-                    "clone" => {
-                        meta_parser! {
-                            nested = [
-                                "target" => target,
-                                "fn" => func,
-                            ]
-                        }
-                        Ok(Specialization2::Clone {
-                            target: target
-                                .ok_or(Error::new(nested.span(), "expected key 'target'"))?
-                                .try_into()?,
-                            func: func
-                                .map(|lit| match lit {
-                                    Lit::Str(s) => s.parse(),
-                                    _ => Err(Error::new(lit.span(), "expected literal string")),
-                                })
-                                .transpose()?,
-                        })
+struct Function {
+    specializations: Vec<Specialization2>,
+    func: ItemFn,
+}
+
+impl TryFrom<Function> for Dispatcher {
+    type Error = Error;
+
+    fn try_from(func: Function) -> Result<Self, Self::Error> {
+        let normalized_sig = util::normalize_signature(&func.func.sig)?;
+        let args = util::args_from_signature(&normalized_sig)?;
+        let fn_params = util::fn_params(&func.func.sig);
+        Ok(Self {
+            specializations: func
+                .specializations
+                .iter()
+                .map(|specialization| match specialization {
+                    Specialization2::Clone { target, .. } => crate::dispatcher::Specialization {
+                        target: target.clone(),
+                        block: func.func.block.as_ref().clone(),
+                        normalize: false,
+                    },
+                    Specialization2::Override {
+                        target,
+                        func,
+                        is_unsafe,
+                    } => crate::dispatcher::Specialization {
+                        target: target.clone(),
+                        block: if *is_unsafe {
+                            parse_quote! {
+                                {
+                                    unsafe { #func::<#(#fn_params),*>(#(#args),*) }
+                                }
+                            }
+                        } else {
+                            parse_quote! {
+                                {
+                                    #func::<#(#fn_params),*>(#(#args),*)
+                                }
+                            }
+                        },
+                        normalize: true,
+                    },
+                })
+                .collect(),
+            attrs: func.func.attrs,
+            vis: func.func.vis,
+            sig: func.func.sig,
+            default: *func.func.block,
+        })
+    }
+}
+
+impl TryFrom<ItemFn> for Function {
+    type Error = Error;
+
+    fn try_from(func: ItemFn) -> Result<Self, Self::Error> {
+        let attrs = func.attrs;
+        let mut multiversioned = Function {
+            specializations: Vec::new(),
+            func: ItemFn {
+                attrs: Vec::new(),
+                ..func
+            },
+        };
+
+        for attr in attrs {
+            // if not in meta list form, ignore the attribute
+            let MetaList { path, nested, .. } = if let Ok(Meta::List(list)) = attr.parse_meta() {
+                list
+            } else {
+                multiversioned.func.attrs.push(attr);
+                continue;
+            };
+
+            // if meta path isn't just an ident, ignore the attribute
+            let path = if let Some(ident) = path.get_ident() {
+                ident
+            } else {
+                multiversioned.func.attrs.push(attr);
+                continue;
+            };
+
+            // parse the attribute
+            match path.to_string().as_str() {
+                "clone" => {
+                    meta_parser! {
+                        &nested => [
+                            "target" => target,
+                            "fn" => func,
+                        ]
                     }
-                    "override" => {
-                        meta_parser! {
-                            nested = [
-                                "target" => target,
-                                "fn" => func,
-                                "unsafe" => is_unsafe,
-                            ]
-                        }
-                        Ok(Specialization2::Override {
+                    multiversioned.specializations.push(Specialization2::Clone {
+                        target: target
+                            .ok_or(Error::new(nested.span(), "expected key 'target'"))?
+                            .try_into()?,
+                        func: func
+                            .map(|lit| match lit {
+                                Lit::Str(s) => s.parse(),
+                                _ => Err(Error::new(lit.span(), "expected literal string")),
+                            })
+                            .transpose()?,
+                    });
+                }
+                "override" => {
+                    meta_parser! {
+                        &nested => [
+                            "target" => target,
+                            "fn" => func,
+                            "unsafe" => is_unsafe,
+                        ]
+                    }
+                    multiversioned
+                        .specializations
+                        .push(Specialization2::Override {
                             target: target
                                 .ok_or(Error::new(nested.span(), "expected key 'target'"))?
                                 .try_into()?,
@@ -116,16 +186,16 @@ impl std::convert::TryFrom<Meta> for Specialization2 {
                                 Lit::Bool(b) => Ok(b.value),
                                 lit => Err(Error::new(lit.span(), "expected literal bool")),
                             })?,
-                        })
-                    }
-                    _ => Err(ParseError::WrongAttr),
+                        });
                 }
-            } else {
-                Err(ParseError::WrongAttr)
+                _ => {
+                    multiversioned.func.attrs.push(attr);
+                    continue;
+                }
             }
-        } else {
-            Err(ParseError::WrongAttr)
         }
+
+        Ok(multiversioned)
     }
 }
 
