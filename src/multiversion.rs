@@ -5,8 +5,7 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use std::convert::{TryFrom, TryInto};
 use syn::{
-    parse::Parse, parse::ParseStream, parse_quote, punctuated::Punctuated, spanned::Spanned, token,
-    Error, Ident, ItemFn, Lit, LitStr, Meta, MetaList, NestedMeta, Path,
+    parse_quote, spanned::Spanned, Error, Ident, ItemFn, Lit, Meta, MetaList, NestedMeta, Path,
 };
 
 // Parses an attribute meta into Options
@@ -162,7 +161,7 @@ impl TryFrom<ItemFn> for Function {
                             .transpose()?,
                     });
                 }
-                "override" => {
+                "specialize" => {
                     meta_parser! {
                         &nested => [
                             "target" => target,
@@ -199,77 +198,8 @@ impl TryFrom<ItemFn> for Function {
     }
 }
 
-pub(crate) struct Specialization {
-    target: Target,
-    _fat_arrow_token: token::FatArrow,
-    unsafety: Option<token::Unsafe>,
-    path: Path,
-}
-
-impl Parse for Specialization {
-    fn parse(input: ParseStream) -> Result<Self, syn::Error> {
-        let target_str = input.parse::<LitStr>()?;
-        Ok(Self {
-            target: Target::parse(&target_str)?,
-            _fat_arrow_token: input.parse()?,
-            unsafety: input.parse()?,
-            path: input.parse()?,
-        })
-    }
-}
-
-pub(crate) struct Config {
-    specializations: Punctuated<Specialization, token::Comma>,
-}
-
-impl Parse for Config {
-    fn parse(input: ParseStream) -> Result<Self, syn::Error> {
-        Ok(Self {
-            specializations: input.parse_terminated(Specialization::parse)?,
-        })
-    }
-}
-
-pub(crate) fn make_multiversioned_fn(
-    config: Config,
-    func: ItemFn,
-) -> Result<TokenStream, syn::Error> {
-    let normalized_sig = util::normalize_signature(&func.sig)?;
-    let args = util::args_from_signature(&normalized_sig)?;
-    let fn_params = util::fn_params(&func.sig);
-    Ok(Dispatcher {
-        attrs: func.attrs,
-        vis: func.vis,
-        sig: func.sig.clone(),
-        specializations: config
-            .specializations
-            .iter()
-            .map(
-                |Specialization {
-                     target,
-                     path,
-                     unsafety,
-                     ..
-                 }| crate::dispatcher::Specialization {
-                    target: target.clone(),
-                    block: if unsafety.is_some() {
-                        parse_quote! {
-                            {
-                                unsafe { #path::<#(#fn_params),*>(#(#args),*) }
-                            }
-                        }
-                    } else {
-                        parse_quote! {
-                            {
-                                #path::<#(#fn_params),*>(#(#args),*)
-                            }
-                        }
-                    },
-                    normalize: true,
-                },
-            )
-            .collect(),
-        default: *func.block,
-    }
-    .to_token_stream())
+pub(crate) fn make_multiversioned_fn(func: ItemFn) -> Result<TokenStream, syn::Error> {
+    let function: Function = func.try_into()?;
+    let dispatcher: Dispatcher = function.try_into()?;
+    Ok(dispatcher.to_token_stream())
 }

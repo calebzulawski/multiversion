@@ -98,10 +98,9 @@
 //!     }
 //! }
 //!
-//! #[multiversion(
-//!     "[x86|x86_64]+avx" => unsafe square_avx,
-//!     "x86+sse" => unsafe square_sse,
-//! )]
+//! #[multiversion]
+//! #[specialize(target = "[x86|x86_64]+avx", fn = "square_avx", unsafe = true)]
+//! #[specialize(target = "x86+sse", fn = "square_sse", unsafe = true)]
 //! fn square(x: &mut [f32]) {
 //!     for v in x {
 //!         *v *= *v;
@@ -207,7 +206,7 @@ mod target_clones;
 mod util;
 
 use quote::ToTokens;
-use syn::{parse_macro_input, ItemFn};
+use syn::{parse::Nothing, parse_macro_input, ItemFn};
 
 /// Provides function multiversioning by explicitly specifying function versions.
 ///
@@ -246,11 +245,10 @@ use syn::{parse_macro_input, ItemFn};
 ///     println!("neon");
 /// }
 ///
-/// #[multiversion(
-///     "[x86|x86_64]+avx" => where_am_i_avx,
-///     "x86+sse" => where_am_i_sse,
-///     "[arm|aarch64]+neon" => where_am_i_neon
-/// )]
+/// #[multiversion]
+/// #[specialize(target = "[x86|x86_64]+avx", fn  = "where_am_i_avx")]
+/// #[specialize(target = "x86+sse", fn = "where_am_i_sse")]
+/// #[specialize(target = "[arm|aarch64]+neon", fn = "where_am_i_neon")]
 /// fn where_am_i() {
 ///     println!("generic");
 /// }
@@ -280,11 +278,10 @@ use syn::{parse_macro_input, ItemFn};
 ///     println!("neon");
 /// }
 ///
-/// #[multiversion(
-///     "[x86|x86_64]+avx" => unsafe where_am_i_avx,
-///     "x86+sse" => unsafe where_am_i_sse,
-///     "[arm|aarch64]+neon" => unsafe where_am_i_neon
-/// )]
+/// #[multiversion]
+/// #[specialize(target = "[x86|x86_64]+avx", fn = "where_am_i_avx", unsafe = true)]
+/// #[specialize(target = "x86+sse", fn = "where_am_i_sse", unsafe = true)]
+/// #[specialize(target = "[arm|aarch64]+neon", fn = "where_am_i_neon")]
 /// fn where_am_i() {
 ///     println!("generic");
 /// }
@@ -305,9 +302,9 @@ pub fn multiversion(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let config = parse_macro_input!(attr as multiversion::Config);
+    parse_macro_input!(attr as Nothing);
     let func = parse_macro_input!(input as ItemFn);
-    match multiversion::make_multiversioned_fn(config, func) {
+    match multiversion::make_multiversioned_fn(func) {
         Ok(tokens) => tokens.into_token_stream(),
         Err(err) => err.to_compile_error(),
     }
