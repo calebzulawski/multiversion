@@ -1,4 +1,7 @@
-#[multiversion::target_clones("[x86|x86_64]+avx2+avx", "[x86|x86_64]+avx", "x86+sse")]
+#[multiversion::multiversion]
+#[clone(target = "[x86|x86_64]+avx2+avx")]
+#[clone(target = "[x86|x86_64]+avx")]
+#[clone(target = "x86+sse")]
 fn double<'a, T: Copy + std::ops::AddAssign>(x: &'a mut [T]) -> &'a mut T {
     assert!(x.len() > 0);
     for v in x.iter_mut() {

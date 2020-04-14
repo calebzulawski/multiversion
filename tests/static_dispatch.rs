@@ -1,11 +1,15 @@
-use multiversion::target_clones;
+use multiversion::multiversion;
 
-#[target_clones("[x86|x86_64]+avx", "x86+sse")]
+#[multiversion]
+#[clone(target = "[x86|x86_64]+avx")]
+#[clone(target = "x86+sse")]
 fn mul(x: f32, y: f32) -> f32 {
     x * y
 }
 
-#[target_clones("[x86|x86_64]+avx", "x86+sse")]
+#[multiversion]
+#[clone(target = "[x86|x86_64]+avx")]
+#[clone(target = "x86+sse")]
 fn square(x: &mut [f32]) {
     #[static_dispatch]
     use self::mul;
