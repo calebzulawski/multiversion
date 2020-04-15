@@ -45,7 +45,7 @@ macro_rules! meta_parser {
     }
 }
 
-enum Specialization2 {
+enum Specialization {
     Clone {
         target: Target,
         func: Option<Ident>,
@@ -58,7 +58,7 @@ enum Specialization2 {
 }
 
 struct Function {
-    specializations: Vec<Specialization2>,
+    specializations: Vec<Specialization>,
     func: ItemFn,
 }
 
@@ -74,12 +74,12 @@ impl TryFrom<Function> for Dispatcher {
                 .specializations
                 .iter()
                 .map(|specialization| match specialization {
-                    Specialization2::Clone { target, .. } => crate::dispatcher::Specialization {
+                    Specialization::Clone { target, .. } => crate::dispatcher::Specialization {
                         target: target.clone(),
                         block: func.func.block.as_ref().clone(),
                         normalize: false,
                     },
-                    Specialization2::Override {
+                    Specialization::Override {
                         target,
                         func,
                         is_unsafe,
@@ -149,7 +149,7 @@ impl TryFrom<ItemFn> for Function {
                             "fn" => func,
                         ]
                     }
-                    multiversioned.specializations.push(Specialization2::Clone {
+                    multiversioned.specializations.push(Specialization::Clone {
                         target: target
                             .ok_or(Error::new(nested.span(), "expected key 'target'"))?
                             .try_into()?,
@@ -171,7 +171,7 @@ impl TryFrom<ItemFn> for Function {
                     }
                     multiversioned
                         .specializations
-                        .push(Specialization2::Override {
+                        .push(Specialization::Override {
                             target: target
                                 .ok_or(Error::new(nested.span(), "expected key 'target'"))?
                                 .try_into()?,

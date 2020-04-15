@@ -1,4 +1,4 @@
-name: CI
+name: Build
 
 on: [push]
 
@@ -9,7 +9,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - 1.31.0
+          - 1.32.0
           - stable
           - beta
           - nightly
