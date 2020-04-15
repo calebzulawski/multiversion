@@ -1,6 +1,6 @@
 Multiversion
 ============
-[![Build Status](https://img.shields.io/github/workflow/status/calebzulawski/multiversion/CI)](https://github.com/calebzulawski/multiversion/actions)
+[![Build Status](https://github.com/calebzulawski/multiversion/workflows/Build/badge.svg?branch=master)](https://github.com/calebzulawski/multiversion/actions)
 ![Rustc Version 1.34+](https://img.shields.io/badge/rustc-1.34+-lightgray.svg)
 [![License](https://img.shields.io/crates/l/multiversion)](https://crates.io/crates/multiversion)
 [![Crates.io](https://img.shields.io/crates/v/multiversion)](https://crates.io/crates/multiversion)
