@@ -19,12 +19,9 @@
 //! dispatch using `#[cfg(target_feature)]` and can be used in `#[no_std]` crates.
 //!
 //! # Capabilities
-//! Most functions can be multiversioned.  The following are notable exceptions that are
-//! unsupported:
-//! * Methods, associated functions, inner functions, or any other function not at module level.
-//! In these cases, create a multiversioned function at module level and call it from the desired
-//! location.
-//! * Functions that take or return `impl Trait` (other than `async`, which is supported).
+//! Most functions can be multiversioned.  Methods, associated functions, inner functions, or any
+//! other function not at module level.  In these cases, create a multiversioned function at module
+//! level and call it from the desired location.
 //!
 //! If any other functions do not work, please file a bug report.
 //!

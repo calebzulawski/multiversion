@@ -167,6 +167,7 @@ impl Dispatcher {
         let block: Block = if cfg!(feature = "runtime_dispatch")
             && fn_params.is_empty()
             && self.sig.asyncness.is_none()
+            && !util::impl_trait_present(&self.sig)
         {
             // Dispatching from an atomic fn pointer occurs when the following is true:
             //   * runtime-dispatching is enabled

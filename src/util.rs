@@ -2,7 +2,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
     parse_quote, visit_mut::VisitMut, BareFnArg, Error, FnArg, GenericParam, Ident, Lifetime, Pat,
-    PatIdent, PatType, Result, Signature, TypeBareFn,
+    PatIdent, PatType, Result, ReturnType, Signature, Type, TypeBareFn,
 };
 
 pub(crate) fn normalize_signature(sig: &Signature) -> Result<Signature> {
@@ -41,6 +41,22 @@ pub(crate) fn args_from_signature<'a>(sig: &'a Signature) -> Result<Vec<&'a Pat>
             FnArg::Typed(arg) => Ok(arg.pat.as_ref()),
         })
         .collect::<Result<Vec<_>>>()
+}
+
+pub(crate) fn impl_trait_present(sig: &Signature) -> bool {
+    if let ReturnType::Type(_, ty) = &sig.output {
+        if let Type::ImplTrait(_) = **ty {
+            return true;
+        }
+    }
+    sig.inputs.iter().any(|arg| {
+        if let FnArg::Typed(pat) = arg {
+            if let Type::ImplTrait(_) = *pat.ty {
+                return true;
+            }
+        }
+        false
+    })
 }
 
 struct LifetimeRenamer;

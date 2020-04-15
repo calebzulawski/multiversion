@@ -23,7 +23,6 @@ These optional features cannot be haphazardly compiled into programs--executing 
 
 ## Limitations
 * No support for member functions or associated functions (or any other functions not at module-level)
-* No support for `impl Trait`
 
 ## Example
 Automatic function multiversioning with the `clone` attribute, similar to GCC's `target_clones` attribute:
