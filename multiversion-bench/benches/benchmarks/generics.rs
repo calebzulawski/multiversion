@@ -1,16 +1,22 @@
 use criterion::{criterion_group, Bencher, Criterion, Fun};
-use multiversion::target_clones;
+use multiversion::multiversion;
 use rand::distributions::Standard;
 use rand::Rng;
 
-#[target_clones("[x86|x86_64]+avx2+avx", "[x86|x86_64]+avx", "x86+sse")]
+#[multiversion]
+#[clone(target = "[x86|x86_64]+avx2+avx")]
+#[clone(target = "[x86|x86_64]+avx")]
+#[clone(target = "x86+sse")]
 fn direct(input: &[f32], output: &mut [f32], factor: f32) {
     for (i, o) in input.iter().zip(output.iter_mut()) {
         *o = *i * factor
     }
 }
 
-#[target_clones("[x86|x86_64]+avx2+avx", "[x86|x86_64]+avx", "x86+sse")]
+#[multiversion]
+#[clone(target = "[x86|x86_64]+avx2+avx")]
+#[clone(target = "[x86|x86_64]+avx")]
+#[clone(target = "x86+sse")]
 fn generic<T: Copy + std::ops::Mul<Output = T>>(input: &[T], output: &mut [T], factor: T) {
     for (i, o) in input.iter().zip(output.iter_mut()) {
         *o = *i * factor

@@ -26,11 +26,13 @@ These optional features cannot be haphazardly compiled into programs--executing 
 * No support for `impl Trait`
 
 ## Example
-Automatic function multiversioning with the `target_clones` attribute, similar to GCC's `target_clones` attribute:
+Automatic function multiversioning with the `clone` attribute, similar to GCC's `target_clones` attribute:
 ```rust
-use multiversion::target_clones;
+use multiversion::multiversion;
 
-#[target_clones("[x86|x86_64]+avx", "x86+sse")]
+#[multiversion]
+#[clone(target = "[x86|x86_64]+avx")]
+#[clone(target = "x86+sse")]
 fn square(x: &mut [f32]) {
     for v in x {
         *v *= *v;
@@ -56,10 +58,9 @@ unsafe fn square_sse(x: &mut [f32]) {
     }
 }
 
-#[multiversion(
-    "[x86|x86_64]+avx" => unsafe square_avx,
-    "x86+sse" => unsafe square_sse
-)]
+#[multiversion]
+#[specialize(target = "[x86|x86_64]+avx", fn = "square_avx", unsafe = true)]
+#[specialize(target = "x86+sse", fn = "square_sse", unsafe = true)]
 fn square(x: &mut [f32]) {
     for v in x {
         *v *= *v;

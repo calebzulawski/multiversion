@@ -155,7 +155,7 @@
 //! The `#[cfg]` attribute allows conditional compilation based on the target architecture and
 //! features, however this does not take into account additional features specified by
 //! `#[target_feature]`.  In this scenario, the `#[target_cfg]` helper attribute provides
-//! conditional compilation in functions tagged with [`target_clones`] or [`target`].
+//! conditional compilation in functions tagged with [`multiversion`] or [`target`].
 //!
 //! The `#[target_cfg]` attribute supports `all`, `any`, and `not` (just like `#[cfg]`) and
 //! supports the following keys:
@@ -179,7 +179,6 @@
 //! ```
 //!
 //! [`target`]: attr.target.html
-//! [`target_clones`]: attr.target_clones.html
 //! [`multiversion`]: attr.multiversion.html
 
 extern crate proc_macro;
@@ -313,7 +312,6 @@ use syn::{parse::Nothing, parse_macro_input, ItemFn};
 /// invoking the function selector, but the atomic ensures that these are synchronized correctly.
 ///
 /// [`target`]: attr.target.html
-/// [`target_clones`]: attr.target_clones.html
 /// [`multiversion`]: attr.multiversion.html
 /// [static dispatching]: index.html#static-dispatching
 /// [conditional compilation]: index.html#conditional-compilation
@@ -351,7 +349,6 @@ pub fn multiversion(
 /// attribute. See [conditional compilation] for more information.
 ///
 /// [`target`]: attr.target.html
-/// [`target_clones`]: attr.target_clones.html
 /// [`multiversion`]: attr.multiversion.html
 /// [static dispatching]: index.html#static-dispatching
 /// [conditional compilation]: index.html#conditional-compilation

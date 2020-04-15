@@ -1,10 +1,9 @@
 use criterion::{criterion_group, Bencher, Criterion, Fun};
-use multiversion::target_clones;
+use multiversion::{multiversion, target};
 use rand::distributions::Standard;
 use rand::Rng;
 
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx")]
+#[target("[x86|x86_64]+avx")]
 unsafe fn square_avx(i: &[f32], o: &mut [f32]) {
     for (i, o) in i.iter().zip(o) {
         *o = i * i;
@@ -17,7 +16,8 @@ fn square_generic(i: &[f32], o: &mut [f32]) {
     }
 }
 
-#[target_clones("x86_64+avx")]
+#[multiversion]
+#[clone(target = "[x86|x86_64]+avx")]
 fn square_fmv(i: &[f32], o: &mut [f32]) {
     for (i, o) in i.iter().zip(o) {
         *o = i * i;
