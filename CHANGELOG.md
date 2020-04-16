@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Support for `impl Trait`.
+### Removed
+- Removed `#[target_clones]` attribute (functionality is now included in `#[multiversion]` attribute).
+### Changed
+- `#[multiversion]` interface now uses helper attributes, providing both target specialization and function cloning.
+- Increased minimum required Rust version to 1.34.0.
+### Fixed
+- Vague error spans now point to a more informative source location.
+- All errors now produce `compile_error!` instead of macro panics.
 
 ## [0.4.0] - 2020-03-20
 ### Added
