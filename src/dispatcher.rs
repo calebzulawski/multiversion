@@ -1,12 +1,9 @@
-use crate::{target::Target, util};
+use crate::{helper_attributes::process_helper_attributes, target::Target, util};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
-use syn::{
-    parse_quote, visit_mut::VisitMut, Attribute, Block, Ident, ItemFn, ItemUse, Lit, Meta,
-    MetaNameValue, NestedMeta, Result, Signature, UseName, UsePath, UseRename, UseTree, Visibility,
-};
+use syn::{parse_quote, Attribute, Block, Ident, ItemFn, Result, Signature, Visibility};
 
-fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
+pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
     if let Some(target) = target {
         if target.has_features_specified() {
             Ident::new(
@@ -15,19 +12,13 @@ fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
                     ident,
                     target.features_string()
                 ),
-                Span::call_site(),
+                ident.span(),
             )
         } else {
-            Ident::new(
-                &format!("__multiversion_{}_default", ident),
-                Span::call_site(),
-            )
+            Ident::new(&format!("__multiversion_{}_default", ident), ident.span())
         }
     } else {
-        Ident::new(
-            &format!("__multiversion_{}_default", ident),
-            Span::call_site(),
-        )
+        Ident::new(&format!("__multiversion_{}_default", ident), ident.span())
     }
 }
 
@@ -62,7 +53,7 @@ impl Specialization {
             let fn_params = crate::util::fn_params(&sig);
             let maybe_await = sig.asyncness.map(|_| util::await_tokens());
             let unsafe_sig = Signature {
-                ident: Ident::new("__unsafe_fn", Span::call_site()),
+                ident: Ident::new("__unsafe_fn", sig.ident.span()),
                 unsafety: parse_quote! { unsafe },
                 ..if self.normalize {
                     crate::util::normalize_signature(sig)?
@@ -151,7 +142,7 @@ impl Dispatcher {
                 block: Box::new({
                     // Rewrite static dispatches, since this doesn't use the target attribute
                     let mut block = self.default.clone();
-                    HelperAttributeVisitor { target: None }.visit_block_mut(&mut block);
+                    process_helper_attributes(None, &mut block)?;
                     block
                 }),
             }
@@ -268,116 +259,13 @@ impl Dispatcher {
 
 impl ToTokens for Dispatcher {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let feature_fns = self.feature_fns().unwrap();
-        let dispatcher_fn = self.dispatcher_fn().unwrap();
-        tokens.extend(quote! {
-            #(#feature_fns)*
-            #dispatcher_fn
+        tokens.extend(match self.feature_fns() {
+            Ok(val) => quote! { #(#val)* },
+            Err(err) => err.to_compile_error(),
         });
-    }
-}
-
-pub(crate) struct HelperAttributeVisitor {
-    pub target: Option<Target>,
-}
-
-impl HelperAttributeVisitor {
-    fn rebuild_use_tree(&self, tree: &UseTree) -> ItemUse {
-        fn finish(
-            idents: Vec<&Ident>,
-            name: &Ident,
-            rename: &Ident,
-            target: Option<&Target>,
-        ) -> ItemUse {
-            let fn_name = feature_fn_name(&name, target);
-            if idents.is_empty() {
-                parse_quote! { use #fn_name as #rename; }
-            } else {
-                parse_quote! { use #(#idents)::*::#fn_name as #rename; }
-            }
-        }
-        fn detail<'a>(
-            tree: &'a UseTree,
-            mut idents: Vec<&'a Ident>,
-            target: Option<&Target>,
-        ) -> ItemUse {
-            match tree {
-                UseTree::Path(UsePath { ident, tree, .. }) => {
-                    idents.push(ident);
-                    detail(tree, idents, target)
-                }
-                UseTree::Name(UseName { ref ident }) => finish(idents, ident, ident, target),
-                UseTree::Rename(UseRename { ident, rename, .. }) => {
-                    finish(idents, ident, rename, target)
-                }
-                _ => panic!("unsupported use statement for #[static_dispatch]"),
-            }
-        }
-        detail(tree, Vec::new(), self.target.as_ref())
-    }
-
-    fn target_cfg_value(&self, nested: &NestedMeta) -> bool {
-        match nested {
-            NestedMeta::Meta(meta) => match meta {
-                Meta::Path(_) => panic!("not expecting path"),
-                Meta::NameValue(MetaNameValue { path, lit, .. }) => {
-                    if path.is_ident("target") {
-                        if let Lit::Str(s) = lit {
-                            let test_target = Some(Target::parse(s).unwrap());
-                            test_target == self.target
-                        } else {
-                            panic!("expected string literal")
-                        }
-                    } else {
-                        panic!("unknown key");
-                    }
-                }
-                Meta::List(list) => {
-                    if list.path.is_ident("not") {
-                        assert_eq!(
-                            list.nested.len(),
-                            1,
-                            "expected a single target_cfg predicate"
-                        );
-                        !self.target_cfg_value(list.nested.first().unwrap())
-                    } else if list.path.is_ident("any") {
-                        list.nested.iter().any(|x| self.target_cfg_value(x))
-                    } else if list.path.is_ident("all") {
-                        list.nested.iter().all(|x| self.target_cfg_value(x))
-                    } else {
-                        panic!("unknown path");
-                    }
-                }
-            },
-            NestedMeta::Lit(_) => panic!("not expecting literal"),
-        }
-    }
-}
-
-impl VisitMut for HelperAttributeVisitor {
-    fn visit_item_use_mut(&mut self, i: &mut ItemUse) {
-        let before = i.attrs.len();
-        i.attrs
-            .retain(|attr| *attr != parse_quote! { #[static_dispatch] });
-        if i.attrs.len() < before {
-            *i = self.rebuild_use_tree(&i.tree);
-        }
-    }
-
-    fn visit_attribute_mut(&mut self, i: &mut Attribute) {
-        if let Ok(Meta::List(list)) = i.parse_meta() {
-            if list.path.is_ident("target_cfg") {
-                assert_eq!(
-                    list.nested.len(),
-                    1,
-                    "expected a single target_cfg predicate"
-                );
-                *i = if self.target_cfg_value(list.nested.first().unwrap()) {
-                    parse_quote! { #[cfg(not(any()))] }
-                } else {
-                    parse_quote! { #[cfg(any())] }
-                };
-            }
-        }
+        tokens.extend(match self.dispatcher_fn() {
+            Ok(val) => val.into_token_stream(),
+            Err(err) => err.to_compile_error(),
+        });
     }
 }

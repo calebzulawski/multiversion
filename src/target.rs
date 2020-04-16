@@ -1,12 +1,12 @@
-use crate::dispatcher::HelperAttributeVisitor;
+use crate::helper_attributes::process_helper_attributes;
 use crate::util;
 use once_cell::sync::Lazy;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use regex::Regex;
 use syn::{
-    parse::Parse, parse::ParseStream, parse_quote, spanned::Spanned, visit_mut::VisitMut,
-    Attribute, Error, Ident, ItemFn, Lit, LitStr, Result, Signature,
+    parse::Parse, parse::ParseStream, parse_quote, spanned::Spanned, Attribute, Error, Ident,
+    ItemFn, Lit, LitStr, Result, Signature,
 };
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
@@ -64,10 +64,17 @@ impl Architecture {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub(crate) struct Target {
     architectures: Vec<Architecture>,
     features: Vec<String>,
+    span: proc_macro2::Span,
+}
+
+impl PartialEq for Target {
+    fn eq(&self, other: &Self) -> bool {
+        self.architectures == other.architectures && self.features == other.features
+    }
 }
 
 impl Target {
@@ -97,11 +104,12 @@ impl Target {
             Ok(Self {
                 architectures: vec![Architecture::new(arch.as_str(), s.span())?],
                 features,
+                span: s.span(),
             })
         } else {
             let mut arches = captures
                 .name("arches")
-                .unwrap()
+                .ok_or_else(|| Error::new(s.span(), "invalid target string"))?
                 .as_str()
                 .split('|')
                 .map(|arch| Architecture::new(arch, s.span()))
@@ -111,6 +119,7 @@ impl Target {
             Ok(Self {
                 architectures: arches,
                 features,
+                span: s.span(),
             })
         }
     }
@@ -133,7 +142,7 @@ impl Target {
         } else {
             format!("{}+{}", arches, self.features.join("+"))
         };
-        LitStr::new(&string, Span::call_site())
+        LitStr::new(&string, self.span)
     }
 
     pub fn arches_as_str(&self) -> Vec<&'static str> {
@@ -223,11 +232,8 @@ impl std::convert::TryFrom<&Lit> for Target {
 }
 
 pub(crate) fn make_target_fn(config: Config, mut func: ItemFn) -> Result<TokenStream> {
-    // Rewrite static dispatches
-    HelperAttributeVisitor {
-        target: Some(config.target.clone()),
-    }
-    .visit_block_mut(&mut func.block);
+    // Rewrite static dispatches, etc
+    process_helper_attributes(Some(config.target.clone()), &mut func.block)?;
 
     // Create the function
     let target_arch = config.target.target_arch();

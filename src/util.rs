@@ -1,8 +1,8 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    parse_quote, visit_mut::VisitMut, BareFnArg, Error, FnArg, GenericParam, Ident, Lifetime, Pat,
-    PatIdent, PatType, Result, ReturnType, Signature, Type, TypeBareFn,
+    parse_quote, spanned::Spanned, visit_mut::VisitMut, BareFnArg, Error, FnArg, GenericParam,
+    Ident, Lifetime, Pat, PatIdent, PatType, Result, ReturnType, Signature, Type, TypeBareFn,
 };
 
 pub(crate) fn normalize_signature(sig: &Signature) -> Result<Signature> {
@@ -19,7 +19,7 @@ pub(crate) fn normalize_signature(sig: &Signature) -> Result<Signature> {
                     mutability: None,
                     ident: match arg.pat.as_ref() {
                         Pat::Ident(pat) => pat.ident.clone(),
-                        _ => Ident::new(&format!("__multiversion_arg_{}", i), Span::call_site()),
+                        _ => Ident::new(&format!("__multiversion_arg_{}", i), x.span()),
                     },
                     subpat: None,
                 })),
