@@ -56,14 +56,14 @@ impl Specialization {
                 ident: Ident::new("__unsafe_fn", sig.ident.span()),
                 unsafety: parse_quote! { unsafe },
                 ..if self.normalize {
-                    crate::util::normalize_signature(sig)?
+                    crate::util::normalize_signature(sig)
                 } else {
                     sig.clone()
                 }
             };
             let outer_sig = Signature {
                 ident: fn_name,
-                ..crate::util::normalize_signature(sig)?
+                ..crate::util::normalize_signature(sig)
             };
             let args = util::args_from_signature(&outer_sig)?;
             let block = &self.block;
@@ -153,7 +153,7 @@ impl Dispatcher {
 
     fn dispatcher_fn(&self) -> Result<ItemFn> {
         let fn_params = util::fn_params(&self.sig);
-        let normalized_signature = util::normalize_signature(&self.sig)?;
+        let normalized_signature = util::normalize_signature(&self.sig);
         let argument_names = util::args_from_signature(&normalized_signature)?;
         let block: Block = if cfg!(feature = "runtime_dispatch")
             && fn_params.is_empty()

@@ -5,14 +5,14 @@ use syn::{
     Ident, Lifetime, Pat, PatIdent, PatType, Result, ReturnType, Signature, Type, TypeBareFn,
 };
 
-pub(crate) fn normalize_signature(sig: &Signature) -> Result<Signature> {
+pub(crate) fn normalize_signature(sig: &Signature) -> Signature {
     let args = sig
         .inputs
         .iter()
         .enumerate()
         .map(|(i, x)| match x {
-            FnArg::Receiver(rec) => Err(Error::new(rec.self_token.span, "member fn not supported")),
-            FnArg::Typed(arg) => Ok(FnArg::Typed(PatType {
+            FnArg::Receiver(_) => x.clone(),
+            FnArg::Typed(arg) => FnArg::Typed(PatType {
                 pat: Box::new(Pat::Ident(PatIdent {
                     attrs: Vec::new(),
                     by_ref: None,
@@ -24,13 +24,13 @@ pub(crate) fn normalize_signature(sig: &Signature) -> Result<Signature> {
                     subpat: None,
                 })),
                 ..arg.clone()
-            })),
+            }),
         })
-        .collect::<Result<Vec<_>>>()?;
-    Ok(Signature {
+        .collect::<Vec<_>>();
+    Signature {
         inputs: parse_quote! { #(#args),* },
         ..sig.clone()
-    })
+    }
 }
 
 pub(crate) fn args_from_signature<'a>(sig: &'a Signature) -> Result<Vec<&'a Pat>> {

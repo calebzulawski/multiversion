@@ -1,12 +1,11 @@
 use crate::helper_attributes::process_helper_attributes;
-use crate::util;
 use once_cell::sync::Lazy;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use regex::Regex;
 use syn::{
-    parse::Parse, parse::ParseStream, parse_quote, spanned::Spanned, Attribute, Error, Ident,
-    ItemFn, Lit, LitStr, Result, Signature,
+    parse::Parse, parse::ParseStream, parse_quote, spanned::Spanned, Attribute, Error, ItemFn, Lit,
+    LitStr, Result,
 };
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
@@ -238,58 +237,12 @@ pub(crate) fn make_target_fn(config: Config, mut func: ItemFn) -> Result<TokenSt
     // Create the function
     let target_arch = config.target.target_arch();
     let target_feature = config.target.target_feature();
-    let maybe_await = func.sig.asyncness.map(|_| util::await_tokens());
-    let safe_inner_span = {
-        if let Some((idx, attr)) = func
-            .attrs
-            .iter()
-            .enumerate()
-            .find(|(_, attr)| **attr == parse_quote! { #[safe_inner] })
-        {
-            if func.sig.unsafety.is_none() {
-                Err(Error::new(
-                    attr.span(),
-                    "#[safe_inner] may only be used on unsafe fn",
-                ))
-            } else {
-                let span = attr.span();
-                func.attrs.remove(idx);
-                Ok(Some(span))
-            }
-        } else {
-            Ok(None)
-        }
-    }?;
-    if let Some(safe_inner_span) = safe_inner_span {
-        let attrs = func.attrs;
-        let vis = func.vis;
-        let unsafe_sig = crate::util::normalize_signature(&func.sig)?;
-        let safe_sig = Signature {
-            unsafety: None,
-            ident: Ident::new("__safe_inner_fn", safe_inner_span),
-            ..func.sig.clone()
-        };
-        let block = func.block;
-        let safe_ident = &safe_sig.ident;
-        let args = crate::util::args_from_signature(&unsafe_sig)?;
-        let fn_params = crate::util::fn_params(&unsafe_sig);
-        Ok(quote! {
-            #target_arch
-            #(#target_feature)*
-            #(#attrs)*
-            #vis #unsafe_sig {
-                #[inline(always)]
-                #safe_sig #block
-                #safe_ident::<#(#fn_params),*>(#(#args),*)#maybe_await
-            }
-        })
-    } else {
-        Ok(quote! {
-            #target_arch
-            #(#target_feature)*
-            #func
-        })
-    }
+    let functions = crate::functions::process_safe_inner(func)?;
+    Ok(quote! {
+        #target_arch
+        #(#target_feature)*
+        #(#functions)*
+    })
 }
 
 #[cfg(test)]

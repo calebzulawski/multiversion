@@ -66,7 +66,7 @@ impl TryFrom<Function> for Dispatcher {
     type Error = Error;
 
     fn try_from(func: Function) -> Result<Self, Self::Error> {
-        let normalized_sig = util::normalize_signature(&func.func.sig)?;
+        let normalized_sig = util::normalize_signature(&func.func.sig);
         let args = util::args_from_signature(&normalized_sig)?;
         let fn_params = util::fn_params(&func.func.sig);
         Ok(Self {

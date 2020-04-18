@@ -181,6 +181,7 @@
 extern crate proc_macro;
 
 mod dispatcher;
+mod functions;
 mod helper_attributes;
 mod multiversion;
 mod target;
