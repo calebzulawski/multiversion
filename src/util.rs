@@ -88,9 +88,10 @@ pub(crate) fn fn_type_from_signature(sig: &Signature) -> Result<TypeBareFn> {
                 attrs: Vec::new(),
                 name: None,
                 ty: match x {
-                    FnArg::Receiver(rec) => {
-                        Err(Error::new(rec.self_token.span, "member fn not supported"))
-                    }
+                    FnArg::Receiver(rec) => Err(Error::new(
+                        rec.self_token.span,
+                        "cannot determine type of associated fn",
+                    )),
                     FnArg::Typed(arg) => Ok(arg.ty.as_ref().clone()),
                 }?,
             })

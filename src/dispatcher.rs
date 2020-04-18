@@ -169,11 +169,14 @@ impl Dispatcher {
             && fn_params.is_empty()
             && self.sig.asyncness.is_none()
             && !util::impl_trait_present(&self.sig)
+            && !self.associated
         {
             // Dispatching from an atomic fn pointer occurs when the following is true:
             //   * runtime-dispatching is enabled
             //   * the function is not generic
             //   * the function is not async
+            //   * the function does not take or return an impl trait
+            //   * the function is not associated
             let fn_ty = util::fn_type_from_signature(&self.sig)?;
             let feature_detection = {
                 let return_if_detected =
@@ -230,6 +233,11 @@ impl Dispatcher {
             // Dispatch the function via branching if runtime-dispatching is disabled, or it is
             // generic/async/impl Trait
             let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
+            let maybe_self = if self.associated {
+                quote! { Self:: }
+            } else {
+                Default::default()
+            };
             let return_if_detected =
                 self.specializations
                     .iter()
@@ -242,7 +250,7 @@ impl Dispatcher {
                                 #target_arch
                                 {
                                     if #features_detected {
-                                        return #function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
+                                        return #maybe_self#function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
                                     }
                                 }
                             })
@@ -254,7 +262,7 @@ impl Dispatcher {
             parse_quote! {
                 {
                     #(#return_if_detected)*
-                    #default_fn::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
+                    #maybe_self#default_fn::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
                 }
             }
         };

@@ -118,15 +118,16 @@ impl TryFrom<Function> for Dispatcher {
 impl TryFrom<ItemFn> for Function {
     type Error = Error;
 
-    fn try_from(func: ItemFn) -> Result<Self, Self::Error> {
+    fn try_from(mut func: ItemFn) -> Result<Self, Self::Error> {
+        let associated = crate::functions::is_associated_fn(&mut func);
         let attrs = func.attrs;
         let mut multiversioned = Function {
             specializations: Vec::new(),
+            associated,
             func: ItemFn {
                 attrs: Vec::new(),
                 ..func
             },
-            associated: false,
         };
 
         for attr in attrs {
@@ -192,12 +193,6 @@ impl TryFrom<ItemFn> for Function {
                                 lit => Err(Error::new(lit.span(), "expected literal bool")),
                             })?,
                         });
-                }
-                "associated" => {
-                    meta_parser! {
-                        &nested => []
-                    }
-                    multiversioned.associated = true;
                 }
                 _ => {
                     multiversioned.func.attrs.push(attr);
