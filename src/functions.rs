@@ -24,8 +24,25 @@ pub fn process_safe_inner(mut item: ItemFn) -> Result<Vec<ItemFn>> {
     }?;
     if let Some(safe_inner_span) = safe_inner_span {
         // create safe function
+        // copy #[cfg] attributes
+        let attrs = item
+            .attrs
+            .iter()
+            .filter_map(|attr| {
+                if let Ok(meta) = attr.parse_meta() {
+                    if *meta.path() == parse_quote! { cfg } {
+                        Some(attr.clone())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .chain(std::iter::once(parse_quote! { #[inline(always)] }))
+            .collect();
         let safe_fn = ItemFn {
-            attrs: vec![parse_quote! { #[inline(always)] }],
+            attrs,
             vis: Visibility::Inherited,
             sig: Signature {
                 unsafety: None,
@@ -36,10 +53,9 @@ pub fn process_safe_inner(mut item: ItemFn) -> Result<Vec<ItemFn>> {
         };
 
         // create unsafe function
-        let unsafe_sig = crate::util::normalize_signature(&item.sig);
+        let (unsafe_sig, args) = crate::util::normalize_signature(&item.sig);
         let maybe_await = item.sig.asyncness.map(|_| crate::util::await_tokens());
         let safe_ident = &safe_fn.sig.ident;
-        let args = crate::util::args_from_signature(&unsafe_sig)?;
         let fn_params = crate::util::fn_params(&unsafe_sig);
         let unsafe_fn = ItemFn {
             block: parse_quote! {

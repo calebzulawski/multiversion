@@ -1,11 +1,12 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    parse_quote, spanned::Spanned, visit_mut::VisitMut, BareFnArg, Error, FnArg, GenericParam,
-    Ident, Lifetime, Pat, PatIdent, PatType, Result, ReturnType, Signature, Type, TypeBareFn,
+    parse_quote, spanned::Spanned, visit_mut::VisitMut, BareFnArg, Error, Expr, FnArg,
+    GenericParam, Ident, Lifetime, Pat, PatIdent, PatType, Result, ReturnType, Signature, Type,
+    TypeBareFn,
 };
 
-pub(crate) fn normalize_signature(sig: &Signature) -> Signature {
+pub(crate) fn normalize_signature(sig: &Signature) -> (Signature, Vec<Expr>) {
     let args = sig
         .inputs
         .iter()
@@ -27,20 +28,30 @@ pub(crate) fn normalize_signature(sig: &Signature) -> Signature {
             }),
         })
         .collect::<Vec<_>>();
-    Signature {
-        inputs: parse_quote! { #(#args),* },
-        ..sig.clone()
-    }
-}
-
-pub(crate) fn args_from_signature<'a>(sig: &'a Signature) -> Result<Vec<&'a Pat>> {
-    sig.inputs
+    let callable_args = args
         .iter()
         .map(|x| match x {
-            FnArg::Receiver(rec) => Err(Error::new(rec.self_token.span, "member fn not supported")),
-            FnArg::Typed(arg) => Ok(arg.pat.as_ref()),
+            FnArg::Receiver(rec) => {
+                let self_token = rec.self_token;
+                parse_quote! { #self_token }
+            }
+            FnArg::Typed(arg) => {
+                if let Pat::Ident(ident) = &*arg.pat {
+                    let ident = &ident.ident;
+                    parse_quote! { #ident }
+                } else {
+                    panic!("pattern should have been ident")
+                }
+            }
         })
-        .collect::<Result<Vec<_>>>()
+        .collect();
+    (
+        Signature {
+            inputs: parse_quote! { #(#args),* },
+            ..sig.clone()
+        },
+        callable_args,
+    )
 }
 
 pub(crate) fn impl_trait_present(sig: &Signature) -> bool {

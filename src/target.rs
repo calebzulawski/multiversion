@@ -237,12 +237,9 @@ pub(crate) fn make_target_fn(config: Config, mut func: ItemFn) -> Result<TokenSt
     // Create the function
     let target_arch = config.target.target_arch();
     let target_feature = config.target.target_feature();
+    let func = parse_quote! { #target_arch #(#target_feature)* #func };
     let functions = crate::functions::process_safe_inner(func)?;
-    Ok(quote! {
-        #target_arch
-        #(#target_feature)*
-        #(#functions)*
-    })
+    Ok(quote! { #(#functions)* })
 }
 
 #[cfg(test)]

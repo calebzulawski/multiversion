@@ -2,7 +2,7 @@ use crate::dispatcher::Dispatcher;
 use crate::target::Target;
 use crate::util;
 use proc_macro2::TokenStream;
-use quote::ToTokens;
+use quote::{quote, ToTokens};
 use std::convert::{TryFrom, TryInto};
 use syn::{
     parse_quote, spanned::Spanned, Error, Ident, ItemFn, Lit, Meta, MetaList, NestedMeta, Path,
@@ -60,52 +60,57 @@ enum Specialization {
 struct Function {
     specializations: Vec<Specialization>,
     func: ItemFn,
+    associated: bool,
 }
 
 impl TryFrom<Function> for Dispatcher {
     type Error = Error;
 
-    fn try_from(func: Function) -> Result<Self, Self::Error> {
-        let normalized_sig = util::normalize_signature(&func.func.sig);
-        let args = util::args_from_signature(&normalized_sig)?;
-        let fn_params = util::fn_params(&func.func.sig);
+    fn try_from(item: Function) -> Result<Self, Self::Error> {
+        let (_, args) = util::normalize_signature(&item.func.sig);
+        let fn_params = util::fn_params(&item.func.sig);
         Ok(Self {
-            specializations: func
+            specializations: item
                 .specializations
                 .iter()
                 .map(|specialization| match specialization {
                     Specialization::Clone { target, .. } => crate::dispatcher::Specialization {
                         target: target.clone(),
-                        block: func.func.block.as_ref().clone(),
+                        block: item.func.block.as_ref().clone(),
                         normalize: false,
                     },
                     Specialization::Override {
                         target,
                         func,
                         is_unsafe,
-                    } => crate::dispatcher::Specialization {
-                        target: target.clone(),
-                        block: if *is_unsafe {
-                            parse_quote! {
-                                {
-                                    unsafe { #func::<#(#fn_params),*>(#(#args),*) }
-                                }
-                            }
+                    } => {
+                        let call = quote! { #func::<#(#fn_params),*>(#(#args),*) };
+                        let call = if item.associated {
+                            quote! { Self::#call }
                         } else {
-                            parse_quote! {
-                                {
-                                    #func::<#(#fn_params),*>(#(#args),*)
+                            call
+                        };
+                        crate::dispatcher::Specialization {
+                            target: target.clone(),
+                            block: if *is_unsafe {
+                                parse_quote! {
+                                    { unsafe { #call } }
                                 }
-                            }
-                        },
-                        normalize: true,
-                    },
+                            } else {
+                                parse_quote! {
+                                    { #call }
+                                }
+                            },
+                            normalize: true,
+                        }
+                    }
                 })
                 .collect(),
-            attrs: func.func.attrs,
-            vis: func.func.vis,
-            sig: func.func.sig,
-            default: *func.func.block,
+            attrs: item.func.attrs,
+            vis: item.func.vis,
+            sig: item.func.sig,
+            default: *item.func.block,
+            associated: item.associated,
         })
     }
 }
@@ -121,6 +126,7 @@ impl TryFrom<ItemFn> for Function {
                 attrs: Vec::new(),
                 ..func
             },
+            associated: false,
         };
 
         for attr in attrs {
@@ -186,6 +192,12 @@ impl TryFrom<ItemFn> for Function {
                                 lit => Err(Error::new(lit.span(), "expected literal bool")),
                             })?,
                         });
+                }
+                "associated" => {
+                    meta_parser! {
+                        &nested => []
+                    }
+                    multiversioned.associated = true;
                 }
                 _ => {
                     multiversioned.func.attrs.push(attr);
