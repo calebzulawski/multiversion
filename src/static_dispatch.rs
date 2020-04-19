@@ -1,8 +1,8 @@
 use crate::dispatcher::feature_fn_name;
 use crate::target::Target;
 use syn::{
-    parse_quote, spanned::Spanned, Attribute, Block, Error, Ident, ItemFn, Lit, Meta, MetaList,
-    NestedMeta, Path, Result, Stmt,
+    parse_quote, spanned::Spanned, Error, Ident, ItemFn, Lit, Meta, MetaList, NestedMeta, Path,
+    Result, Stmt,
 };
 
 pub(crate) fn process_static_dispatch(item: &mut ItemFn, target: Option<&Target>) -> Result<()> {
@@ -44,14 +44,23 @@ pub(crate) fn process_static_dispatch(item: &mut ItemFn, target: Option<&Target>
                         _ => Err(Error::new(lit.span(), "expected literal string")),
                     })
                     .transpose()?;
-                let ident = &func.segments.last().unwrap().ident;
+
+                // Build new source fn path
+                let mut source = func.clone();
+
+                // Get last ident in path
+                let ident = &mut source.segments.last_mut().unwrap().ident;
+
+                // Bound name is either the ident, or `rename` if it exists
                 let binding = if let Some(rename) = rename {
                     rename.clone()
                 } else {
                     ident.clone()
                 };
-                let func = feature_fn_name(&ident, target);
-                bindings.push(parse_quote! { let #binding = #func; });
+
+                // Replace the last ident with the mangled name
+                *ident = feature_fn_name(ident, target);
+                bindings.push(parse_quote! { let #binding = #source; });
             }
             _ => {
                 retained.push(attr);

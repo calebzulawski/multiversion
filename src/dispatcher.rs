@@ -1,4 +1,4 @@
-use crate::{target::Target, target_cfg::process_target_cfg, util};
+use crate::{target::Target, util};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{parse_quote, Attribute, Block, Ident, ItemFn, Result, Signature, Visibility};

@@ -4,14 +4,11 @@ use crate::util;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use std::convert::{TryFrom, TryInto};
-use syn::{
-    parse_quote, spanned::Spanned, Error, Ident, ItemFn, Lit, Meta, MetaList, NestedMeta, Path,
-};
+use syn::{parse_quote, spanned::Spanned, Error, ItemFn, Lit, Meta, MetaList, NestedMeta, Path};
 
 enum Specialization {
     Clone {
         target: Target,
-        func: Option<Ident>,
     },
     Override {
         target: Target,
@@ -116,19 +113,12 @@ impl TryFrom<ItemFn> for Function {
                     meta_parser! {
                         &nested => [
                             "target" => target,
-                            "fn" => func,
                         ]
                     }
                     multiversioned.specializations.push(Specialization::Clone {
                         target: target
                             .ok_or(Error::new(nested.span(), "expected key 'target'"))?
                             .try_into()?,
-                        func: func
-                            .map(|lit| match lit {
-                                Lit::Str(s) => s.parse(),
-                                _ => Err(Error::new(lit.span(), "expected literal string")),
-                            })
-                            .transpose()?,
                     });
                 }
                 "specialize" => {

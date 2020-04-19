@@ -6,10 +6,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use regex::Regex;
 use std::convert::TryInto;
-use syn::{
-    parse::Parse, parse::ParseStream, parse_quote, spanned::Spanned, Attribute, Error, ItemFn, Lit,
-    LitStr, Result,
-};
+use syn::{parse_quote, spanned::Spanned, Attribute, Error, ItemFn, Lit, LitStr, Result};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 enum Architecture {
