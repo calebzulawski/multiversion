@@ -3,23 +3,20 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{parse_quote, Attribute, Block, Ident, ItemFn, Result, Signature, Visibility};
 
-pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
+pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> (Ident, Ident) {
     if let Some(target) = target {
         if target.has_features_specified() {
-            Ident::new(
-                &format!(
-                    "__multiversion_{}_feature_{}",
-                    ident,
-                    target.features_string()
-                ),
-                ident.span(),
-            )
-        } else {
-            Ident::new(&format!("__multiversion_{}_default", ident), ident.span())
+            let base = format!("{}_{}", ident, target.features_string());
+            return (
+                Ident::new(&format!("{}_version", base), ident.span()),
+                Ident::new(&format!("__{}_static_dispatch", base), ident.span()),
+            );
         }
-    } else {
-        Ident::new(&format!("__multiversion_{}_default", ident), ident.span())
     }
+
+    // If this is a default fn, it doesn't have a dedicated static dispatcher
+    let default = Ident::new(&format!("{}_default_version", ident), ident.span());
+    (default.clone(), default)
 }
 
 pub(crate) struct Specialization {
@@ -37,31 +34,26 @@ impl Specialization {
         associated: bool,
     ) -> Result<Vec<ItemFn>> {
         let target_string = self.target.target_string();
-        let fn_name = feature_fn_name(&sig.ident, Some(&self.target));
-        let mut attrs = attrs.clone();
-        attrs.insert(0, parse_quote! { #[multiversion::target(#target_string)] });
-        if sig.unsafety.is_some() {
-            // If the function is already unsafe, just tag it with the target attribute
-            attrs.push(parse_quote! { #[inline] });
-            attrs.push(parse_quote! { #[doc(hidden)] });
-            let unsafe_fn = ItemFn {
-                attrs,
-                vis: vis.clone(),
-                sig: Signature {
-                    ident: fn_name,
-                    ..sig.clone()
-                },
-                block: Box::new(self.block.clone()),
-            };
-            Ok(vec![unsafe_fn])
-        } else {
-            // If the function isn't unsafe, create an unsafe version
+        let (fn_name, dispatch_fn_name) = feature_fn_name(&sig.ident, Some(&self.target));
 
-            // create unsafe fn
+        let mut target_attrs = Vec::new();
+        target_attrs.push(parse_quote! { #[multiversion::target(#target_string)] });
+        target_attrs.push(parse_quote! { #[inline] });
+        target_attrs.push(parse_quote! { #[doc(hidden)] });
+        target_attrs.extend(attrs.iter().cloned());
+
+        // If this target doesn't have any features, treat it as a default version
+        if self.target.has_features_specified() {
+            // if the original function is safe, tag it with #[safe_inner]
+            if sig.unsafety.is_none() {
+                target_attrs.push(parse_quote! { #[safe_inner] });
+            }
+
+            // create unsafe/target fn
             let fn_params = crate::util::fn_params(&sig);
             let maybe_await = sig.asyncness.map(|_| util::await_tokens());
             let unsafe_sig = Signature {
-                ident: Ident::new(&format!("__unsafe_{}", fn_name), sig.ident.span()),
+                ident: fn_name,
                 unsafety: parse_quote! { unsafe },
                 ..if self.normalize {
                     crate::util::normalize_signature(sig).0
@@ -69,24 +61,26 @@ impl Specialization {
                     sig.clone()
                 }
             };
-            let block = &self.block;
-            let unsafe_fn: ItemFn = parse_quote! {
-                #[allow(non_snake_case)] #(#attrs)* #[safe_inner] #unsafe_sig #block
+            let target_fn = ItemFn {
+                attrs: target_attrs,
+                vis: vis.clone(),
+                sig: unsafe_sig,
+                block: Box::new(self.block.clone()),
             };
 
-            // create safe fn
+            // create safe/dispatch fn
             let (outer_sig, args) = util::normalize_signature(sig);
             let outer_sig = Signature {
-                ident: fn_name,
+                ident: dispatch_fn_name,
                 ..outer_sig
             };
-            let unsafe_ident = &unsafe_fn.sig.ident;
+            let target_fn_ident = &target_fn.sig.ident;
             let maybe_self = if associated {
                 quote! { Self:: }
             } else {
                 Default::default()
             };
-            let safe_fn = ItemFn {
+            let dispatch_fn = ItemFn {
                 attrs: vec![
                     parse_quote! { #[inline(always)] },
                     parse_quote! { #[doc(hidden)] },
@@ -95,12 +89,22 @@ impl Specialization {
                 vis: vis.clone(),
                 block: Box::new(parse_quote! {
                     {
-                        unsafe { #maybe_self#unsafe_ident::<#(#fn_params),*>(#(#args),*)#maybe_await }
+                        unsafe { #maybe_self#target_fn_ident::<#(#fn_params),*>(#(#args),*)#maybe_await }
                     }
                 }),
                 sig: outer_sig,
             };
-            Ok(vec![safe_fn, unsafe_fn])
+            Ok(vec![dispatch_fn, target_fn])
+        } else {
+            Ok(vec![ItemFn {
+                attrs: target_attrs,
+                vis: vis.clone(),
+                sig: Signature {
+                    ident: fn_name,
+                    ..sig.clone()
+                },
+                block: Box::new(self.block.clone()),
+            }])
         }
     }
 }
@@ -153,7 +157,7 @@ impl Dispatcher {
                 attrs,
                 vis: self.vis.clone(),
                 sig: Signature {
-                    ident: feature_fn_name(&self.sig.ident, None),
+                    ident: feature_fn_name(&self.sig.ident, None).1,
                     ..self.sig.clone()
                 },
                 block: Box::new(self.default.clone()),
@@ -187,7 +191,7 @@ impl Dispatcher {
                             if target.has_features_specified() {
                                 let target_arch = target.target_arch();
                                 let features_detected = target.features_detected();
-                                let function = feature_fn_name(&self.sig.ident, Some(&target));
+                                let function = feature_fn_name(&self.sig.ident, Some(&target)).1;
                                 Some(quote! {
                                     #target_arch
                                     {
@@ -200,7 +204,7 @@ impl Dispatcher {
                                 None
                             }
                         });
-                let default_fn = feature_fn_name(&self.sig.ident, None);
+                let default_fn = feature_fn_name(&self.sig.ident, None).1;
                 quote! {
                     fn __get_fn<#(#fn_params),*>() -> #fn_ty {
                         #(#return_if_detected)*
@@ -246,7 +250,7 @@ impl Dispatcher {
                         if target.has_features_specified() {
                             let target_arch = target.target_arch();
                             let features_detected = target.features_detected();
-                            let function = feature_fn_name(&self.sig.ident, Some(&target));
+                            let function = feature_fn_name(&self.sig.ident, Some(&target)).1;
                             Some(quote! {
                                 #target_arch
                                 {
@@ -259,7 +263,7 @@ impl Dispatcher {
                             None
                         }
                     });
-            let default_fn = feature_fn_name(&self.sig.ident, None);
+            let default_fn = feature_fn_name(&self.sig.ident, None).1;
             parse_quote! {
                 {
                     #(#return_if_detected)*

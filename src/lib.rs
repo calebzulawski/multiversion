@@ -302,6 +302,28 @@ use syn::{parse::Nothing, parse_macro_input, ItemFn};
 /// The [`multiversion`] attribute supports conditional compilation with the `#[target_cfg]` helper
 /// attribute. See [conditional compilation] for more information.
 ///
+/// # Function name mangling
+/// The functions created by this macro are mangled as `{ident}_{features}_version`, where `ident` is
+/// the name of the multiversioned function, and `features` is either `default` (for the default
+/// version with no features enabled) or the list of features, sorted alphabetically.  Dots (`.`)
+/// in the feature names are removed.
+///
+/// The following creates two functions, `foo_avx_sse41_version` and `foo_default_version`.
+/// ```
+/// #[multiversion::multiversion]
+/// #[clone(target = "[x86|x86_64]+sse4.1+avx")]
+/// fn foo() {}
+///
+/// #[multiversion::target("[x86|x86_64]+sse4.1+avx")]
+/// unsafe fn call_foo_avx() {
+///     foo_avx_sse41_version();
+/// }
+///
+/// fn call_foo_default() {
+///     foo_default_version();
+/// }
+/// ```
+///
 /// # Implementation details
 /// The function version dispatcher consists of a function selector and an atomic function pointer.
 /// Initially the function pointer will point to the function selector. On invocation, this selector

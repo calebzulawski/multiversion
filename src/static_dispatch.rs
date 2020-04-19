@@ -59,7 +59,7 @@ pub(crate) fn process_static_dispatch(item: &mut ItemFn, target: Option<&Target>
                 };
 
                 // Replace the last ident with the mangled name
-                *ident = feature_fn_name(ident, target);
+                *ident = feature_fn_name(ident, target).1;
                 bindings.push(parse_quote! { let #binding = #source; });
             }
             _ => {
