@@ -25,7 +25,7 @@ default = ["runtime_dispatch"]
 runtime_dispatch = []
 
 [dependencies]
-syn = { version = "1", features = ["full", "extra-traits", "visit-mut"] }
+syn = { version = "^1.0.7", features = ["full", "extra-traits", "visit-mut"] }
 quote = "1"
 proc-macro2 = "1"
 regex = "1"
