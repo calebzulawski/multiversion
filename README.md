@@ -19,10 +19,7 @@ These optional features cannot be haphazardly compiled into programs--executing 
 ## Features
 * Dynamic dispatching, using runtime CPU feature detection
 * Static dispatching, avoiding repeated feature detection for nested multiversioned functions (and allowing inlining!)
-* Support for generic and `async` functions
-
-## Limitations
-* No support for member functions or associated functions (or any other functions not at module-level)
+* Support for all functions, including generic and `async`
 
 ## Example
 Automatic function multiversioning with the `clone` attribute, similar to GCC's `target_clones` attribute:
