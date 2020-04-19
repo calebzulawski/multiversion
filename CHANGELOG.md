@@ -6,7 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Support for associated functions (including methods).
 - Support for `impl Trait`.
+- Specification for name mangling.
+- Documentation for `#[safe_inner]` helper attribute for `#[target]`.
 ### Removed
 - Removed `#[target_clones]` attribute (functionality is now included in `#[multiversion]` attribute).
 ### Changed
