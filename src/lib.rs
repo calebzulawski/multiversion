@@ -19,8 +19,12 @@
 //! dispatch using `#[cfg(target_feature)]` and can be used in `#[no_std]` crates.
 //!
 //! # Capabilities
-//! The intention of this crate is to allow any function to be multiversioned.  If any functions do
-//! not work, please file an issue on GitHub.
+//! The intention of this crate is to allow any function, other than trait methods, to be
+//! multiversioned.  If any functions do not work please file an issue on GitHub.
+//!
+//! The [`multiversion`] macro produces additional functions adjacent to the tagged function which
+//! do not correspond to a trait member.  If you would like to multiversion a trait method, instead
+//! try multiversioning a free function or struct method and calling it from the trait method.
 //!
 //! # Target specification strings
 //! Targets for the [`target`] and [`multiversion`] attributes are specified as a combination of
@@ -202,7 +206,7 @@ use syn::{parse::Nothing, parse_macro_input, ItemFn};
 ///   * Arguments:
 ///     * `target`: the target specification of the clone
 /// * `#[specialize]`
-///   * Specializes the function for the specified target by calling `function`.
+///   * Specializes the function for the specified target with another function.
 ///   * Arguments:
 ///     * `target`: the target specification of the specialization
 ///     * `fn`: path to the function specializing the tagged function
@@ -262,8 +266,7 @@ use syn::{parse::Nothing, parse_macro_input, ItemFn};
 /// ## Making `target_feature` functions safe
 /// This example is the same as the above example, but calls `unsafe` specialized functions.  Note
 /// that the `where_am_i` function is still safe, since we know we are only calling specialized
-/// functions on supported CPUs.  In this example, the [`target`] attribute is used for
-/// convenience.
+/// functions on supported CPUs.
 /// ```
 /// use multiversion::{multiversion, target};
 ///
