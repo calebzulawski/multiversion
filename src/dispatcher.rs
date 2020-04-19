@@ -1,4 +1,4 @@
-use crate::{helper_attributes::process_helper_attributes, target::Target, util};
+use crate::{target::Target, target_cfg::process_target_cfg, util};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{parse_quote, Attribute, Block, Ident, ItemFn, Result, Signature, Visibility};
@@ -29,18 +29,23 @@ pub(crate) struct Specialization {
 }
 
 impl Specialization {
-    fn make_fn(&self, vis: &Visibility, sig: &Signature, associated: bool) -> Result<Vec<ItemFn>> {
+    fn make_fn(
+        &self,
+        vis: &Visibility,
+        sig: &Signature,
+        attrs: &Vec<Attribute>,
+        associated: bool,
+    ) -> Result<Vec<ItemFn>> {
         let target_string = self.target.target_string();
-        let target_attr: Attribute = parse_quote! { #[multiversion::target(#target_string)] };
         let fn_name = feature_fn_name(&sig.ident, Some(&self.target));
+        let mut attrs = attrs.clone();
+        attrs.insert(0, parse_quote! { #[multiversion::target(#target_string)] });
         if sig.unsafety.is_some() {
             // If the function is already unsafe, just tag it with the target attribute
+            attrs.push(parse_quote! { #[inline] });
+            attrs.push(parse_quote! { #[doc(hidden)] });
             let unsafe_fn = ItemFn {
-                attrs: vec![
-                    parse_quote! { #[inline] },
-                    parse_quote! { #[doc(hidden)] },
-                    target_attr,
-                ],
+                attrs,
                 vis: vis.clone(),
                 sig: Signature {
                     ident: fn_name,
@@ -50,7 +55,7 @@ impl Specialization {
             };
             Ok(vec![unsafe_fn])
         } else {
-            // If the function isn't unsafe, crete an unsafe version
+            // If the function isn't unsafe, create an unsafe version
 
             // create unsafe fn
             let fn_params = crate::util::fn_params(&sig);
@@ -66,7 +71,7 @@ impl Specialization {
             };
             let block = &self.block;
             let unsafe_fn: ItemFn = parse_quote! {
-                #[allow(non_snake_case)] #target_attr #[safe_inner] #unsafe_sig #block
+                #[allow(non_snake_case)] #(#attrs)* #[safe_inner] #unsafe_sig #block
             };
 
             // create safe fn
@@ -134,28 +139,24 @@ impl Dispatcher {
     fn feature_fns(&self) -> Result<Vec<ItemFn>> {
         let mut fns = Vec::new();
         for f in &self.specializations {
-            fns.extend(f.make_fn(&self.vis, &self.sig, self.associated)?);
+            fns.extend(f.make_fn(&self.vis, &self.sig, &self.attrs, self.associated)?);
         }
 
         // Create default fn
+        let mut attrs = self.attrs.clone();
+        attrs.insert(0, parse_quote! { #[multiversion::target] });
+        attrs.push(parse_quote! { #[inline(always)] });
+        attrs.push(parse_quote! { #[doc(hidden)] });
+        attrs.push(self.cfg_if_not_defaulted());
         fns.push({
             ItemFn {
-                attrs: vec![
-                    parse_quote! { #[inline(always)] },
-                    parse_quote! { #[doc(hidden)] },
-                    self.cfg_if_not_defaulted(),
-                ],
+                attrs,
                 vis: self.vis.clone(),
                 sig: Signature {
                     ident: feature_fn_name(&self.sig.ident, None),
                     ..self.sig.clone()
                 },
-                block: Box::new({
-                    // Rewrite static dispatches, since this doesn't use the target attribute
-                    let mut block = self.default.clone();
-                    process_helper_attributes(None, &mut block)?;
-                    block
-                }),
+                block: Box::new(self.default.clone()),
             }
         });
 
@@ -267,7 +268,7 @@ impl Dispatcher {
             }
         };
         Ok(ItemFn {
-            attrs: self.attrs.clone(),
+            attrs: Vec::new(),
             vis: self.vis.clone(),
             sig: normalized_signature,
             block: Box::new(block),

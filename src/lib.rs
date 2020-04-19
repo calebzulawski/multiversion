@@ -180,11 +180,15 @@
 
 extern crate proc_macro;
 
+#[macro_use]
+mod meta;
+
 mod dispatcher;
-mod functions;
-mod helper_attributes;
 mod multiversion;
+mod safe_inner;
+mod static_dispatch;
 mod target;
+mod target_cfg;
 mod util;
 
 use quote::ToTokens;
@@ -356,9 +360,9 @@ pub fn target(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let config = parse_macro_input!(attr as target::Config);
+    let target = parse_macro_input!(attr as Option<syn::Lit>);
     let func = parse_macro_input!(input as ItemFn);
-    match target::make_target_fn(config, func) {
+    match target::make_target_fn(target, func) {
         Ok(tokens) => tokens.into_token_stream(),
         Err(err) => err.to_compile_error(),
     }

@@ -1,8 +1,11 @@
-use crate::helper_attributes::process_helper_attributes;
+use crate::safe_inner::process_safe_inner;
+use crate::static_dispatch::process_static_dispatch;
+use crate::target_cfg::process_target_cfg;
 use once_cell::sync::Lazy;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use regex::Regex;
+use std::convert::TryInto;
 use syn::{
     parse::Parse, parse::ParseStream, parse_quote, spanned::Spanned, Attribute, Error, ItemFn, Lit,
     LitStr, Result,
@@ -206,19 +209,6 @@ impl Target {
     }
 }
 
-pub(crate) struct Config {
-    target: Target,
-}
-
-impl Parse for Config {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let target_string = input.parse::<LitStr>()?;
-        Ok(Self {
-            target: Target::parse(&target_string)?,
-        })
-    }
-}
-
 impl std::convert::TryFrom<&Lit> for Target {
     type Error = Error;
 
@@ -230,15 +220,20 @@ impl std::convert::TryFrom<&Lit> for Target {
     }
 }
 
-pub(crate) fn make_target_fn(config: Config, mut func: ItemFn) -> Result<TokenStream> {
-    // Rewrite static dispatches, etc
-    process_helper_attributes(Some(config.target.clone()), &mut func.block)?;
+pub(crate) fn make_target_fn(target: Option<Lit>, mut func: ItemFn) -> Result<TokenStream> {
+    let target = target.as_ref().map(|s| s.try_into()).transpose()?;
+
+    // Rewrite #[target_cfg] and #[static_dispatch]
+    process_target_cfg(target.clone(), &mut func.block)?;
+    process_static_dispatch(&mut func, target.as_ref())?;
 
     // Create the function
-    let target_arch = config.target.target_arch();
-    let target_feature = config.target.target_feature();
-    let func = parse_quote! { #target_arch #(#target_feature)* #func };
-    let functions = crate::functions::process_safe_inner(func)?;
+    if let Some(target) = target {
+        let target_arch = target.target_arch();
+        let target_feature = target.target_feature();
+        func = parse_quote! { #target_arch #(#target_feature)* #func };
+    }
+    let functions = process_safe_inner(func)?;
     Ok(quote! { #(#functions)* })
 }
 

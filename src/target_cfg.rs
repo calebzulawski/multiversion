@@ -1,11 +1,11 @@
-use crate::{dispatcher::feature_fn_name, target::Target};
+use crate::target::Target;
 use syn::{
-    parse_quote, spanned::Spanned, visit_mut::VisitMut, Attribute, Block, Error, Ident, ItemUse,
-    Lit, Meta, MetaNameValue, NestedMeta, Result, UseName, UsePath, UseRename, UseTree,
+    parse_quote, spanned::Spanned, visit_mut::VisitMut, Attribute, Block, Error, Lit, Meta,
+    MetaNameValue, NestedMeta, Result,
 };
 
-pub(crate) fn process_helper_attributes(target: Option<Target>, block: &mut Block) -> Result<()> {
-    let mut visitor = HelperAttributeVisitor {
+pub(crate) fn process_target_cfg(target: Option<Target>, block: &mut Block) -> Result<()> {
+    let mut visitor = ReplaceTargetCfg {
         target,
         result: Ok(()),
     };
@@ -13,49 +13,12 @@ pub(crate) fn process_helper_attributes(target: Option<Target>, block: &mut Bloc
     visitor.result
 }
 
-struct HelperAttributeVisitor {
+struct ReplaceTargetCfg {
     target: Option<Target>,
     result: Result<()>,
 }
 
-impl HelperAttributeVisitor {
-    fn rebuild_use_tree(&self, tree: &UseTree) -> Result<ItemUse> {
-        fn finish(
-            idents: Vec<&Ident>,
-            name: &Ident,
-            rename: &Ident,
-            target: Option<&Target>,
-        ) -> ItemUse {
-            let fn_name = feature_fn_name(&name, target);
-            if idents.is_empty() {
-                parse_quote! { use #fn_name as #rename; }
-            } else {
-                parse_quote! { use #(#idents)::*::#fn_name as #rename; }
-            }
-        }
-        fn detail<'a>(
-            tree: &'a UseTree,
-            mut idents: Vec<&'a Ident>,
-            target: Option<&Target>,
-        ) -> Result<ItemUse> {
-            match tree {
-                UseTree::Path(UsePath { ident, tree, .. }) => {
-                    idents.push(ident);
-                    detail(tree, idents, target)
-                }
-                UseTree::Name(UseName { ref ident }) => Ok(finish(idents, ident, ident, target)),
-                UseTree::Rename(UseRename { ident, rename, .. }) => {
-                    Ok(finish(idents, ident, rename, target))
-                }
-                _ => Err(Error::new(
-                    tree.span(),
-                    "unsupported use statement for #[static_dispatch]",
-                )),
-            }
-        }
-        detail(tree, Vec::new(), self.target.as_ref())
-    }
-
+impl ReplaceTargetCfg {
     fn target_cfg_value(&self, nested: &NestedMeta) -> Result<bool> {
         match nested {
             NestedMeta::Meta(meta) => match meta {
@@ -109,19 +72,7 @@ impl HelperAttributeVisitor {
     }
 }
 
-impl VisitMut for HelperAttributeVisitor {
-    fn visit_item_use_mut(&mut self, i: &mut ItemUse) {
-        let before = i.attrs.len();
-        i.attrs
-            .retain(|attr| *attr != parse_quote! { #[static_dispatch] });
-        if i.attrs.len() < before {
-            self.result = self.result.clone().and_then(|_| {
-                *i = self.rebuild_use_tree(&i.tree)?;
-                Ok(())
-            });
-        }
-    }
-
+impl VisitMut for ReplaceTargetCfg {
     fn visit_attribute_mut(&mut self, i: &mut Attribute) {
         if let Ok(Meta::List(list)) = i.parse_meta() {
             if list.path.is_ident("target_cfg") {
