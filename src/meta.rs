@@ -17,19 +17,19 @@ macro_rules! meta_parser {
                                     if $var.is_none() {
                                         $var = Some(&nv.lit);
                                     } else {
-                                        Err(Error::new(nv.path.span(), "key already provided"))?
+                                        return Err(Error::new(nv.path.span(), "key already provided"));
                                     }
                                 }
                             )*
-                            _ => Err(Error::new(nv.path.span(), "unexpected key"))?
+                            _ => return Err(Error::new(nv.path.span(), "unexpected key")),
                         };
                     }
-                    _ => Err(Error::new(meta.span(), "expected name-value pair"))?
+                    _ => return Err(Error::new(meta.span(), "expected name-value pair")),
                 }
-                NestedMeta::Lit(lit) => Err(Error::new(
+                NestedMeta::Lit(lit) => return Err(Error::new(
                     lit.span(),
                     "unexpected literal, expected name-value pair",
-                ))?,
+                )),
             }
         }
     }

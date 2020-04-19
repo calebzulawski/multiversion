@@ -30,7 +30,7 @@ impl Specialization {
         &self,
         vis: &Visibility,
         sig: &Signature,
-        attrs: &Vec<Attribute>,
+        attrs: &[Attribute],
         associated: bool,
     ) -> Result<Vec<ItemFn>> {
         let target_string = self.target.target_string();

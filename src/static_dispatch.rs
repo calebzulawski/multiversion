@@ -34,10 +34,11 @@ pub(crate) fn process_static_dispatch(item: &mut ItemFn, target: Option<&Target>
                         "rename" => rename,
                     ]
                 }
-                let func = match func.ok_or(Error::new(nested.span(), "expected key 'fn'"))? {
-                    Lit::Str(s) => s.parse_with(Path::parse_mod_style),
-                    l => Err(Error::new(l.span(), "expected literal string")),
-                }?;
+                let func =
+                    match func.ok_or_else(|| Error::new(nested.span(), "expected key 'fn'"))? {
+                        Lit::Str(s) => s.parse_with(Path::parse_mod_style),
+                        l => Err(Error::new(l.span(), "expected literal string")),
+                    }?;
                 let rename: Option<Ident> = rename
                     .map(|lit| match lit {
                         Lit::Str(s) => s.parse(),

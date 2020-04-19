@@ -117,7 +117,7 @@ impl TryFrom<ItemFn> for Function {
                     }
                     multiversioned.specializations.push(Specialization::Clone {
                         target: target
-                            .ok_or(Error::new(nested.span(), "expected key 'target'"))?
+                            .ok_or_else(|| Error::new(nested.span(), "expected key 'target'"))?
                             .try_into()?,
                     });
                 }
@@ -133,10 +133,10 @@ impl TryFrom<ItemFn> for Function {
                         .specializations
                         .push(Specialization::Override {
                             target: target
-                                .ok_or(Error::new(nested.span(), "expected key 'target'"))?
+                                .ok_or_else(|| Error::new(nested.span(), "expected key 'target'"))?
                                 .try_into()?,
                             func: match func
-                                .ok_or(Error::new(nested.span(), "expected key 'fn'"))?
+                                .ok_or_else(|| Error::new(nested.span(), "expected key 'fn'"))?
                             {
                                 Lit::Str(s) => s.parse(),
                                 lit => Err(Error::new(lit.span(), "expected literal string")),

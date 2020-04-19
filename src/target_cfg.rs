@@ -38,10 +38,10 @@ impl ReplaceTargetCfg {
                 Meta::List(list) => {
                     if list.path.is_ident("not") {
                         if list.nested.len() != 1 {
-                            Err(Error::new(
+                            return Err(Error::new(
                                 list.nested.span(),
                                 "expected a single target_cfg predicate",
-                            ))?
+                            ));
                         }
                         self.target_cfg_value(list.nested.first().unwrap())
                             .map(|v| !v)
@@ -78,10 +78,10 @@ impl VisitMut for ReplaceTargetCfg {
             if list.path.is_ident("target_cfg") {
                 self.result = self.result.clone().and_then(|_| {
                     if list.nested.len() != 1 {
-                        Err(Error::new(
+                        return Err(Error::new(
                             list.nested.span(),
                             "expected a single target_cfg predicate",
-                        ))?
+                        ));
                     }
                     *i = if self.target_cfg_value(list.nested.first().unwrap())? {
                         parse_quote! { #[cfg(not(any()))] }
