@@ -28,8 +28,8 @@
 //!
 //! # Target specification strings
 //! Targets for the [`target`] and [`multiversion`] attributes are specified as a combination of
-//! architecture (as specified in the `target_arch` attribute) and feature (as specified in the
-//! `target_feature` attribute). A single architecture can be specified as:
+//! architecture (as specified in the [`target_arch`] attribute) and feature (as specified in the
+//! [`target_feature`] attribute). A single architecture can be specified as:
 //! * `"arch"`
 //! * `"arch+feature"`
 //! * `"arch+feature1+feature2"`
@@ -177,6 +177,8 @@
 //!
 //! [`target`]: attr.target.html
 //! [`multiversion`]: attr.multiversion.html
+//! [`target_arch`]: https://doc.rust-lang.org/reference/conditional-compilation.html#target_arch
+//! [`target_feature`]: https://doc.rust-lang.org/reference/conditional-compilation.html#target_feature
 
 extern crate proc_macro;
 
