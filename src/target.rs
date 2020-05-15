@@ -1,10 +1,8 @@
 use crate::safe_inner::process_safe_inner;
 use crate::static_dispatch::process_static_dispatch;
 use crate::target_cfg::process_target_cfg;
-use once_cell::sync::Lazy;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use regex::Regex;
 use std::convert::TryInto;
 use syn::{parse_quote, spanned::Spanned, Attribute, Error, ItemFn, Lit, LitStr, Result};
 
@@ -78,49 +76,40 @@ impl PartialEq for Target {
 
 impl Target {
     pub(crate) fn parse(s: &LitStr) -> Result<Self> {
-        static RE: Lazy<Regex> = Lazy::new(|| {
-            Regex::new(
-                r"^(?:\[(?P<arches>\w+(?:\|\w+)*)\]|(?P<arch>\w+))(?P<features>(?:\+[\w.]+)+)?$",
-            )
-            .unwrap()
-        });
-        let owned = s.value();
-        let captures = RE
-            .captures(&owned)
-            .ok_or_else(|| Error::new(s.span(), "invalid target string"))?;
-        let features = captures.name("features").map_or(Vec::new(), |x| {
-            let mut v = x
-                .as_str()
-                .split('+')
-                .skip(1)
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>();
-            v.sort_unstable();
-            v.dedup();
-            v
-        });
-        if let Some(arch) = captures.name("arch") {
-            Ok(Self {
-                architectures: vec![Architecture::new(arch.as_str(), s.span())?],
-                features,
-                span: s.span(),
-            })
-        } else {
-            let mut arches = captures
-                .name("arches")
-                .ok_or_else(|| Error::new(s.span(), "invalid target string"))?
-                .as_str()
+        let value = s.value();
+
+        let mut it = value.as_str().split('+');
+
+        let arch_specifier = it
+            .next()
+            .filter(|x| !x.is_empty())
+            .ok_or_else(|| Error::new(s.span(), "expected architecture specifier"))?;
+        let architectures = if arch_specifier.starts_with('[') && arch_specifier.ends_with(']') {
+            arch_specifier[1..arch_specifier.len() - 1]
                 .split('|')
-                .map(|arch| Architecture::new(arch, s.span()))
-                .collect::<Result<Vec<_>>>()?;
-            arches.sort_unstable();
-            arches.dedup();
-            Ok(Self {
-                architectures: arches,
-                features,
-                span: s.span(),
+                .map(|x| Architecture::new(x, s.span()))
+                .collect::<Result<Vec<_>>>()?
+        } else {
+            vec![Architecture::new(arch_specifier, s.span())?]
+        };
+
+        let mut features = it
+            .map(|x| {
+                if x.is_empty() {
+                    Err(Error::new(s.span(), "feature string cannot be empty"))
+                } else {
+                    Ok(x.to_string())
+                }
             })
-        }
+            .collect::<Result<Vec<_>>>()?;
+        features.sort_unstable();
+        features.dedup();
+
+        Ok(Self {
+            architectures,
+            features,
+            span: s.span(),
+        })
     }
 
     pub fn target_string(&self) -> LitStr {
@@ -279,6 +268,36 @@ mod test {
             vec![Architecture::PowerPC, Architecture::PowerPC64]
         );
         assert_eq!(target.features, vec!["altivec", "power8"]);
+    }
+
+    #[test]
+    fn parse_no_arch() {
+        let s = LitStr::new("sse4.2+xsave", Span::call_site());
+        Target::parse(&s).unwrap_err();
+    }
+
+    #[test]
+    fn parse_missing_arch_close() {
+        let s = LitStr::new("[x86+sse4.2+xsave", Span::call_site());
+        Target::parse(&s).unwrap_err();
+    }
+
+    #[test]
+    fn parse_malformed_arch() {
+        let s = LitStr::new("[x86|]+sse4.2+xsave", Span::call_site());
+        Target::parse(&s).unwrap_err();
+    }
+
+    #[test]
+    fn parse_extra_plus_start() {
+        let s = LitStr::new("+x86+sse4.2+xsave", Span::call_site());
+        Target::parse(&s).unwrap_err();
+    }
+
+    #[test]
+    fn parse_extra_plus_end() {
+        let s = LitStr::new("x86+sse4.2+xsave+", Span::call_site());
+        Target::parse(&s).unwrap_err();
     }
 
     #[test]
