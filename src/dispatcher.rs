@@ -154,11 +154,11 @@ impl Dispatcher {
 
         // Create default fn
         let mut attrs = self.attrs.clone();
-        attrs.insert(0, parse_quote! { #[multiversion::target] });
         attrs.push(parse_quote! { #[inline(always)] });
         attrs.push(parse_quote! { #[doc(hidden)] });
         attrs.push(self.cfg_if_not_defaulted());
-        fns.push({
+        fns.extend(make_target_fn_items(
+            None,
             ItemFn {
                 attrs,
                 vis: self.vis.clone(),
@@ -167,8 +167,8 @@ impl Dispatcher {
                     ..self.sig.clone()
                 },
                 block: Box::new(self.default.clone()),
-            }
-        });
+            },
+        )?);
 
         Ok(fns)
     }
