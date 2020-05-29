@@ -5,8 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### [0.5.1] - 2020-05-29
 ### Changed
 - Removed dependency on `regex` and `once_cell`
+### Fixed
+- Fixed bug where `#[multiversion]` failed to compile when crate was re-exported or renamed.
 
 ## [0.5.0] - 2020-04-19
 ### Added
@@ -58,7 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial multiversion implementation
 
-[Unreleased]: https://github.com/calebzulawski/multiversion/compare/0.5.0...HEAD
+[Unreleased]: https://github.com/calebzulawski/multiversion/compare/0.5.1...HEAD
+[0.5.1]: https://github.com/calebzulawski/multiversion/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/calebzulawski/multiversion/compare/0.4.0...0.5.0
 [0.4.0]: https://github.com/calebzulawski/multiversion/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/calebzulawski/multiversion/compare/0.2.0...0.3.0
