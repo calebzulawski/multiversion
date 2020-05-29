@@ -1,4 +1,7 @@
-use crate::{target::Target, util};
+use crate::{
+    target::{make_target_fn_items, Target},
+    util,
+};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{parse_quote, Attribute, Block, Ident, ItemFn, Result, Signature, Visibility};
@@ -33,11 +36,9 @@ impl Specialization {
         attrs: &[Attribute],
         associated: bool,
     ) -> Result<Vec<ItemFn>> {
-        let target_string = self.target.target_string();
         let (fn_name, dispatch_fn_name) = feature_fn_name(&sig.ident, Some(&self.target));
 
         let mut target_attrs = Vec::new();
-        target_attrs.push(parse_quote! { #[multiversion::target(#target_string)] });
         target_attrs.push(parse_quote! { #[inline] });
         target_attrs.push(parse_quote! { #[doc(hidden)] });
         target_attrs.extend(attrs.iter().cloned());
@@ -94,17 +95,22 @@ impl Specialization {
                 }),
                 sig: outer_sig,
             };
-            Ok(vec![dispatch_fn, target_fn])
+            let mut fns = vec![dispatch_fn];
+            fns.extend(make_target_fn_items(Some(&self.target), target_fn)?);
+            Ok(fns)
         } else {
-            Ok(vec![ItemFn {
-                attrs: target_attrs,
-                vis: vis.clone(),
-                sig: Signature {
-                    ident: fn_name,
-                    ..sig.clone()
+            make_target_fn_items(
+                Some(&self.target),
+                ItemFn {
+                    attrs: target_attrs,
+                    vis: vis.clone(),
+                    sig: Signature {
+                        ident: fn_name,
+                        ..sig.clone()
+                    },
+                    block: Box::new(self.block.clone()),
                 },
-                block: Box::new(self.block.clone()),
-            }])
+            )
         }
     }
 }

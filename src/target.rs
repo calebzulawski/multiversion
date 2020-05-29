@@ -112,27 +112,6 @@ impl Target {
         })
     }
 
-    pub fn target_string(&self) -> LitStr {
-        let arches = if self.architectures.len() > 1 {
-            format!(
-                "[{}]",
-                self.architectures
-                    .iter()
-                    .map(|x| x.as_str())
-                    .collect::<Vec<_>>()
-                    .join("|")
-            )
-        } else {
-            self.architectures.first().unwrap().as_str().to_string()
-        };
-        let string = if self.features.is_empty() {
-            arches
-        } else {
-            format!("{}+{}", arches, self.features.join("+"))
-        };
-        LitStr::new(&string, self.span)
-    }
-
     pub fn arches_as_str(&self) -> Vec<&'static str> {
         self.architectures.iter().map(|x| x.as_str()).collect()
     }
@@ -206,12 +185,19 @@ impl std::convert::TryFrom<&Lit> for Target {
     }
 }
 
-pub(crate) fn make_target_fn(target: Option<Lit>, mut func: ItemFn) -> Result<TokenStream> {
+pub(crate) fn make_target_fn(target: Option<Lit>, func: ItemFn) -> Result<TokenStream> {
     let target = target.as_ref().map(|s| s.try_into()).transpose()?;
+    let functions = make_target_fn_items(target.as_ref(), func)?;
+    Ok(quote! { #(#functions)* })
+}
 
+pub(crate) fn make_target_fn_items(
+    target: Option<&Target>,
+    mut func: ItemFn,
+) -> Result<Vec<ItemFn>> {
     // Rewrite #[target_cfg] and #[static_dispatch]
-    process_target_cfg(target.clone(), &mut func.block)?;
-    process_static_dispatch(&mut func, target.as_ref())?;
+    process_target_cfg(target.cloned(), &mut func.block)?;
+    process_static_dispatch(&mut func, target)?;
 
     // Create the function
     if let Some(target) = target {
@@ -219,8 +205,7 @@ pub(crate) fn make_target_fn(target: Option<Lit>, mut func: ItemFn) -> Result<To
         let target_feature = target.target_feature();
         func = parse_quote! { #target_arch #(#target_feature)* #func };
     }
-    let functions = process_safe_inner(func)?;
-    Ok(quote! { #(#functions)* })
+    process_safe_inner(func)
 }
 
 #[cfg(test)]
