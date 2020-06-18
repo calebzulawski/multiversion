@@ -6,13 +6,10 @@ edition = "2018"
 publish = false
 
 [dev-dependencies]
-multiversion = { path = ".." }
+multiversion = { path = "../multiversion" }
 criterion = "0.3"
 rand = "0.7"
 
 [[bench]]
 name = "bench_main"
 harness = false
-
-[profile.bench]
-opt-level = 3

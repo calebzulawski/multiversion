@@ -180,22 +180,6 @@
 //! [`target_arch`]: https://doc.rust-lang.org/reference/conditional-compilation.html#target_arch
 //! [`target_feature`]: https://doc.rust-lang.org/reference/conditional-compilation.html#target_feature
 
-extern crate proc_macro;
-
-#[macro_use]
-mod meta;
-
-mod dispatcher;
-mod multiversion;
-mod safe_inner;
-mod static_dispatch;
-mod target;
-mod target_cfg;
-mod util;
-
-use quote::ToTokens;
-use syn::{parse::Nothing, parse_macro_input, ItemFn};
-
 /// Provides function multiversioning.
 ///
 /// Functions are selected in order, calling the first matching target.  The function tagged by the
@@ -348,19 +332,7 @@ use syn::{parse::Nothing, parse_macro_input, ItemFn};
 /// [`multiversion`]: attr.multiversion.html
 /// [static dispatching]: index.html#static-dispatching
 /// [conditional compilation]: index.html#conditional-compilation
-#[proc_macro_attribute]
-pub fn multiversion(
-    attr: proc_macro::TokenStream,
-    input: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-    parse_macro_input!(attr as Nothing);
-    let func = parse_macro_input!(input as ItemFn);
-    match multiversion::make_multiversioned_fn(func) {
-        Ok(tokens) => tokens.into_token_stream(),
-        Err(err) => err.to_compile_error(),
-    }
-    .into()
-}
+pub use multiversion_macros::multiversion;
 
 /// Provides a less verbose equivalent to the `target_arch` and `target_feature` attributes.
 ///
@@ -392,16 +364,4 @@ pub fn multiversion(
 /// [`multiversion`]: attr.multiversion.html
 /// [static dispatching]: index.html#static-dispatching
 /// [conditional compilation]: index.html#conditional-compilation
-#[proc_macro_attribute]
-pub fn target(
-    attr: proc_macro::TokenStream,
-    input: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-    let target = parse_macro_input!(attr as Option<syn::Lit>);
-    let func = parse_macro_input!(input as ItemFn);
-    match target::make_target_fn(target, func) {
-        Ok(tokens) => tokens.into_token_stream(),
-        Err(err) => err.to_compile_error(),
-    }
-    .into()
-}
+pub use multiversion_macros::target;

@@ -1,33 +1,6 @@
-[package]
-name = "multiversion"
-version = "0.5.1"
-authors = ["Caleb Zulawski <caleb.zulawski@gmail.com>"]
-license = "MIT OR Apache-2.0"
-description = "Easy function multiversioning"
-repository = "https://github.com/calebzulawski/multiversion"
-categories = ["hardware-support", "no-std"]
-readme = "README.md"
-include = [
-    "/Cargo.toml",
-    "/LICENSE-APACHE",
-    "/LICENSE-MIT",
-    "/README.md",
-    "/src/**",
-    "/tests/**",
+[workspace]
+members = [
+    "multiversion",
+    "multiversion-macros",
+    "multiversion-bench",
 ]
-edition = "2018"
-
-[lib]
-proc-macro = true
-
-[features]
-default = ["runtime_dispatch"]
-runtime_dispatch = []
-
-[dependencies]
-syn = { version = "^1.0.7", features = ["full", "extra-traits", "visit-mut"] }
-quote = "1"
-proc-macro2 = "1"
-
-[dev-dependencies]
-rustversion = "1"

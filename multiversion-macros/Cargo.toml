@@ -1,0 +1,30 @@
+[package]
+name = "multiversion-macros"
+version = "0.1.0"
+authors = ["Caleb Zulawski <caleb.zulawski@gmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "Implementation crate for multiversion"
+repository = "https://github.com/calebzulawski/multiversion"
+categories = []
+readme = "README.md"
+include = [
+    "/Cargo.toml",
+    "/LICENSE-APACHE",
+    "/LICENSE-MIT",
+    "/README.md",
+    "/src/**",
+    "/tests/**",
+]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[features]
+default = ["runtime_dispatch"]
+runtime_dispatch = []
+
+[dependencies]
+syn = { version = "^1.0.7", features = ["full", "extra-traits", "visit-mut"] }
+quote = "1"
+proc-macro2 = "1"
