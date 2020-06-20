@@ -1,3 +1,4 @@
+#![feature(const_if_match)]
 #![allow(clippy::needless_doctest_main)]
 //! This crate provides the [`target`]  and [`multiversion`] attributes for implementing
 //! function multiversioning.
@@ -365,3 +366,6 @@ pub use multiversion_macros::multiversion;
 /// [static dispatching]: index.html#static-dispatching
 /// [conditional compilation]: index.html#conditional-compilation
 pub use multiversion_macros::target;
+
+mod arch;
+pub use arch::*;
