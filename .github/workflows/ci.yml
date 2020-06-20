@@ -9,9 +9,9 @@ jobs:
     strategy:
       matrix:
         version:
-          - 1.34.0
-          - stable
-          - beta
+          #- 1.34.0
+          #- stable
+          #- beta
           - nightly
         os:
           - macos-latest
@@ -30,4 +30,4 @@ jobs:
         rustup install --profile minimal ${{ matrix.version }}
         rustup default ${{ matrix.version }}
     - name: Run tests
-      run: cargo test --verbose ${{ matrix.features }}
+      run: cargo test --verbose ${{ matrix.features }} --manifest-path multiversion/Cargo.toml
