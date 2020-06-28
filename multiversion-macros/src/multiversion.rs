@@ -21,6 +21,7 @@ struct Function {
     specializations: Vec<Specialization>,
     func: ItemFn,
     associated: bool,
+    crate_path: Path,
 }
 
 impl TryFrom<Function> for Dispatcher {
@@ -71,6 +72,7 @@ impl TryFrom<Function> for Dispatcher {
             sig: item.func.sig,
             default: *item.func.block,
             associated: item.associated,
+            crate_path: item.crate_path,
         })
     }
 }
@@ -84,6 +86,7 @@ impl TryFrom<ItemFn> for Function {
         let mut multiversioned = Function {
             specializations: Vec::new(),
             associated,
+            crate_path: parse_quote!(multiversion),
             func: ItemFn {
                 attrs: Vec::new(),
                 ..func
@@ -109,6 +112,20 @@ impl TryFrom<ItemFn> for Function {
 
             // parse the attribute
             match path.to_string().as_str() {
+                "crate_path" => {
+                    meta_parser! {
+                        &nested => [
+                            "path" => crate_path,
+                        ]
+                    }
+                    if let Lit::Str(crate_path) = crate_path
+                        .ok_or_else(|| Error::new(nested.span(), "expected key 'path'"))?
+                    {
+                        multiversioned.crate_path = crate_path.parse()?;
+                    } else {
+                        return Err(Error::new(crate_path.span(), "expected literal string"));
+                    }
+                }
                 "clone" => {
                     meta_parser! {
                         &nested => [

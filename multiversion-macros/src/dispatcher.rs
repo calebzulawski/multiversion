@@ -4,7 +4,7 @@ use crate::{
 };
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
-use syn::{parse_quote, Attribute, Block, Ident, ItemFn, Result, Signature, Visibility};
+use syn::{parse_quote, Attribute, Block, Ident, ItemFn, Path, Result, Signature, Visibility};
 
 pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> (Ident, Ident) {
     if let Some(target) = target {
@@ -122,6 +122,7 @@ pub(crate) struct Dispatcher {
     pub specializations: Vec<Specialization>,
     pub default: Block,
     pub associated: bool,
+    pub crate_path: Path,
 }
 
 impl Dispatcher {
@@ -196,7 +197,7 @@ impl Dispatcher {
                         .filter_map(|Specialization { target, .. }| {
                             if target.has_features_specified() {
                                 let target_arch = target.target_arch();
-                                let features_detected = target.features_detected(None);
+                                let features_detected = target.features_detected(&self.crate_path);
                                 let function = feature_fn_name(&self.sig.ident, Some(&target)).1;
                                 Some(quote! {
                                     #target_arch
@@ -255,7 +256,7 @@ impl Dispatcher {
                     .filter_map(|Specialization { target, .. }| {
                         if target.has_features_specified() {
                             let target_arch = target.target_arch();
-                            let features_detected = target.features_detected(None);
+                            let features_detected = target.features_detected(&self.crate_path);
                             let function = feature_fn_name(&self.sig.ident, Some(&target)).1;
                             Some(quote! {
                                 #target_arch

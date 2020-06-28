@@ -128,13 +128,12 @@ impl Target {
             .collect()
     }
 
-    pub fn features_detected(&self, crate_path: Option<&Path>) -> TokenStream {
+    pub fn features_detected(&self, crate_path: &Path) -> TokenStream {
         if self.features.is_empty() {
             quote! { true }
         } else {
             let features = &self.features;
-            let path = crate_path.cloned().unwrap_or(parse_quote!(multiversion));
-            quote! { #path::are_cpu_features_detected!(#(#features),*) }
+            quote! { #crate_path::are_cpu_features_detected!(#(#features),*) }
         }
     }
 }
