@@ -4,7 +4,9 @@ use crate::util;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use std::convert::{TryFrom, TryInto};
-use syn::{parse_quote, spanned::Spanned, Error, ItemFn, Lit, Meta, MetaList, NestedMeta, Path};
+use syn::{
+    parse_quote, spanned::Spanned, Error, Ident, ItemFn, Lit, Meta, MetaList, NestedMeta, Path,
+};
 
 enum Specialization {
     Clone {
@@ -22,6 +24,7 @@ struct Function {
     func: ItemFn,
     associated: bool,
     crate_path: Path,
+    cpu_token: Option<(Ident, Ident)>,
 }
 
 impl TryFrom<Function> for Dispatcher {
@@ -73,6 +76,7 @@ impl TryFrom<Function> for Dispatcher {
             default: *item.func.block,
             associated: item.associated,
             crate_path: item.crate_path,
+            cpu_token: item.cpu_token,
         })
     }
 }
@@ -87,6 +91,7 @@ impl TryFrom<ItemFn> for Function {
             specializations: Vec::new(),
             associated,
             crate_path: parse_quote!(multiversion),
+            cpu_token: None,
             func: ItemFn {
                 attrs: Vec::new(),
                 ..func
@@ -125,6 +130,34 @@ impl TryFrom<ItemFn> for Function {
                     } else {
                         return Err(Error::new(crate_path.span(), "expected literal string"));
                     }
+                }
+                "cpu_token" => {
+                    meta_parser! {
+                        &nested => [
+                            "name" => name,
+                            "type" => type_name,
+                        ]
+                    }
+
+                    let name = if let Lit::Str(name) =
+                        name.ok_or_else(|| Error::new(nested.span(), "expected key 'path'"))?
+                    {
+                        name.parse()?
+                    } else {
+                        return Err(Error::new(name.span(), "expected literal string"));
+                    };
+
+                    let type_name = if let Some(type_name) = type_name {
+                        if let Lit::Str(type_name) = type_name {
+                            type_name.parse()?
+                        } else {
+                            return Err(Error::new(type_name.span(), "expected literal string"));
+                        }
+                    } else {
+                        parse_quote!(CpuTokenType)
+                    };
+
+                    multiversioned.cpu_token = Some((name, type_name));
                 }
                 "clone" => {
                     meta_parser! {

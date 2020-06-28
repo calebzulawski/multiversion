@@ -11,6 +11,7 @@ mod foo {
 #[clone(target = "[x86|x86_64]+avx")]
 #[clone(target = "x86+sse")]
 #[static_dispatch(fn = "self::foo::mul")]
+#[cpu_token(name = "token")]
 fn square(x: &mut [f32]) {
     for v in x {
         *v = mul(*v, *v);
@@ -21,6 +22,7 @@ fn square(x: &mut [f32]) {
 #[clone(target = "[x86|x86_64]+avx")]
 #[clone(target = "x86+sse")]
 #[static_dispatch(fn = "self::foo::mul", rename = "muls")]
+#[cpu_token(name = "token")]
 fn square2(x: &mut [f32]) {
     for v in x {
         *v = muls(*v, *v);
@@ -41,6 +43,7 @@ impl Squarer {
     #[clone(target = "[x86|x86_64]+avx")]
     #[clone(target = "x86+sse")]
     #[static_dispatch(fn = "Self::mul")]
+    #[cpu_token(name = "token")]
     fn square(&self, x: &mut [f32]) {
         for v in x {
             *v = mul(self, *v, *v);
@@ -51,6 +54,7 @@ impl Squarer {
     #[clone(target = "[x86|x86_64]+avx")]
     #[clone(target = "x86+sse")]
     #[static_dispatch(fn = "self::foo::mul", rename = "muls")]
+    #[cpu_token(name = "token")]
     fn square2(&self, x: &mut [f32]) {
         for v in x {
             *v = muls(*v, *v);

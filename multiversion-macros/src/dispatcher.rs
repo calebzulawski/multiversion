@@ -35,6 +35,8 @@ impl Specialization {
         sig: &Signature,
         attrs: &[Attribute],
         associated: bool,
+        crate_path: &Path,
+        cpu_token: Option<&(Ident, Ident)>,
     ) -> Result<Vec<ItemFn>> {
         let (fn_name, dispatch_fn_name) = feature_fn_name(&sig.ident, Some(&self.target));
 
@@ -42,6 +44,21 @@ impl Specialization {
         target_attrs.push(parse_quote! { #[inline] });
         target_attrs.push(parse_quote! { #[doc(hidden)] });
         target_attrs.extend(attrs.iter().cloned());
+
+        // Insert CPU token
+        let block = Box::new(if let Some((name, type_name)) = cpu_token {
+            let features = self.target.list_features();
+            let block = &self.block;
+            parse_quote! {
+                {
+                    #crate_path::cpu_token_type! { #type_name: #(#features),* }
+                    let #name = unsafe { <#type_name as #crate_path::CpuToken>::new() };
+                    #block
+                }
+            }
+        } else {
+            self.block.clone()
+        });
 
         // If this target doesn't have any features, treat it as a default version
         if self.target.has_features_specified() {
@@ -66,7 +83,7 @@ impl Specialization {
                 attrs: target_attrs,
                 vis: vis.clone(),
                 sig: unsafe_sig,
-                block: Box::new(self.block.clone()),
+                block,
             };
 
             // create safe/dispatch fn
@@ -108,7 +125,7 @@ impl Specialization {
                         ident: fn_name,
                         ..sig.clone()
                     },
-                    block: Box::new(self.block.clone()),
+                    block,
                 },
             )
         }
@@ -123,6 +140,7 @@ pub(crate) struct Dispatcher {
     pub default: Block,
     pub associated: bool,
     pub crate_path: Path,
+    pub cpu_token: Option<(Ident, Ident)>,
 }
 
 impl Dispatcher {
@@ -150,7 +168,14 @@ impl Dispatcher {
     fn feature_fns(&self) -> Result<Vec<ItemFn>> {
         let mut fns = Vec::new();
         for f in &self.specializations {
-            fns.extend(f.make_fn(&self.vis, &self.sig, &self.attrs, self.associated)?);
+            fns.extend(f.make_fn(
+                &self.vis,
+                &self.sig,
+                &self.attrs,
+                self.associated,
+                &self.crate_path,
+                self.cpu_token.as_ref(),
+            )?);
         }
 
         // Create default fn

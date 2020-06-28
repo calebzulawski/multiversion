@@ -98,6 +98,10 @@ impl Target {
         })
     }
 
+    pub fn list_features(&self) -> &[String] {
+        &self.features
+    }
+
     pub fn arches_as_str(&self) -> Vec<&'static str> {
         self.architectures.iter().map(|x| x.as_str()).collect()
     }
