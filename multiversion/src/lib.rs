@@ -205,6 +205,10 @@
 ///       `unsafe` as well.
 /// * `#[static_dispatch]`
 ///   * Statically dispatches another multiversioned function, see [static dispatching].
+/// * `#[crate_path]`
+///   * Specifies the location of the multiversion crate (useful for re-exporting).
+///   * Arguments:
+///     * `path`: the path to the multiversion crate
 ///
 /// # Examples
 /// ## Cloning
