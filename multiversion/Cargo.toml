@@ -18,8 +18,8 @@ include = [
 edition = "2018"
 
 [features]
-default = ["runtime_dispatch"]
-runtime_dispatch = ["multiversion-macros/runtime_dispatch"]
+default = ["std"]
+std = ["multiversion-macros/std"]
 
 [dependencies]
 multiversion-macros = { version = "0.1", path = "../multiversion-macros", default-features = false }

@@ -1,23 +1,23 @@
 /// A trait that indicates presence of a set of CPU features.
 ///
-/// To create types that implement this trait, use [`cpu_type`].
+/// To create types that implement this trait, use [`cpu_token_type`].
 ///
 /// # Safety
-/// Types implementing `Cpu` must uphold the guarantee of only being safely constructible if the
+/// Types implementing `CpuToken` must uphold the guarantee of only being safely constructible if the
 /// required features are supported by the CPU.
 ///
 /// # Example
-/// The `Cpu` trait can be used to prove existence of CPU features:
+/// The `CpuToken` trait can be used to prove existence of CPU features:
 ///
 /// ```
-/// use multiversion::{Cpu, cpu_type, target};
+/// use multiversion::{CpuToken, cpu_token_type, target};
 ///
 /// // A type requiring no CPU features
-/// cpu_type! { NoFeatures }
+/// cpu_token_type! { NoFeatures }
 ///
 /// // A type for detecting AVX and AVX2 support
 /// #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-/// cpu_type! { Avx2 : "avx", "avx2" }
+/// cpu_token_type! { Avx2 : "avx", "avx2" }
 ///
 /// // This function is unsafe to call without first checking for AVX and AVX2
 /// #[target("[x86|x86_64]+avx+avx2")]
@@ -44,26 +44,41 @@
 /// }
 /// ```
 ///
-/// [`cpu_type`]: macro.cpu_type.html
-pub unsafe trait Cpu: Copy {
-    type FeatureList: AsRef<[&'static str]>;
-
+/// [`cpu_token_type`]: macro.cpu_token_type.html
+pub unsafe trait CpuToken: Copy {
     /// The CPU features required by this type.
-    const FEATURES: Self::FeatureList;
+    const FEATURES: &'static [&'static str];
 
     /// Creates the CPU feature type without detecting features.
     unsafe fn new() -> Self;
 
     /// Returns the CPU feature type if all features are detected, or `None` otherwise.
     fn detect() -> Option<Self>;
+
+    /// Converts a token into a token containing a subset of available CPU features.
+    fn into_subset<T: CpuToken>() -> Option<T> {
+        if detail::subset(Self::FEATURES, T::FEATURES) {
+            unsafe { Some(T::new()) }
+        } else {
+            None
+        }
+    }
 }
 
-/// Detects features, using `target_feature` if no_std
-#[cfg(feature = "runtime_dispatch")]
-#[doc(hidden)]
+/// Detects CPU features.
+///
+/// When the `std` feature is enabled, this macro operates like the standard library detection
+/// macro for the current target (e.g. [`is_x86_feature_detected`]), but accepts multiple arguments.
+///
+/// When the `std` feature is not enabled, this macro detects if the feature is
+/// enabled during compilation, using the [`cfg`] attribute.
+///
+/// [`is_x86_feature_detected`]: https://doc.rust-lang.org/std/macro.is_x86_feature_detected.html
+/// [`cfg`]: https://doc.rust-lang.org/reference/conditional-compilation.html#target_feature
+#[cfg(any(feature = "std", doc))]
 #[macro_export]
-macro_rules! detect_features {
-    { $feature:tt } => {
+macro_rules! are_cpu_features_detected {
+    { $feature:tt $(,)? } => {
         {
             #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             { is_x86_feature_detected!($feature) }
@@ -92,14 +107,13 @@ macro_rules! detect_features {
             { compile_error!("Unsupported architecture. Expected x86, x86_64, arm, aarch64, powerpc, powerpc64, mips, or mips64.") }
         }
     };
-    { $first:tt, $($features:tt),+ } => {
-        $crate::detect_features!($first) $(&& $crate::detect_features!($features))*
+    { $first:tt, $($features:tt),+ $(,)? } => {
+        $crate::are_cpu_features_detected!($first) $(&& $crate::are_cpu_features_detected!($features))*
     }
 }
-#[cfg(not(feature = "runtime_dispatch"))]
-#[doc(hidden)]
+#[cfg(not(any(feature = "std", doc)))]
 #[macro_export]
-macro_rules! detect_features {
+macro_rules! are_cpu_features_detected {
     { $($features:tt),+ } => {
         {
             #[cfg(all( $(target_feature = $features),* ))]
@@ -110,32 +124,23 @@ macro_rules! detect_features {
     }
 }
 
-/// Counts the number of token trees.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! count_tts {
-    { $v:tt } => { 1 };
-    { $first:tt $($rest:tt)+ } => { $crate::count_tts! { $($rest)* } + 1 };
-}
-
 /// Defines types that indicates presence of a set of CPU features.
 ///
-/// The generated types implement [`Cpu`].  For example, a type `Avx2` that detects AVX and AVX2:
+/// The generated types implement [`CpuToken`].  For example, a type `Avx2` that detects AVX and AVX2:
 /// ```
 /// #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-/// multiversion::cpu_type! { Avx2 : "avx", "avx2" }
+/// multiversion::cpu_token_type! { Avx2 : "avx", "avx2" }
 /// ```
 ///
-/// [`Cpu`]: trait.Cpu.html
+/// [`CpuToken`]: trait.CpuToken.html
 #[macro_export]
-macro_rules! cpu_type {
+macro_rules! cpu_token_type {
     { $name:ident } => {
         #[derive(Copy, Clone, Debug, Default)]
         struct $name;
 
-        unsafe impl $crate::Cpu for $name {
-            type FeatureList = [&'static str; 0];
-            const FEATURES: Self::FeatureList = [];
+        unsafe impl $crate::CpuToken for $name {
+            const FEATURES: &'static [&'static str] = &[];
 
             unsafe fn new() -> Self {
                 Self
@@ -150,21 +155,59 @@ macro_rules! cpu_type {
         #[derive(Copy, Clone, Debug)]
         struct $name($crate::detail::UnsafeConstructible);
 
-        unsafe impl $crate::Cpu for $name {
-            type FeatureList = [&'static str; $crate::count_tts!( $($features)* )];
-            const FEATURES: Self::FeatureList = [$($features),*];
+        unsafe impl $crate::CpuToken for $name {
+            const FEATURES: &'static [&'static str] = &[$($features),*];
 
             unsafe fn new() -> Self {
                 Self($crate::detail::UnsafeConstructible::new())
             }
 
             fn detect() -> Option<Self> {
-                if $crate::detect_features!($($features),*) {
+                if $crate::are_cpu_features_detected!($($features),*) {
                     unsafe { Some(Self::new()) }
                 } else {
                     None
                 }
             }
+        }
+    }
+}
+
+/// Tests if a type implementing [`CpuToken`] supports a feature.
+///
+/// ```
+/// use multiversion::{CpuToken, cpu_token_type, cpu_token_has_features};
+///
+/// #[cfg(target_arch = "x86_64")]
+/// fn main() {
+///     cpu_token_type! { SomeCpu: "sse4.1", "avx", "avx2" }
+///
+///     const HAS_AVX: bool = cpu_token_has_features! { type SomeCpu: "avx" };
+///     assert!(HAS_AVX);
+///
+///     // Check if a value supports a featre
+///     if let Some(cpu) = SomeCpu::detect() {
+///         let has_avx512f = cpu_token_has_features! { cpu: "avx512f" };
+///         assert!(!has_avx512f);
+///     }
+/// }
+/// ```
+///
+/// [`CpuToken`]: trait.CpuToken.html
+#[macro_export]
+macro_rules! cpu_token_has_features {
+    { type $cpu:ty : $($feature:tt),+ $(,)? } => {
+        {
+            $( $crate::detail::contains(&<$cpu as $crate::CpuToken>::FEATURES, $feature) )&*
+        }
+    };
+    { $cpu:ident : $($feature:tt),+ $(,)? } => {
+        {
+            #[inline(always)]
+            fn supports<T: $crate::CpuToken>(_: T) -> bool {
+                $crate::cpu_token_has_features!{ type T: $($feature)* }
+            }
+            supports($cpu)
         }
     }
 }
@@ -207,6 +250,17 @@ pub mod detail {
 
         contains_impl(slice, value, 0)
     }
+
+    pub const fn subset(source: &[&str], subset: &[&str]) -> bool {
+        const fn subset_impl(source: &[&str], subset: &[&str], index: usize) -> bool {
+            if index == subset.len() {
+                true
+            } else {
+                contains(source, subset[index]) && subset_impl(source, subset, index + 1)
+            }
+        }
+        subset_impl(source, subset, 0)
+    }
 }
 
 #[cfg(test)]
@@ -236,17 +290,30 @@ mod test {
     }
 
     #[test]
+    fn subset() {
+        use detail::subset;
+        let features = ["a", "b", "foo"];
+        assert!(subset(&features, &["foo", "a", "b"]));
+        assert!(subset(&features, &["foo", "b"]));
+        assert!(subset(&features, &["foo", "foo"]));
+        assert!(subset(&features, &["a"]));
+        assert!(subset(&features, &["a"]));
+        assert!(!subset(&features, &["a", "bar"]));
+        assert!(!subset(&features, &["bar"]));
+    }
+
+    #[test]
     fn generic() {
-        cpu_type! { Generic }
-        assert!(<Generic as Cpu>::FEATURES.is_empty());
+        cpu_token_type! { Generic }
+        assert!(<Generic as CpuToken>::FEATURES.is_empty());
     }
 
     #[test]
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     fn x86() {
-        cpu_type! { Avx : "avx" }
-        cpu_type! { Avx2 : "avx", "avx2" }
-        assert_eq!(<Avx as Cpu>::FEATURES, ["avx"]);
-        assert_eq!(<Avx2 as Cpu>::FEATURES, ["avx", "avx2"]);
+        cpu_token_type! { Avx : "avx" }
+        cpu_token_type! { Avx2 : "avx", "avx2" }
+        assert_eq!(<Avx as CpuToken>::FEATURES, ["avx"]);
+        assert_eq!(<Avx2 as CpuToken>::FEATURES, ["avx", "avx2"]);
     }
 }

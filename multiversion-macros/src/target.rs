@@ -4,7 +4,7 @@ use crate::target_cfg::process_target_cfg;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use std::convert::TryInto;
-use syn::{parse_quote, spanned::Spanned, Attribute, Error, ItemFn, Lit, LitStr, Result};
+use syn::{parse_quote, spanned::Spanned, Attribute, Error, ItemFn, Lit, LitStr, Path, Result};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 enum Architecture {
@@ -43,20 +43,6 @@ impl Architecture {
             Architecture::Mips64 => "mips64",
             Architecture::PowerPC => "powerpc",
             Architecture::PowerPC64 => "powerpc64",
-        }
-    }
-
-    #[cfg(feature = "runtime_dispatch")]
-    fn feature_detector(&self) -> TokenStream {
-        match self {
-            Architecture::X86 => quote! { is_x86_feature_detected! },
-            Architecture::X86_64 => quote! { is_x86_feature_detected! },
-            Architecture::Arm => quote! { is_arm_feature_detected! },
-            Architecture::Aarch64 => quote! { is_aarch64_feature_detected! },
-            Architecture::Mips => quote! { is_mips_feature_detected! },
-            Architecture::Mips64 => quote! { is_mips64_feature_detected! },
-            Architecture::PowerPC => quote! { is_powerpc_feature_detected! },
-            Architecture::PowerPC64 => quote! { is_powerpc64_feature_detected! },
         }
     }
 }
@@ -142,34 +128,13 @@ impl Target {
             .collect()
     }
 
-    pub fn features_detected(&self) -> TokenStream {
+    pub fn features_detected(&self, crate_path: Option<&Path>) -> TokenStream {
         if self.features.is_empty() {
-            quote! {
-                true
-            }
+            quote! { true }
         } else {
-            let arches = self.architectures.iter().map(|x| {
-                let arch = x.as_str();
-                let features = self.features.iter();
-                #[cfg(feature = "runtime_dispatch")]
-                {
-                    let feature_detector = x.feature_detector();
-                    quote! {
-                        #[cfg(target_arch = #arch)]
-                        {
-                            #( #feature_detector(#features) )&&*
-                        }
-                    }
-                }
-                #[cfg(not(feature = "runtime_dispatch"))]
-                quote! {
-                    #[cfg(target_arch = #arch)]
-                    {
-                        cfg!(all(#(target_feature = #features),*))
-                    }
-                }
-            });
-            quote! { { #(#arches)* } }
+            let features = &self.features;
+            let path = crate_path.cloned().unwrap_or(parse_quote!(multiversion));
+            quote! { #path::are_cpu_features_detected!(#(#features),*) }
         }
     }
 }
@@ -325,82 +290,6 @@ mod test {
                 parse_quote! { #[target_feature(enable = "avx")] },
                 parse_quote! { #[target_feature(enable = "xsave")] }
             ]
-        );
-    }
-
-    #[test]
-    fn generate_single_features_detect() {
-        let s = LitStr::new("x86+avx", Span::call_site());
-        let target = Target::parse(&s).unwrap();
-        assert_eq!(
-            target.features_detected().to_string(),
-            {
-                #[cfg(feature = "runtime_dispatch")]
-                {
-                    quote! {
-                        {
-                            #[cfg(target_arch = "x86")]
-                            {
-                                is_x86_feature_detected!("avx")
-                            }
-                        }
-                    }
-                }
-                #[cfg(not(feature = "runtime_dispatch"))]
-                {
-                    quote! {
-                        {
-                            #[cfg(target_arch = "x86")]
-                            {
-                                cfg!(all(target_feature = "avx"))
-                            }
-                        }
-                    }
-                }
-            }
-            .to_string()
-        );
-    }
-
-    #[test]
-    fn generate_multiple_features_detect() {
-        let s = LitStr::new("[x86|x86_64]+avx+xsave", Span::call_site());
-        let target = Target::parse(&s).unwrap();
-        assert_eq!(
-            target.features_detected().to_string(),
-            {
-                #[cfg(feature = "runtime_dispatch")]
-                {
-                    quote! {
-                        {
-                            #[cfg(target_arch = "x86")]
-                            {
-                                is_x86_feature_detected!("avx") && is_x86_feature_detected!("xsave")
-                            }
-                            #[cfg(target_arch = "x86_64")]
-                            {
-                                is_x86_feature_detected!("avx") && is_x86_feature_detected!("xsave")
-                            }
-                        }
-                    }
-                }
-                #[cfg(not(feature = "runtime_dispatch"))]
-                {
-                    quote! {
-                        {
-                            #[cfg(target_arch = "x86")]
-                            {
-                                cfg!(all(target_feature = "avx", target_feature = "xsave"))
-                            }
-                            #[cfg(target_arch = "x86_64")]
-                            {
-                                cfg!(all(target_feature = "avx", target_feature = "xsave"))
-                            }
-                        }
-                    }
-                }
-            }
-            .to_string()
         );
     }
 }

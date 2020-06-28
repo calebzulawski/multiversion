@@ -14,10 +14,10 @@
 //! with various features enabled and safely detecting which version to use at runtime.
 //!
 //! # Cargo features
-//! There is one cargo feature, `runtime_dispatch`, enabled by default.  When enabled,
-//! [`multiversion`] will use CPU feature detection at runtime to dispatch the appropriate function,
-//! which requires the `std` crate.  Disabling this feature will only allow compile-time function
-//! dispatch using `#[cfg(target_feature)]` and can be used in `#[no_std]` crates.
+//! There is one cargo feature, `std`, enabled by default.  When enabled, [`multiversion`] will
+//! use CPU feature detection at runtime to dispatch the appropriate function. Disabling this
+//! feature will only allow compile-time function dispatch using `#[cfg(target_feature)]` and can
+//! be used in `#[no_std]` crates.
 //!
 //! # Capabilities
 //! The intention of this crate is to allow any function, other than trait methods, to be

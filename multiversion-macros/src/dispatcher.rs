@@ -176,7 +176,7 @@ impl Dispatcher {
     fn dispatcher_fn(&self) -> Result<ItemFn> {
         let fn_params = util::fn_params(&self.sig);
         let (normalized_signature, argument_names) = util::normalize_signature(&self.sig);
-        let block: Block = if cfg!(feature = "runtime_dispatch")
+        let block: Block = if cfg!(feature = "std")
             && fn_params.is_empty()
             && self.sig.asyncness.is_none()
             && !util::impl_trait_present(&self.sig)
@@ -196,7 +196,7 @@ impl Dispatcher {
                         .filter_map(|Specialization { target, .. }| {
                             if target.has_features_specified() {
                                 let target_arch = target.target_arch();
-                                let features_detected = target.features_detected();
+                                let features_detected = target.features_detected(None);
                                 let function = feature_fn_name(&self.sig.ident, Some(&target)).1;
                                 Some(quote! {
                                     #target_arch
@@ -255,7 +255,7 @@ impl Dispatcher {
                     .filter_map(|Specialization { target, .. }| {
                         if target.has_features_specified() {
                             let target_arch = target.target_arch();
-                            let features_detected = target.features_detected();
+                            let features_detected = target.features_detected(None);
                             let function = feature_fn_name(&self.sig.ident, Some(&target)).1;
                             Some(quote! {
                                 #target_arch
