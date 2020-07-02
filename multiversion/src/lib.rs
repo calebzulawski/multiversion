@@ -1,4 +1,3 @@
-#![feature(const_if_match)]
 #![allow(clippy::needless_doctest_main)]
 //! This crate provides the [`target`]  and [`multiversion`] attributes for implementing
 //! function multiversioning.

@@ -24,7 +24,7 @@ struct Function {
     func: ItemFn,
     associated: bool,
     crate_path: Path,
-    cpu_token: Option<(Ident, Ident)>,
+    cpu_token: Option<Ident>,
 }
 
 impl TryFrom<Function> for Dispatcher {
@@ -131,11 +131,10 @@ impl TryFrom<ItemFn> for Function {
                         return Err(Error::new(crate_path.span(), "expected literal string"));
                     }
                 }
-                "cpu_token" => {
+                "cpu_features_token" => {
                     meta_parser! {
                         &nested => [
                             "name" => name,
-                            "type" => type_name,
                         ]
                     }
 
@@ -146,18 +145,7 @@ impl TryFrom<ItemFn> for Function {
                     } else {
                         return Err(Error::new(name.span(), "expected literal string"));
                     };
-
-                    let type_name = if let Some(type_name) = type_name {
-                        if let Lit::Str(type_name) = type_name {
-                            type_name.parse()?
-                        } else {
-                            return Err(Error::new(type_name.span(), "expected literal string"));
-                        }
-                    } else {
-                        parse_quote!(CpuTokenType)
-                    };
-
-                    multiversioned.cpu_token = Some((name, type_name));
+                    multiversioned.cpu_token = Some(name);
                 }
                 "clone" => {
                     meta_parser! {

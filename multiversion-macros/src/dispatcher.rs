@@ -36,7 +36,7 @@ impl Specialization {
         attrs: &[Attribute],
         associated: bool,
         crate_path: &Path,
-        cpu_token: Option<&(Ident, Ident)>,
+        cpu_token: Option<&Ident>,
     ) -> Result<Vec<ItemFn>> {
         let (fn_name, dispatch_fn_name) = feature_fn_name(&sig.ident, Some(&self.target));
 
@@ -46,13 +46,12 @@ impl Specialization {
         target_attrs.extend(attrs.iter().cloned());
 
         // Insert CPU token
-        let block = Box::new(if let Some((name, type_name)) = cpu_token {
+        let block = Box::new(if let Some(name) = cpu_token {
             let features = self.target.list_features();
             let block = &self.block;
             parse_quote! {
                 {
-                    #crate_path::cpu_token_type! { #type_name: #(#features),* }
-                    let #name = unsafe { <#type_name as #crate_path::CpuToken>::new() };
+                    const #name: #crate_path::CpuFeatures = unsafe { #crate_path::CpuFeatures::new(&[#(#features),*]) };
                     #block
                 }
             }
@@ -140,7 +139,7 @@ pub(crate) struct Dispatcher {
     pub default: Block,
     pub associated: bool,
     pub crate_path: Path,
-    pub cpu_token: Option<(Ident, Ident)>,
+    pub cpu_token: Option<Ident>,
 }
 
 impl Dispatcher {
