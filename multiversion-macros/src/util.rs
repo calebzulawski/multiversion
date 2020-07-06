@@ -27,6 +27,26 @@ pub(crate) fn is_associated_fn(item: &mut ItemFn) -> bool {
     v.0
 }
 
+pub(crate) fn arg_exprs(sig: &Signature) -> Vec<Expr> {
+    sig.inputs
+        .iter()
+        .map(|x| match x {
+            FnArg::Receiver(rec) => {
+                let self_token = rec.self_token;
+                parse_quote! { #self_token }
+            }
+            FnArg::Typed(arg) => {
+                if let Pat::Ident(ident) = &*arg.pat {
+                    let ident = &ident.ident;
+                    parse_quote! { #ident }
+                } else {
+                    panic!("pattern should have been ident")
+                }
+            }
+        })
+        .collect()
+}
+
 pub(crate) fn normalize_signature(sig: &Signature) -> (Signature, Vec<Expr>) {
     let args = sig
         .inputs
@@ -49,30 +69,12 @@ pub(crate) fn normalize_signature(sig: &Signature) -> (Signature, Vec<Expr>) {
             }),
         })
         .collect::<Vec<_>>();
-    let callable_args = args
-        .iter()
-        .map(|x| match x {
-            FnArg::Receiver(rec) => {
-                let self_token = rec.self_token;
-                parse_quote! { #self_token }
-            }
-            FnArg::Typed(arg) => {
-                if let Pat::Ident(ident) = &*arg.pat {
-                    let ident = &ident.ident;
-                    parse_quote! { #ident }
-                } else {
-                    panic!("pattern should have been ident")
-                }
-            }
-        })
-        .collect();
-    (
-        Signature {
-            inputs: parse_quote! { #(#args),* },
-            ..sig.clone()
-        },
-        callable_args,
-    )
+    let sig = Signature {
+        inputs: parse_quote! { #(#args),* },
+        ..sig.clone()
+    };
+    let callable_args = arg_exprs(&sig);
+    (sig, callable_args)
 }
 
 pub(crate) fn impl_trait_present(sig: &Signature) -> bool {

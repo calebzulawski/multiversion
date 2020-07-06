@@ -198,6 +198,108 @@ impl Dispatcher {
         Ok(fns)
     }
 
+    // Create the static dispatcher functions
+    fn static_dispatcher_fn(&self) -> Result<Vec<ItemFn>> {
+        if self.sig.receiver().is_some() {
+            return Ok(Vec::new());
+        }
+
+        let crate_path = &self.crate_path;
+        let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
+        let maybe_self = if self.associated {
+            quote! { Self:: }
+        } else {
+            Default::default()
+        };
+
+        let mut functions = Vec::new();
+
+        let dispatches = self
+            .specializations
+            .iter()
+            .enumerate()
+            .filter_map(|(index, specialization)| {
+                if specialization.target.has_features_specified() {
+                    let features = specialization.target.list_features();
+                    Some((
+                        index + 1,
+                        quote! { #(__cpu_features.supports(#features))&* },
+                        feature_fn_name(&self.sig.ident, Some(&specialization.target)).0,
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        // Create function index dispatcher
+        {
+            let name = Ident::new(
+                &format!("{}_dispatch_index", &self.sig.ident),
+                self.sig.ident.span(),
+            );
+            let index = dispatches.iter().cloned().map(|x| x.0);
+            let supports = dispatches.iter().cloned().map(|x| x.1);
+            functions.push(parse_quote! {
+                #[doc(hidden)]
+                const fn #name(__cpu_features: #crate_path::CpuFeatures) -> usize {
+                    #(
+                    if #supports {
+                        #index
+                    } else
+                    )*
+                    {
+                        0 // default fn has index 0
+                    }
+                }
+            });
+        }
+
+        // Create function caller
+        {
+            let sig = {
+                let (sig, _) = util::normalize_signature(&self.sig);
+                let args = sig.inputs.iter();
+                Signature {
+                    ident: Ident::new(
+                        &format!("{}_dispatch", &self.sig.ident),
+                        self.sig.ident.span(),
+                    ),
+                    inputs: parse_quote! { __multiversion_fn_index: usize, #(#args),* },
+                    ..sig
+                }
+            };
+            let args = util::arg_exprs(&sig);
+            let args = args.iter().skip(1);
+            let args = quote! { #(#args),* };
+            let types = sig.generics.type_params().collect::<Vec<_>>();
+            let types = quote! { #(#types),* };
+            let index = dispatches.iter().map(|x| x.0);
+            let function = dispatches.iter().cloned().map(|x| x.2);
+            let default_function = feature_fn_name(&self.sig.ident, None).0;
+            functions.push(parse_quote! {
+                #[doc(hidden)]
+                #[inline(always)]
+                #sig {
+                    if __multiversion_fn_index == 0 {
+                        #maybe_self #default_function::<#types>(#args) #maybe_await
+                    } else
+                    #(
+                    if __multiversion_fn_index == #index {
+                        unsafe { #maybe_self #function::<#types>(#args) #maybe_await }
+                    } else
+                    )*
+                    {
+                        panic!("invalid function index");
+                    }
+
+                }
+            });
+        }
+
+        Ok(functions)
+    }
+
     fn dispatcher_fn(&self) -> Result<ItemFn> {
         let fn_params = util::fn_params(&self.sig);
         let (normalized_signature, argument_names) = util::normalize_signature(&self.sig);
@@ -317,6 +419,14 @@ impl ToTokens for Dispatcher {
             Ok(val) => quote! { #(#val)* },
             Err(err) => err.to_compile_error(),
         });
+        match self.static_dispatcher_fn() {
+            Ok(val) => {
+                for v in val {
+                    tokens.extend(v.into_token_stream());
+                }
+            }
+            Err(err) => tokens.extend(err.to_compile_error()),
+        }
         tokens.extend(match self.dispatcher_fn() {
             Ok(val) => val.into_token_stream(),
             Err(err) => err.to_compile_error(),
