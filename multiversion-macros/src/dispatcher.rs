@@ -225,6 +225,7 @@ impl Dispatcher {
                         index + 1,
                         quote! { #(__cpu_features.supports(#features))&* },
                         feature_fn_name(&self.sig.ident, Some(&specialization.target)).0,
+                        specialization.target.target_arch(),
                     ))
                 } else {
                     None
@@ -238,19 +239,21 @@ impl Dispatcher {
                 &format!("{}_dispatch_index", &self.sig.ident),
                 self.sig.ident.span(),
             );
-            let index = dispatches.iter().cloned().map(|x| x.0);
-            let supports = dispatches.iter().cloned().map(|x| x.1);
+            let index = dispatches.iter().map(|x| x.0);
+            let supports = dispatches.iter().map(|x| x.1.clone());
+            let target_arch = dispatches.iter().map(|x| x.3.clone());
             functions.push(parse_quote! {
                 #[doc(hidden)]
                 const fn #name(__cpu_features: #crate_path::CpuFeatures) -> usize {
                     #(
-                    if #supports {
-                        #index
-                    } else
-                    )*
+                    #target_arch
                     {
-                        0 // default fn has index 0
+                        if #supports {
+                            return #index;
+                        }
                     }
+                    )*
+                    0 // default fn has index 0
                 }
             });
         }
@@ -261,6 +264,7 @@ impl Dispatcher {
                 let (sig, _) = util::normalize_signature(&self.sig);
                 let args = sig.inputs.iter();
                 Signature {
+                    unsafety: parse_quote! { unsafe },
                     ident: Ident::new(
                         &format!("{}_dispatch", &self.sig.ident),
                         self.sig.ident.span(),
@@ -269,30 +273,35 @@ impl Dispatcher {
                     ..sig
                 }
             };
-            let args = util::arg_exprs(&sig);
-            let args = args.iter().skip(1);
-            let args = quote! { #(#args),* };
-            let types = sig.generics.type_params().collect::<Vec<_>>();
-            let types = quote! { #(#types),* };
+            let args = {
+                let args = util::arg_exprs(&sig);
+                let args = args.iter().skip(1);
+                quote! { #(#args),* }
+            };
+            let types = {
+                let types = sig.generics.type_params().map(|param| param.ident.clone());
+                quote! { #(#types),* }
+            };
             let index = dispatches.iter().map(|x| x.0);
-            let function = dispatches.iter().cloned().map(|x| x.2);
+            let function = dispatches.iter().map(|x| x.2.clone());
+            let target_arch = dispatches.iter().map(|x| x.3.clone());
             let default_function = feature_fn_name(&self.sig.ident, None).0;
             functions.push(parse_quote! {
                 #[doc(hidden)]
                 #[inline(always)]
                 #sig {
                     if __multiversion_fn_index == 0 {
-                        #maybe_self #default_function::<#types>(#args) #maybe_await
-                    } else
-                    #(
-                    if __multiversion_fn_index == #index {
-                        unsafe { #maybe_self #function::<#types>(#args) #maybe_await }
-                    } else
-                    )*
-                    {
-                        panic!("invalid function index");
+                        return #maybe_self #default_function::<#types>(#args) #maybe_await;
                     }
-
+                    #(
+                    #target_arch
+                    {
+                        if __multiversion_fn_index == #index {
+                            return #maybe_self #function::<#types>(#args) #maybe_await;
+                        }
+                    }
+                    )*
+                    panic!("invalid function index");
                 }
             });
         }
