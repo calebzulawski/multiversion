@@ -1,12 +1,11 @@
 use crate::dispatcher::Dispatcher;
+use crate::meta::{parse_attributes, parse_crate_path};
 use crate::target::Target;
 use crate::util;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use std::convert::{TryFrom, TryInto};
-use syn::{
-    parse_quote, spanned::Spanned, Error, Ident, ItemFn, Lit, Meta, MetaList, NestedMeta, Path,
-};
+use syn::{parse_quote, spanned::Spanned, Error, ItemFn, Lit, Meta, NestedMeta, Path};
 
 enum Specialization {
     Clone {
@@ -24,7 +23,6 @@ struct Function {
     func: ItemFn,
     associated: bool,
     crate_path: Path,
-    cpu_token: Option<Ident>,
 }
 
 impl TryFrom<Function> for Dispatcher {
@@ -76,7 +74,6 @@ impl TryFrom<Function> for Dispatcher {
             default: *item.func.block,
             associated: item.associated,
             crate_path: item.crate_path,
-            cpu_token: item.cpu_token,
         })
     }
 }
@@ -86,70 +83,25 @@ impl TryFrom<ItemFn> for Function {
 
     fn try_from(mut func: ItemFn) -> Result<Self, Self::Error> {
         let associated = crate::util::is_associated_fn(&mut func);
-        let attrs = func.attrs;
         let mut multiversioned = Function {
             specializations: Vec::new(),
             associated,
             crate_path: parse_quote!(multiversion),
-            cpu_token: None,
             func: ItemFn {
                 attrs: Vec::new(),
                 ..func
             },
         };
 
-        for attr in attrs {
-            // if not in meta list form, ignore the attribute
-            let MetaList { path, nested, .. } = if let Ok(Meta::List(list)) = attr.parse_meta() {
-                list
-            } else {
-                multiversioned.func.attrs.push(attr);
-                continue;
-            };
-
-            // if meta path isn't just an ident, ignore the attribute
-            let path = if let Some(ident) = path.get_ident() {
-                ident
-            } else {
-                multiversioned.func.attrs.push(attr);
-                continue;
-            };
-
-            // parse the attribute
-            match path.to_string().as_str() {
+        multiversioned.func.attrs = parse_attributes(func.attrs.drain(..), |path, nested| {
+            Ok(match path.to_string().as_str() {
                 "crate_path" => {
-                    meta_parser! {
-                        &nested => [
-                            "path" => crate_path,
-                        ]
-                    }
-                    if let Lit::Str(crate_path) = crate_path
-                        .ok_or_else(|| Error::new(nested.span(), "expected key 'path'"))?
-                    {
-                        multiversioned.crate_path = crate_path.parse()?;
-                    } else {
-                        return Err(Error::new(crate_path.span(), "expected literal string"));
-                    }
-                }
-                "cpu_features_token" => {
-                    meta_parser! {
-                        &nested => [
-                            "name" => name,
-                        ]
-                    }
-
-                    let name = if let Lit::Str(name) =
-                        name.ok_or_else(|| Error::new(nested.span(), "expected key 'path'"))?
-                    {
-                        name.parse()?
-                    } else {
-                        return Err(Error::new(name.span(), "expected literal string"));
-                    };
-                    multiversioned.cpu_token = Some(name);
+                    multiversioned.crate_path = parse_crate_path(nested)?;
+                    true
                 }
                 "clone" => {
                     meta_parser! {
-                        &nested => [
+                        nested => [
                             "target" => target,
                         ]
                     }
@@ -158,10 +110,11 @@ impl TryFrom<ItemFn> for Function {
                             .ok_or_else(|| Error::new(nested.span(), "expected key 'target'"))?
                             .try_into()?,
                     });
+                    true
                 }
                 "specialize" => {
                     meta_parser! {
-                        &nested => [
+                        nested => [
                             "target" => target,
                             "fn" => func,
                             "unsafe" => is_unsafe,
@@ -184,13 +137,11 @@ impl TryFrom<ItemFn> for Function {
                                 lit => Err(Error::new(lit.span(), "expected literal bool")),
                             })?,
                         });
+                    true
                 }
-                _ => {
-                    multiversioned.func.attrs.push(attr);
-                    continue;
-                }
-            }
-        }
+                _ => false,
+            })
+        })?;
 
         Ok(multiversioned)
     }

@@ -1,82 +1,82 @@
-use crate::dispatcher::feature_fn_name;
 use crate::target::Target;
 use syn::{
-    parse_quote, spanned::Spanned, Error, Ident, ItemFn, Lit, Meta, MetaList, NestedMeta, Path,
-    Result, Stmt,
+    parse_quote,
+    spanned::Spanned,
+    visit_mut::{self, VisitMut},
+    Error, Expr, ExprBlock, ExprCall, ItemFn, Path, Result,
 };
 
-pub(crate) fn process_static_dispatch(item: &mut ItemFn, target: Option<&Target>) -> Result<()> {
-    let mut retained = Vec::new();
-    let mut bindings = Vec::<Stmt>::new();
-    for attr in item.attrs.iter().cloned() {
-        // if not in meta list form, ignore the attribute
-        let MetaList { path, nested, .. } = if let Ok(Meta::List(list)) = attr.parse_meta() {
-            list
-        } else {
-            retained.push(attr);
-            continue;
-        };
+struct StaticDispatchVisitor<'a> {
+    crate_path: &'a Path,
+    target: Option<&'a Target>,
+    status: Result<()>,
+}
 
-        // if meta path isn't just an ident, ignore the attribute
-        let path = if let Some(ident) = path.get_ident() {
-            ident
-        } else {
-            retained.push(attr);
-            continue;
-        };
-
-        // parse the attribute
-        match path.to_string().as_str() {
-            "static_dispatch" => {
-                meta_parser! {
-                    &nested => [
-                        "fn" => func,
-                        "rename" => rename,
-                    ]
-                }
-                let func =
-                    match func.ok_or_else(|| Error::new(nested.span(), "expected key 'fn'"))? {
-                        Lit::Str(s) => s.parse_with(Path::parse_mod_style),
-                        l => Err(Error::new(l.span(), "expected literal string")),
-                    }?;
-                let rename: Option<Ident> = rename
-                    .map(|lit| match lit {
-                        Lit::Str(s) => s.parse(),
-                        _ => Err(Error::new(lit.span(), "expected literal string")),
-                    })
-                    .transpose()?;
-
-                // Build new source fn path
-                let mut source = func.clone();
-
-                // Get last ident in path
-                let ident = &mut source.segments.last_mut().unwrap().ident;
-
-                // Bound name is either the ident, or `rename` if it exists
-                let binding = if let Some(rename) = rename {
-                    rename.clone()
-                } else {
-                    ident.clone()
-                };
-
-                // Replace the last ident with the mangled name
-                *ident = feature_fn_name(ident, target).1;
-                bindings.push(parse_quote! { let #binding = #source; });
-            }
-            _ => {
-                retained.push(attr);
-            }
+impl<'a> StaticDispatchVisitor<'a> {
+    pub fn new(crate_path: &'a Path, target: Option<&'a Target>) -> Self {
+        Self {
+            crate_path,
+            target,
+            status: Ok(()),
         }
     }
 
-    // replace attributes
-    item.attrs = retained;
-    let block = &item.block;
-    item.block = parse_quote! {
-        {
-            #(#bindings)*
-            #block
+    pub fn status(self) -> Result<()> {
+        self.status
+    }
+}
+
+impl VisitMut for StaticDispatchVisitor<'_> {
+    fn visit_expr_mut(&mut self, i: &mut Expr) {
+        if self.status.as_ref().ok().is_some() {
+            if let Expr::Macro(expr) = i {
+                if let Some(path_ident) = expr.mac.path.get_ident() {
+                    let crate_path = &self.crate_path;
+                    let features = if let Some(target) = self.target {
+                        target.list_features()
+                    } else {
+                        &[]
+                    };
+                    match path_ident.to_string().as_str() {
+                        "token" => {
+                            if expr.mac.tokens.is_empty() {
+                                *i = parse_quote! { unsafe { #crate_path::CpuFeatures::new(&[#(#features),*]) } };
+                            } else {
+                                self.status = Err(Error::new(
+                                    expr.span(),
+                                    "`tokens!()` helper macro doesn't take any arguments",
+                                ));
+                            }
+                        }
+                        "dispatch" => match expr.mac.parse_body::<ExprCall>() {
+                            Ok(call) => {
+                                let block: ExprBlock = parse_quote! {
+                                    {
+                                        const __TOKEN: #crate_path::CpuFeatures = unsafe { #crate_path::CpuFeatures::new(&[#(#features),*]) };
+                                        #crate_path::dispatch!(__TOKEN => #call)
+                                    }
+                                };
+                                *i = block.into();
+                            }
+                            Err(error) => {
+                                self.status = Err(error);
+                            }
+                        },
+                        _ => { /* skip this macro */ }
+                    }
+                }
+            }
         }
-    };
-    Ok(())
+        visit_mut::visit_expr_mut(self, i);
+    }
+}
+
+pub(crate) fn process_static_dispatch(
+    item: &mut ItemFn,
+    crate_path: &Path,
+    target: Option<&Target>,
+) -> Result<()> {
+    let mut visitor = StaticDispatchVisitor::new(crate_path, target);
+    visitor.visit_item_fn_mut(item);
+    visitor.status()
 }

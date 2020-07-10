@@ -107,20 +107,8 @@
 //! Sometimes it may be useful to call multiversioned functions from other multiversioned functions.
 //! In these situations it would be inefficient to perform feature detection multiple times.
 //! Additionally, the runtime detection prevents the function from being inlined.  In this situation,
-//! the `#[static_dispatch]` helper attribute allows bypassing feature detection.
+//! the `dispatch` and `token` helper attributes allows bypassing feature detection.
 //!
-//! The `#[static_dispatch]` attribute accepts the following arguments:
-//! * `fn`: path to the function to static dispatch.
-//! * `rename` (optional): the binding to use for the statically dispatched function.  If not
-//!   provided, the function name is used.
-//!
-//! Caveats:
-//! * The caller function must exactly match an available feature set in the called function.  A
-//!   function compiled for `x86_64+avx+avx2` cannot statically dispatch a function compiled for
-//!   `x86_64+avx`.  A function compiled for `x86_64+avx` may statically dispatch a function
-//!   compiled for `[x86|x86_64]+avx`, since an exact feature match exists for that architecture.
-//! * The receiver (`self`, `&self`, etc.) must be provided as the first argument to the statically
-//!   dispatched function, e.g. `foo(bar)` rather than `bar.foo()`.
 //! ```
 //! # mod fix { // doctests do something weird with modules, this fixes it
 //! use multiversion::multiversion;
@@ -137,9 +125,8 @@
 //! #[multiversion]
 //! #[clone(target = "[x86|x86_64]+avx")]
 //! #[clone(target = "x86+sse")]
-//! #[static_dispatch(fn = "square")]
 //! fn square_plus_one(x: &mut [f32]) {
-//!     square(x); // this function call bypasses feature detection
+//!     dispatch!(square(x)); // this function call bypasses feature detection
 //!     for v in x {
 //!         *v += 1.0;
 //!     }
@@ -202,8 +189,6 @@
 ///       indicates that the safety contract is fulfilled and`function` is safe to call on the specified
 ///       target.  If `function` is unsafe for any other reason, remember to mark the tagged function
 ///       `unsafe` as well.
-/// * `#[static_dispatch]`
-///   * Statically dispatches another multiversioned function, see [static dispatching].
 /// * `#[crate_path]`
 ///   * Specifies the location of the multiversion crate (useful for re-exporting).
 ///   * Arguments:
@@ -353,8 +338,10 @@ pub use multiversion_macros::multiversion;
 /// * `#[safe_inner]`
 ///   * Indicates that the inner contents of the function are safe and requires the use of `unsafe`
 ///     blocks to call `unsafe` functions.
-/// * `#[static_dispatch]`
-///   * Statically dispatches a multiversioned function, see [static dispatching].
+/// * `#[crate_path]`
+///   * Specifies the location of the multiversion crate (useful for re-exporting).
+///   * Arguments:
+///     * `path`: the path to the multiversion crate
 ///
 /// # Static dispatching
 /// The [`target`] attribute allows functions called inside the function to be statically dispatched.
@@ -369,6 +356,8 @@ pub use multiversion_macros::multiversion;
 /// [static dispatching]: index.html#static-dispatching
 /// [conditional compilation]: index.html#conditional-compilation
 pub use multiversion_macros::target;
+
+pub use multiversion_macros::dispatch;
 
 mod arch;
 pub use arch::*;

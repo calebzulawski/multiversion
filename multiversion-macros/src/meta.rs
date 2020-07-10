@@ -1,3 +1,8 @@
+use syn::{
+    punctuated::Punctuated, spanned::Spanned, token::Comma, Attribute, Error, Ident, Lit, Meta,
+    MetaList, NestedMeta, Path, Result,
+};
+
 // Parses an attribute meta into Options
 macro_rules! meta_parser {
     {
@@ -32,5 +37,50 @@ macro_rules! meta_parser {
                 )),
             }
         }
+    }
+}
+
+pub(crate) fn parse_attributes<I, F>(attrs: I, mut f: F) -> Result<Vec<Attribute>>
+where
+    I: Iterator<Item = Attribute>,
+    F: FnMut(&Ident, &Punctuated<NestedMeta, Comma>) -> Result<bool>,
+{
+    let mut retained = Vec::new();
+    for attr in attrs {
+        // if not in meta list form, ignore the attribute
+        let MetaList { path, nested, .. } = if let Ok(Meta::List(list)) = attr.parse_meta() {
+            list
+        } else {
+            retained.push(attr);
+            continue;
+        };
+
+        // if meta path isn't just an ident, ignore the attribute
+        let path = if let Some(ident) = path.get_ident() {
+            ident
+        } else {
+            retained.push(attr);
+            continue;
+        };
+
+        if !f(path, &nested)? {
+            retained.push(attr);
+        }
+    }
+    Ok(retained)
+}
+
+pub(crate) fn parse_crate_path(nested: &Punctuated<NestedMeta, Comma>) -> Result<Path> {
+    meta_parser! {
+        nested => [
+            "path" => crate_path,
+        ]
+    }
+    if let Lit::Str(crate_path) =
+        crate_path.ok_or_else(|| Error::new(nested.span(), "expected key 'path'"))?
+    {
+        Ok(crate_path.parse()?)
+    } else {
+        Err(Error::new(crate_path.span(), "expected literal string"))
     }
 }

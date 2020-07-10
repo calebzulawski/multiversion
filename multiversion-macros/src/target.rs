@@ -1,3 +1,4 @@
+use crate::meta::{parse_attributes, parse_crate_path};
 use crate::safe_inner::process_safe_inner;
 use crate::static_dispatch::process_static_dispatch;
 use crate::target_cfg::process_target_cfg;
@@ -153,19 +154,29 @@ impl std::convert::TryFrom<&Lit> for Target {
     }
 }
 
-pub(crate) fn make_target_fn(target: Option<Lit>, func: ItemFn) -> Result<TokenStream> {
+pub(crate) fn make_target_fn(target: Option<Lit>, mut func: ItemFn) -> Result<TokenStream> {
+    let mut crate_path = parse_quote! { multiversion };
+    func.attrs = parse_attributes(func.attrs.drain(..), |path, nested| {
+        Ok(if path.to_string().as_str() == "crate_path" {
+            crate_path = parse_crate_path(nested)?;
+            true
+        } else {
+            false
+        })
+    })?;
     let target = target.as_ref().map(|s| s.try_into()).transpose()?;
-    let functions = make_target_fn_items(target.as_ref(), func)?;
+    let functions = make_target_fn_items(target.as_ref(), &crate_path, func)?;
     Ok(quote! { #(#functions)* })
 }
 
 pub(crate) fn make_target_fn_items(
     target: Option<&Target>,
+    crate_path: &Path,
     mut func: ItemFn,
 ) -> Result<Vec<ItemFn>> {
     // Rewrite #[target_cfg] and #[static_dispatch]
     process_target_cfg(target.cloned(), &mut func.block)?;
-    process_static_dispatch(&mut func, target)?;
+    process_static_dispatch(&mut func, crate_path, target)?;
 
     // Create the function
     if let Some(target) = target {

@@ -22,6 +22,17 @@ pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> (Ident,
     (default.clone(), default)
 }
 
+pub(crate) fn dispatch_index_fn_name(ident: &Ident) -> Ident {
+    Ident::new(
+        &format!("__multiversion_{}_dispatch_index", ident),
+        ident.span(),
+    )
+}
+
+pub(crate) fn dispatch_fn_name(ident: &Ident) -> Ident {
+    Ident::new(&format!("__multiversion_{}_dispatch", ident), ident.span())
+}
+
 pub(crate) struct Specialization {
     pub target: Target,
     pub block: Block,
@@ -36,7 +47,6 @@ impl Specialization {
         attrs: &[Attribute],
         associated: bool,
         crate_path: &Path,
-        cpu_token: Option<&Ident>,
     ) -> Result<Vec<ItemFn>> {
         let (fn_name, dispatch_fn_name) = feature_fn_name(&sig.ident, Some(&self.target));
 
@@ -44,20 +54,6 @@ impl Specialization {
         target_attrs.push(parse_quote! { #[inline] });
         target_attrs.push(parse_quote! { #[doc(hidden)] });
         target_attrs.extend(attrs.iter().cloned());
-
-        // Insert CPU token
-        let block = Box::new(if let Some(name) = cpu_token {
-            let features = self.target.list_features();
-            let block = &self.block;
-            parse_quote! {
-                {
-                    const #name: #crate_path::CpuFeatures = unsafe { #crate_path::CpuFeatures::new(&[#(#features),*]) };
-                    #block
-                }
-            }
-        } else {
-            self.block.clone()
-        });
 
         // If this target doesn't have any features, treat it as a default version
         if self.target.has_features_specified() {
@@ -82,7 +78,7 @@ impl Specialization {
                 attrs: target_attrs,
                 vis: vis.clone(),
                 sig: unsafe_sig,
-                block,
+                block: Box::new(self.block.clone()),
             };
 
             // create safe/dispatch fn
@@ -112,11 +108,16 @@ impl Specialization {
                 sig: outer_sig,
             };
             let mut fns = vec![dispatch_fn];
-            fns.extend(make_target_fn_items(Some(&self.target), target_fn)?);
+            fns.extend(make_target_fn_items(
+                Some(&self.target),
+                crate_path,
+                target_fn,
+            )?);
             Ok(fns)
         } else {
             make_target_fn_items(
                 Some(&self.target),
+                crate_path,
                 ItemFn {
                     attrs: target_attrs,
                     vis: vis.clone(),
@@ -124,7 +125,7 @@ impl Specialization {
                         ident: fn_name,
                         ..sig.clone()
                     },
-                    block,
+                    block: Box::new(self.block.clone()),
                 },
             )
         }
@@ -139,7 +140,6 @@ pub(crate) struct Dispatcher {
     pub default: Block,
     pub associated: bool,
     pub crate_path: Path,
-    pub cpu_token: Option<Ident>,
 }
 
 impl Dispatcher {
@@ -173,7 +173,6 @@ impl Dispatcher {
                 &self.attrs,
                 self.associated,
                 &self.crate_path,
-                self.cpu_token.as_ref(),
             )?);
         }
 
@@ -184,6 +183,7 @@ impl Dispatcher {
         attrs.push(self.cfg_if_not_defaulted());
         fns.extend(make_target_fn_items(
             None,
+            &self.crate_path,
             ItemFn {
                 attrs,
                 vis: self.vis.clone(),
@@ -204,6 +204,7 @@ impl Dispatcher {
             return Ok(Vec::new());
         }
 
+        let vis = &self.vis;
         let crate_path = &self.crate_path;
         let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
         let maybe_self = if self.associated {
@@ -235,16 +236,13 @@ impl Dispatcher {
 
         // Create function index dispatcher
         {
-            let name = Ident::new(
-                &format!("{}_dispatch_index", &self.sig.ident),
-                self.sig.ident.span(),
-            );
+            let name = dispatch_index_fn_name(&self.sig.ident);
             let index = dispatches.iter().map(|x| x.0);
             let supports = dispatches.iter().map(|x| x.1.clone());
             let target_arch = dispatches.iter().map(|x| x.3.clone());
             functions.push(parse_quote! {
                 #[doc(hidden)]
-                const fn #name(__cpu_features: #crate_path::CpuFeatures) -> usize {
+                #vis const fn #name(__cpu_features: #crate_path::CpuFeatures) -> usize {
                     #(
                     #target_arch
                     {
@@ -265,10 +263,7 @@ impl Dispatcher {
                 let args = sig.inputs.iter();
                 Signature {
                     unsafety: parse_quote! { unsafe },
-                    ident: Ident::new(
-                        &format!("{}_dispatch", &self.sig.ident),
-                        self.sig.ident.span(),
-                    ),
+                    ident: dispatch_fn_name(&self.sig.ident),
                     inputs: parse_quote! { __multiversion_fn_index: usize, #(#args),* },
                     ..sig
                 }
@@ -288,11 +283,8 @@ impl Dispatcher {
             let default_function = feature_fn_name(&self.sig.ident, None).0;
             functions.push(parse_quote! {
                 #[doc(hidden)]
-                #[inline(always)]
-                #sig {
-                    if __multiversion_fn_index == 0 {
-                        return #maybe_self #default_function::<#types>(#args) #maybe_await;
-                    }
+                #[inline]
+                #vis #sig {
                     #(
                     #target_arch
                     {
@@ -301,7 +293,7 @@ impl Dispatcher {
                         }
                     }
                     )*
-                    panic!("invalid function index");
+                    return #maybe_self #default_function::<#types>(#args) #maybe_await;
                 }
             });
         }

@@ -1,3 +1,4 @@
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CpuFeatures(&'static [&'static str]);
 
 const fn const_slice_eq(a: &[u8], b: &[u8]) -> bool {
@@ -37,6 +38,7 @@ impl CpuFeatures {
     }
 }
 
+#[macro_export]
 macro_rules! detect_cpu_features {
     { $($feature:tt),* $(,)? } => {
         {
