@@ -3,7 +3,7 @@ use crate::target::Target;
 use syn::{
     spanned::Spanned,
     visit_mut::{self, VisitMut},
-    Error, Expr, ExprCall, ItemFn, Result,
+    Error, Expr, ItemFn, Result,
 };
 
 struct StaticDispatchVisitor<'a> {
@@ -28,17 +28,25 @@ fn dispatch_impl(expr: &mut Expr, target: Option<&Target>) -> Result<()> {
     if let Expr::Macro(macro_expr) = expr {
         if let Some(path_ident) = macro_expr.mac.path.get_ident() {
             if path_ident.to_string().as_str() == "dispatch" {
-                let mut call = macro_expr.mac.parse_body::<ExprCall>()?;
-                if let Expr::Path(ref mut function) = *call.func {
-                    let ident = &mut function.path.segments.last_mut().unwrap().ident;
-                    *ident = feature_fn_name(ident, target).1;
-                    Ok(())
-                } else {
-                    Err(Error::new(
-                        call.func.span(),
-                        "dispatching a function requires a direct function call",
-                    ))
+                let mut call = macro_expr.mac.parse_body::<Expr>()?;
+                let ident = match &mut call {
+                    Expr::Call(ref mut call) => {
+                        if let Expr::Path(ref mut function) = *call.func {
+                            Ok(&mut function.path.segments.last_mut().unwrap().ident)
+                        } else {
+                            Err(Error::new(
+                                call.func.span(),
+                                "dispatching a function requires a direct function call",
+                            ))
+                        }
+                    }
+                    Expr::MethodCall(call) => Ok(&mut call.method),
+                    _ => Err(Error::new(
+                        call.span(),
+                        "expected a function or method call",
+                    )),
                 }?;
+                *ident = feature_fn_name(ident, target).1;
                 *expr = call.into();
             }
         }

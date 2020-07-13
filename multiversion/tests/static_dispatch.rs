@@ -16,7 +16,6 @@ fn square(x: &mut [f32]) {
     }
 }
 
-/*
 struct Squarer;
 
 impl Squarer {
@@ -32,11 +31,10 @@ impl Squarer {
     #[clone(target = "x86+sse")]
     fn square(&self, x: &mut [f32]) {
         for v in x {
-            *v = dispatch!(mul(self, *v, *v));
+            *v = dispatch!(self.mul(*v, *v));
         }
     }
 }
-*/
 
 #[test]
 fn static_dispatch() {
@@ -45,7 +43,6 @@ fn static_dispatch() {
     assert_eq!(x, vec![0f32, 1f32, 4f32, 9f32]);
 }
 
-/*
 #[test]
 fn static_dispatch_associated() {
     let mut x = vec![0f32, 1f32, 2f32, 3f32];
@@ -53,4 +50,3 @@ fn static_dispatch_associated() {
     squarer.square(x.as_mut_slice());
     assert_eq!(x, vec![0f32, 1f32, 4f32, 9f32]);
 }
-*/
