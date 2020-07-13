@@ -41,6 +41,9 @@ fn dispatch_impl(expr: &mut Expr, target: Option<&Target>) -> Result<()> {
                         }
                     }
                     Expr::MethodCall(call) => Ok(&mut call.method),
+                    Expr::Path(ref mut path) => {
+                        Ok(&mut path.path.segments.last_mut().unwrap().ident)
+                    }
                     _ => Err(Error::new(
                         call.span(),
                         "expected a function or method call",
