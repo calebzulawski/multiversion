@@ -135,6 +135,18 @@
 //! # }
 //! ```
 //!
+//! The `dispatch` macro supports either paths or function calls:
+//! * `dispatch!(foo)`
+//! * `dispatch!(Self::foo::<A, B>)`
+//! * `dispatch!(foo(a, b))`
+//! * `dispatch!(self.foo::<A, B>(a, b))`
+//!
+//! The statically dispatched function must be multiversioned over a subset of CPU features
+//! supported by the caller function.  For example, a function compiled for `x86_64+avx+avx2`
+//! cannot statically dispatch a function compiled for `x86_64+avx`, but a function compiled
+//! for `x86_64+avx` may statically dispatch a multiversioned function compiled for both 
+//! `[x86|x86_64]+avx` and `x86+sse` since an exact feature match exists for that architecture.
+//!
 //! # Conditional compilation
 //! The `#[cfg]` attribute allows conditional compilation based on the target architecture and
 //! features, however this does not take into account additional features specified by
