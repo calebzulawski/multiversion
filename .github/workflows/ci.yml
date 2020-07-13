@@ -16,7 +16,7 @@ jobs:
         os:
           - macos-latest
           - ubuntu-latest
-          - windows-latest
+          #- windows-latest
         features:
           - --all-features
           - --no-default-features
