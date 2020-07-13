@@ -1,21 +1,19 @@
+use crate::dispatcher::feature_fn_name;
 use crate::target::Target;
 use syn::{
-    parse_quote,
     spanned::Spanned,
     visit_mut::{self, VisitMut},
-    Error, Expr, ExprBlock, ExprCall, ItemFn, Path, Result,
+    Error, Expr, ExprCall, ItemFn, Result,
 };
 
 struct StaticDispatchVisitor<'a> {
-    crate_path: &'a Path,
     target: Option<&'a Target>,
     status: Result<()>,
 }
 
 impl<'a> StaticDispatchVisitor<'a> {
-    pub fn new(crate_path: &'a Path, target: Option<&'a Target>) -> Self {
+    pub fn new(target: Option<&'a Target>) -> Self {
         Self {
-            crate_path,
             target,
             status: Ok(()),
         }
@@ -26,57 +24,41 @@ impl<'a> StaticDispatchVisitor<'a> {
     }
 }
 
+fn dispatch_impl(expr: &mut Expr, target: Option<&Target>) -> Result<()> {
+    if let Expr::Macro(macro_expr) = expr {
+        if let Some(path_ident) = macro_expr.mac.path.get_ident() {
+            if path_ident.to_string().as_str() == "dispatch" {
+                let mut call = macro_expr.mac.parse_body::<ExprCall>()?;
+                if let Expr::Path(ref mut function) = *call.func {
+                    let ident = &mut function.path.segments.last_mut().unwrap().ident;
+                    *ident = feature_fn_name(ident, target).1;
+                    Ok(())
+                } else {
+                    Err(Error::new(
+                        call.func.span(),
+                        "dispatching a function requires a direct function call",
+                    ))
+                }?;
+                *expr = call.into();
+            }
+        }
+    }
+    Ok(())
+}
+
 impl VisitMut for StaticDispatchVisitor<'_> {
     fn visit_expr_mut(&mut self, i: &mut Expr) {
         if self.status.as_ref().ok().is_some() {
-            if let Expr::Macro(expr) = i {
-                if let Some(path_ident) = expr.mac.path.get_ident() {
-                    let crate_path = &self.crate_path;
-                    let features = if let Some(target) = self.target {
-                        target.list_features()
-                    } else {
-                        &[]
-                    };
-                    match path_ident.to_string().as_str() {
-                        "token" => {
-                            if expr.mac.tokens.is_empty() {
-                                *i = parse_quote! { unsafe { #crate_path::CpuFeatures::new(&[#(#features),*]) } };
-                            } else {
-                                self.status = Err(Error::new(
-                                    expr.span(),
-                                    "`tokens!()` helper macro doesn't take any arguments",
-                                ));
-                            }
-                        }
-                        "dispatch" => match expr.mac.parse_body::<ExprCall>() {
-                            Ok(call) => {
-                                let block: ExprBlock = parse_quote! {
-                                    {
-                                        const __TOKEN: #crate_path::CpuFeatures = unsafe { #crate_path::CpuFeatures::new(&[#(#features),*]) };
-                                        #crate_path::dispatch!(__TOKEN => #call)
-                                    }
-                                };
-                                *i = block.into();
-                            }
-                            Err(error) => {
-                                self.status = Err(error);
-                            }
-                        },
-                        _ => { /* skip this macro */ }
-                    }
-                }
+            if let Err(error) = dispatch_impl(i, self.target) {
+                self.status = Err(error);
             }
+            visit_mut::visit_expr_mut(self, i);
         }
-        visit_mut::visit_expr_mut(self, i);
     }
 }
 
-pub(crate) fn process_static_dispatch(
-    item: &mut ItemFn,
-    crate_path: &Path,
-    target: Option<&Target>,
-) -> Result<()> {
-    let mut visitor = StaticDispatchVisitor::new(crate_path, target);
+pub(crate) fn process_static_dispatch(item: &mut ItemFn, target: Option<&Target>) -> Result<()> {
+    let mut visitor = StaticDispatchVisitor::new(target);
     visitor.visit_item_fn_mut(item);
     visitor.status()
 }

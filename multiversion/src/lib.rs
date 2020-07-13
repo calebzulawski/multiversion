@@ -357,7 +357,61 @@ pub use multiversion_macros::multiversion;
 /// [conditional compilation]: index.html#conditional-compilation
 pub use multiversion_macros::target;
 
-pub use multiversion_macros::dispatch;
-
-mod arch;
-pub use arch::*;
+/// Detects CPU features.
+///
+/// When the `std` feature is enabled, this macro operates like the standard library detection
+/// macro for the current target (e.g. [`is_x86_feature_detected`]), but accepts multiple arguments.
+///
+/// When the `std` feature is not enabled, this macro detects if the feature is
+/// enabled during compilation, using the [`cfg`] attribute.
+///
+/// [`is_x86_feature_detected`]: https://doc.rust-lang.org/std/macro.is_x86_feature_detected.html
+/// [`cfg`]: https://doc.rust-lang.org/reference/conditional-compilation.html#target_feature
+#[cfg(any(feature = "std", doc))]
+#[macro_export]
+macro_rules! are_cpu_features_detected {
+    { $feature:tt $(,)? } => {
+        {
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            { is_x86_feature_detected!($feature) }
+            #[cfg(target_arch = "arm")]
+            { is_arm_feature_detected!($feature) }
+            #[cfg(target_arch = "aarch64")]
+            { is_aarch64_feature_detected!($feature) }
+            #[cfg(target_arch = "powerpc")]
+            { is_powerpc_feature_detected!($feature) }
+            #[cfg(target_arch = "powerpc64")]
+            { is_powerpc64_feature_detected!($feature) }
+            #[cfg(target_arch = "mips")]
+            { is_mips_feature_detected!($feature) }
+            #[cfg(target_arch = "mips64")]
+            { is_mips64_feature_detected!($feature) }
+            #[cfg(not(any(
+                target_arch = "x86",
+                target_arch = "x86_64",
+                target_arch = "arm",
+                target_arch = "aarch64",
+                target_arch = "powerpc",
+                target_arch = "powerpc64",
+                target_arch = "mips",
+                target_arch = "mips64",
+            )))]
+            { compile_error!("Unsupported architecture. Expected x86, x86_64, arm, aarch64, powerpc, powerpc64, mips, or mips64.") }
+        }
+    };
+    { $first:tt, $($features:tt),+ $(,)? } => {
+        $crate::are_cpu_features_detected!($first) $(&& $crate::are_cpu_features_detected!($features))*
+    }
+}
+#[cfg(not(any(feature = "std", doc)))]
+#[macro_export]
+macro_rules! are_cpu_features_detected {
+    { $($features:tt),+ } => {
+        {
+            #[cfg(all( $(target_feature = $features),* ))]
+            { true }
+            #[cfg(not(all( $(target_feature = $features),* )))]
+            { false }
+        }
+    }
+}

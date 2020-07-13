@@ -22,17 +22,6 @@ pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> (Ident,
     (default.clone(), default)
 }
 
-pub(crate) fn dispatch_index_fn_name(ident: &Ident) -> Ident {
-    Ident::new(
-        &format!("__multiversion_{}_dispatch_index", ident),
-        ident.span(),
-    )
-}
-
-pub(crate) fn dispatch_fn_name(ident: &Ident) -> Ident {
-    Ident::new(&format!("__multiversion_{}_dispatch", ident), ident.span())
-}
-
 pub(crate) struct Specialization {
     pub target: Target,
     pub block: Block,
@@ -46,7 +35,6 @@ impl Specialization {
         sig: &Signature,
         attrs: &[Attribute],
         associated: bool,
-        crate_path: &Path,
     ) -> Result<Vec<ItemFn>> {
         let (fn_name, dispatch_fn_name) = feature_fn_name(&sig.ident, Some(&self.target));
 
@@ -108,16 +96,11 @@ impl Specialization {
                 sig: outer_sig,
             };
             let mut fns = vec![dispatch_fn];
-            fns.extend(make_target_fn_items(
-                Some(&self.target),
-                crate_path,
-                target_fn,
-            )?);
+            fns.extend(make_target_fn_items(Some(&self.target), target_fn)?);
             Ok(fns)
         } else {
             make_target_fn_items(
                 Some(&self.target),
-                crate_path,
                 ItemFn {
                     attrs: target_attrs,
                     vis: vis.clone(),
@@ -167,13 +150,7 @@ impl Dispatcher {
     fn feature_fns(&self) -> Result<Vec<ItemFn>> {
         let mut fns = Vec::new();
         for f in &self.specializations {
-            fns.extend(f.make_fn(
-                &self.vis,
-                &self.sig,
-                &self.attrs,
-                self.associated,
-                &self.crate_path,
-            )?);
+            fns.extend(f.make_fn(&self.vis, &self.sig, &self.attrs, self.associated)?);
         }
 
         // Create default fn
@@ -183,7 +160,6 @@ impl Dispatcher {
         attrs.push(self.cfg_if_not_defaulted());
         fns.extend(make_target_fn_items(
             None,
-            &self.crate_path,
             ItemFn {
                 attrs,
                 vis: self.vis.clone(),
@@ -196,109 +172,6 @@ impl Dispatcher {
         )?);
 
         Ok(fns)
-    }
-
-    // Create the static dispatcher functions
-    fn static_dispatcher_fn(&self) -> Result<Vec<ItemFn>> {
-        if self.sig.receiver().is_some() {
-            return Ok(Vec::new());
-        }
-
-        let vis = &self.vis;
-        let crate_path = &self.crate_path;
-        let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
-        let maybe_self = if self.associated {
-            quote! { Self:: }
-        } else {
-            Default::default()
-        };
-
-        let mut functions = Vec::new();
-
-        let dispatches = self
-            .specializations
-            .iter()
-            .enumerate()
-            .filter_map(|(index, specialization)| {
-                if specialization.target.has_features_specified() {
-                    let features = specialization.target.list_features();
-                    Some((
-                        index + 1,
-                        quote! { #(__cpu_features.supports(#features))&* },
-                        feature_fn_name(&self.sig.ident, Some(&specialization.target)).0,
-                        specialization.target.target_arch(),
-                    ))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-
-        // Create function index dispatcher
-        {
-            let name = dispatch_index_fn_name(&self.sig.ident);
-            let index = dispatches.iter().map(|x| x.0);
-            let supports = dispatches.iter().map(|x| x.1.clone());
-            let target_arch = dispatches.iter().map(|x| x.3.clone());
-            functions.push(parse_quote! {
-                #[doc(hidden)]
-                #vis const fn #name(__cpu_features: #crate_path::CpuFeatures) -> usize {
-                    #(
-                    #target_arch
-                    {
-                        if #supports {
-                            return #index;
-                        }
-                    }
-                    )*
-                    0 // default fn has index 0
-                }
-            });
-        }
-
-        // Create function caller
-        {
-            let sig = {
-                let (sig, _) = util::normalize_signature(&self.sig);
-                let args = sig.inputs.iter();
-                Signature {
-                    unsafety: parse_quote! { unsafe },
-                    ident: dispatch_fn_name(&self.sig.ident),
-                    inputs: parse_quote! { __multiversion_fn_index: usize, #(#args),* },
-                    ..sig
-                }
-            };
-            let args = {
-                let args = util::arg_exprs(&sig);
-                let args = args.iter().skip(1);
-                quote! { #(#args),* }
-            };
-            let types = {
-                let types = sig.generics.type_params().map(|param| param.ident.clone());
-                quote! { #(#types),* }
-            };
-            let index = dispatches.iter().map(|x| x.0);
-            let function = dispatches.iter().map(|x| x.2.clone());
-            let target_arch = dispatches.iter().map(|x| x.3.clone());
-            let default_function = feature_fn_name(&self.sig.ident, None).0;
-            functions.push(parse_quote! {
-                #[doc(hidden)]
-                #[inline]
-                #vis #sig {
-                    #(
-                    #target_arch
-                    {
-                        if __multiversion_fn_index == #index {
-                            return #maybe_self #function::<#types>(#args) #maybe_await;
-                        }
-                    }
-                    )*
-                    return #maybe_self #default_function::<#types>(#args) #maybe_await;
-                }
-            });
-        }
-
-        Ok(functions)
     }
 
     fn dispatcher_fn(&self) -> Result<ItemFn> {
@@ -420,14 +293,6 @@ impl ToTokens for Dispatcher {
             Ok(val) => quote! { #(#val)* },
             Err(err) => err.to_compile_error(),
         });
-        match self.static_dispatcher_fn() {
-            Ok(val) => {
-                for v in val {
-                    tokens.extend(v.into_token_stream());
-                }
-            }
-            Err(err) => tokens.extend(err.to_compile_error()),
-        }
         tokens.extend(match self.dispatcher_fn() {
             Ok(val) => val.into_token_stream(),
             Err(err) => err.to_compile_error(),
