@@ -42,7 +42,7 @@ jobs:
         toolchain: stable
         override: true
         profile: minimal
-        components: [clippy, rustfmt]
+        components: clippy, rustfmt
     - name: Clippy lint
       run: cargo clippy --all-targets ${{ matrix.features }} --manifest-path multiversion/Cargo.toml -- -D warnings
     - name: Check formatting
