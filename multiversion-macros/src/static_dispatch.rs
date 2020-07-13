@@ -50,7 +50,7 @@ fn dispatch_impl(expr: &mut Expr, target: Option<&Target>) -> Result<()> {
                     )),
                 }?;
                 *ident = feature_fn_name(ident, target).1;
-                *expr = call.into();
+                *expr = call;
             }
         }
     }
