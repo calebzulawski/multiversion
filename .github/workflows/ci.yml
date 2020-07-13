@@ -17,6 +17,7 @@ jobs:
           - macos-latest
           - ubuntu-latest
           #- windows-latest
+          # disabled due to rustup errors
         features:
           - --all-features
           - --no-default-features
