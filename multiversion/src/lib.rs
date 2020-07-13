@@ -107,7 +107,7 @@
 //! Sometimes it may be useful to call multiversioned functions from other multiversioned functions.
 //! In these situations it would be inefficient to perform feature detection multiple times.
 //! Additionally, the runtime detection prevents the function from being inlined.  In this situation,
-//! the `dispatch` and `token` helper attributes allows bypassing feature detection.
+//! the `dispatch` helper macro allows bypassing feature detection:
 //!
 //! ```
 //! # mod fix { // doctests do something weird with modules, this fixes it
