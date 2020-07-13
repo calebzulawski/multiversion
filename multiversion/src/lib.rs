@@ -350,10 +350,6 @@ pub use multiversion_macros::multiversion;
 /// * `#[safe_inner]`
 ///   * Indicates that the inner contents of the function are safe and requires the use of `unsafe`
 ///     blocks to call `unsafe` functions.
-/// * `#[crate_path]`
-///   * Specifies the location of the multiversion crate (useful for re-exporting).
-///   * Arguments:
-///     * `path`: the path to the multiversion crate
 ///
 /// # Static dispatching
 /// The [`target`] attribute allows functions called inside the function to be statically dispatched.
