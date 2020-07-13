@@ -12,3 +12,8 @@ use core as multiversion; // override the multiversion name
 #[clone(target = "[x86|x86_64]+avx")]
 #[crate_path(path = "multiversion_export::nested")]
 fn foo() {}
+
+#[test]
+fn crate_path() {
+    foo()
+}

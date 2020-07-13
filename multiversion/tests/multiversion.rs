@@ -1,3 +1,5 @@
+#![allow(clippy::blacklisted_name)]
+
 use multiversion::{multiversion, target};
 
 #[target("x86_64+avx2")]

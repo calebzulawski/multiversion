@@ -1,9 +1,11 @@
+#![allow(clippy::needless_lifetimes)]
+
 #[multiversion::multiversion]
 #[clone(target = "[x86|x86_64]+avx2+avx")]
 #[clone(target = "[x86|x86_64]+avx")]
 #[clone(target = "x86+sse")]
 fn double<'a, T: Copy + std::ops::AddAssign>(x: &'a mut [T]) -> &'a mut T {
-    assert!(x.len() > 0);
+    assert!(!x.is_empty());
     for v in x.iter_mut() {
         *v += *v;
     }
@@ -17,7 +19,7 @@ impl<'a> Doubler<'a> {
     #[clone(target = "[x86|x86_64]+avx")]
     #[clone(target = "x86+sse")]
     fn double<'b, T: Copy + std::ops::AddAssign>(&self, x: &'b mut [T]) -> &'b mut T {
-        assert!(x.len() > 0);
+        assert!(!x.is_empty());
         if *self.0 {
             for v in x.iter_mut() {
                 *v += *v;

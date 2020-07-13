@@ -1,3 +1,5 @@
+#![allow(clippy::blacklisted_name)]
+
 struct Foo {
     bar: i64,
     baz: i64,
