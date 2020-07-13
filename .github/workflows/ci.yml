@@ -3,9 +3,7 @@ name: Build
 on: [push]
 
 jobs:
-  build:
-
-
+  test:
     strategy:
       matrix:
         version:
@@ -27,8 +25,25 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install toolchain
-      run: |
-        rustup install --profile minimal ${{ matrix.version }}
-        rustup default ${{ matrix.version }}
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.version }}
+        override: true
+        profile: minimal
     - name: Run tests
       run: cargo test --verbose ${{ matrix.features }} --manifest-path multiversion/Cargo.toml
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        profile: minimal
+        components: [clippy, rustfmt]
+    - name: Clippy lint
+      run: cargo clippy --all-targets ${{ matrix.features }} --manifest-path multiversion/Cargo.toml -- -D warnings
+    - name: Check formatting
+      run: cargo fmt -- --check
