@@ -71,6 +71,22 @@ fn static_dispatch_indirect() {
 }
 
 #[test]
+fn static_dispatch_target() {
+    #[multiversion::target("[x86|x86_64]+avx")]
+    unsafe fn square_avx(x: &mut [f32]) {
+        dispatch!(square(x));
+    }
+
+    if multiversion::are_cpu_features_detected!("avx") {
+        let mut x = vec![0f32, 1f32, 2f32, 3f32];
+        unsafe {
+            square_avx(x.as_mut_slice());
+        }
+        assert_eq!(x, vec![0f32, 1f32, 4f32, 9f32]);
+    }
+}
+
+#[test]
 fn static_dispatch_associated() {
     let mut x = vec![0f32, 1f32, 2f32, 3f32];
     let squarer = Squarer;
