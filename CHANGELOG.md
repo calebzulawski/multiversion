@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Added `are_cpu_features_detected` macro.
+- Added `#[crate_path]` helper attribute for renaming/reimporting the crate.
 ### Changed
 - Changed static dispatching from the `#[static_dispatch]` helper attribute to `dispatch!` helper macro.
 
