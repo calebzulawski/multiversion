@@ -49,4 +49,7 @@ jobs:
     - name: Check formatting
       run: cargo fmt -- --check
     - name: Deadlinks
-      run: cargo install cargo-deadlinks && cargo deadlinks -v --check-http
+      run: |
+        cargo install cargo-deadlinks
+        cargo doc
+        cargo deadlinks -v --check-http
