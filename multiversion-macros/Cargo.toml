@@ -25,6 +25,6 @@ default = ["std"]
 std = []
 
 [dependencies]
-syn = { version = "^1.0.7", features = ["full", "extra-traits", "visit-mut"] }
+syn = { version = "^1.0.36", features = ["full", "extra-traits", "visit-mut"] }
 quote = "1"
 proc-macro2 = "1"

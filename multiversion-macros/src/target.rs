@@ -4,9 +4,7 @@ use crate::target_cfg::process_target_cfg;
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::convert::TryInto;
-use syn::{
-    parse_quote, spanned::Spanned as _, Attribute, Error, ItemFn, Lit, LitStr, Path, Result,
-};
+use syn::{parse_quote, Attribute, Error, ItemFn, Lit, LitStr, Path, Result};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Target {
