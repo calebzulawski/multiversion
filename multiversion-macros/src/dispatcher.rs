@@ -135,7 +135,7 @@ impl Dispatcher {
             .iter()
             .filter_map(|Specialization { target, .. }| {
                 if !target.has_features_specified() {
-                    Some(target.arches_as_str())
+                    Some(target.arches())
                 } else {
                     None
                 }
