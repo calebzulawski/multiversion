@@ -7,11 +7,10 @@ async fn async_add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
 
-#[rustversion::since(1.39)]
 struct Adder(f32);
 
-#[rustversion::since(1.39)]
 impl Adder {
+    #[rustversion::since(1.39)]
     #[multiversion::multiversion]
     #[clone(target = "[x86|x86_64]+avx")]
     #[clone(target = "[x86|x86_64]+sse")]
@@ -21,10 +20,11 @@ impl Adder {
     }
 }
 
-#[rustversion::since(1.39)]
 mod test {
+
     // Adapted from David Tolnay's async-trait.
     // Provided under Apache License, Version 2.0 or MIT license.
+    #[rustversion::since(1.39)]
     pub fn block_on<F: std::future::Future>(mut fut: F) -> F::Output {
         use std::pin::Pin;
         use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
@@ -58,6 +58,7 @@ mod test {
         }
     }
 
+    #[rustversion::since(1.39)]
     #[test]
     fn async_fn() {
         let mut a = vec![0f32, 2f32, 4f32];
@@ -67,6 +68,7 @@ mod test {
         assert_eq!(a, vec![1f32, 3f32, 5f32]);
     }
 
+    #[rustversion::since(1.39)]
     #[test]
     fn async_associated_fn() {
         let mut a = vec![0f32, 2f32, 4f32];
