@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- Changed function dispatcher to use direct function calls.
+This improves performance for generic/`async` functions, as well as when using retpolines or other indirect branch exploit mitigation.
+This change may slightly reduce performance for simple function dispatch on some CPUs.
 
 ## [0.6.1] - 2020-08-18
 ### Fixed
