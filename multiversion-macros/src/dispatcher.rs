@@ -38,9 +38,7 @@ impl Specialization {
     ) -> Result<Vec<ItemFn>> {
         let (fn_name, dispatch_fn_name) = feature_fn_name(&sig.ident, Some(&self.target));
 
-        let mut target_attrs = Vec::new();
-        target_attrs.push(parse_quote! { #[inline] });
-        target_attrs.push(parse_quote! { #[doc(hidden)] });
+        let mut target_attrs = vec![parse_quote! { #[inline] }, parse_quote! { #[doc(hidden)] }];
         target_attrs.extend(attrs.iter().cloned());
 
         // If this target doesn't have any features, treat it as a default version
