@@ -315,19 +315,18 @@
 /// ```
 ///
 /// # Implementation details
-/// The function version dispatcher consists of a function selector and an atomic function pointer.
-/// Initially the function pointer will point to the function selector. On invocation, this selector
-/// will then choose an implementation, store a pointer to it in the atomic function pointer for later
-/// use and then pass on control to the chosen function. On subsequent calls, the chosen function
-/// will be called without invoking the function selector.
+/// The function version dispatcher performs function selection on the first invocation.
+/// This is implemented with a static atomic variable containing the selected function.
 ///
-/// Some comments on the benefits of this implementation:
-/// * The function selector is only invoked once. Subsequent calls are reduced to an atomic load
-/// and indirect function call (for non-generic, non-`async` functions). Generic and `async` functions
-/// cannot be stored in the atomic function pointer, which may result in additional branches.
-/// * If called in multiple threads, there is no contention. It is possible for two threads to hit
-/// the same function before function selection has completed, which results in each thread
-/// invoking the function selector, but the atomic ensures that these are synchronized correctly.
+/// This implementation has a few benefits:
+/// * The function selector is typically only invoked once.  Subsequent calls are reduced to an
+/// atomic load.
+/// * If called in multiple threads, there is no contention.  Both threads may perform feature
+/// detection, but the atomic ensures these are synchronized correctly.
+/// * The selected function is represented by an integer, rather than a function pointer.  This
+/// allows caching function selection in generic and `async` functions.  This also allows the
+/// function calls to be direct, rather than indirect, improving performance in the presence of
+/// indirect branch exploit mitigations such as retpolines.
 ///
 /// [`target`]: attr.target.html
 /// [`multiversion`]: attr.multiversion.html

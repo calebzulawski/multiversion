@@ -174,7 +174,7 @@ impl Dispatcher {
         Ok(fns)
     }
 
-    fn dispatcher_fn(&self) -> Result<ItemFn> {
+    fn dispatcher_fn(&self) -> ItemFn {
         let fn_params = util::fn_params(&self.sig);
         let (normalized_signature, argument_names) = util::normalize_signature(&self.sig);
         let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
@@ -292,12 +292,12 @@ impl Dispatcher {
                 }
             }
         };
-        Ok(ItemFn {
+        ItemFn {
             attrs: Vec::new(),
             vis: self.vis.clone(),
             sig: normalized_signature,
             block: Box::new(block),
-        })
+        }
     }
 }
 
@@ -307,9 +307,6 @@ impl ToTokens for Dispatcher {
             Ok(val) => quote! { #(#val)* },
             Err(err) => err.to_compile_error(),
         });
-        tokens.extend(match self.dispatcher_fn() {
-            Ok(val) => val.into_token_stream(),
-            Err(err) => err.to_compile_error(),
-        });
+        tokens.extend(self.dispatcher_fn().into_token_stream())
     }
 }
