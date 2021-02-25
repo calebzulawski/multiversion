@@ -2,7 +2,7 @@ use crate::{
     target::{make_target_fn_items, Target},
     util,
 };
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{parse_quote, Attribute, Block, Ident, ItemFn, Path, Result, Signature, Visibility};
 
@@ -177,67 +177,81 @@ impl Dispatcher {
     fn dispatcher_fn(&self) -> Result<ItemFn> {
         let fn_params = util::fn_params(&self.sig);
         let (normalized_signature, argument_names) = util::normalize_signature(&self.sig);
-        let block: Block = if cfg!(feature = "std")
-            && fn_params.is_empty()
-            && self.sig.asyncness.is_none()
-            && !util::impl_trait_present(&self.sig)
-            && !self.associated
-        {
-            // Dispatching from an atomic fn pointer occurs when the following is true:
-            //   * runtime-dispatching is enabled
-            //   * the function is not generic
-            //   * the function is not async
-            //   * the function does not take or return an impl trait
-            //   * the function is not associated
-            let fn_ty = util::fn_type_from_signature(&self.sig)?;
-            let feature_detection = {
-                let return_if_detected =
-                    self.specializations
-                        .iter()
-                        .filter_map(|Specialization { target, .. }| {
-                            if target.has_features_specified() {
-                                let target_arch = target.target_arch();
-                                let features_detected = target.features_detected(&self.crate_path);
-                                let function = feature_fn_name(&self.sig.ident, Some(&target)).1;
-                                Some(quote! {
-                                    #target_arch
-                                    {
-                                        if #features_detected {
-                                            return #function
-                                        }
-                                    }
-                                })
-                            } else {
-                                None
+        let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
+        let maybe_self = if self.associated {
+            quote! { Self:: }
+        } else {
+            Default::default()
+        };
+        let crate_path = &self.crate_path;
+        let block: Block = if cfg!(feature = "std") {
+            let ordered_targets = self
+                .specializations
+                .iter()
+                .filter_map(|Specialization { target, .. }| {
+                    if target.has_features_specified() {
+                        Some(target)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+
+            let detect_index = {
+                let detect_feature = ordered_targets.iter().enumerate().map(|(index, target)| {
+                    let index = index + 2; // 0 is not cached, 1 is default features
+                    let target_arch = target.target_arch();
+                    let features_detected = target.features_detected(&self.crate_path);
+                    quote! {
+                        #target_arch
+                        {
+                            if #features_detected {
+                                return core::num::NonZeroUsize::new(#index).unwrap()
                             }
-                        });
-                let default_fn = feature_fn_name(&self.sig.ident, None).1;
+                        }
+                    }
+                });
                 quote! {
-                    fn __get_fn<#(#fn_params),*>() -> #fn_ty {
-                        #(#return_if_detected)*
-                        #default_fn
-                    };
+                    fn __detect_index() -> core::num::NonZeroUsize {
+                        #(#detect_feature)*
+                        core::num::NonZeroUsize::new(1).unwrap() // default feature
+                    }
                 }
             };
-            let resolver_signature = Signature {
-                ident: Ident::new("__resolver_fn", Span::call_site()),
-                ..normalized_signature.clone()
+
+            let call_function = |function| {
+                quote! {
+                    #maybe_self#function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
+                }
+            };
+
+            let match_arm = ordered_targets.iter().enumerate().map(|(index, target)| {
+                let index = index + 2; // 0 is not cached, 1 is default features
+                let target_arch = target.target_arch();
+                let function = feature_fn_name(&self.sig.ident, Some(&target)).1;
+                let arm = call_function(function);
+                quote! {
+                    #target_arch
+                    #index => #arm,
+                }
+            });
+            let default_arm = {
+                let default_function = feature_fn_name(&self.sig.ident, None).1;
+                let arm = call_function(default_function);
+                quote! {
+                    1 => #arm,
+                }
             };
             parse_quote! {
                 {
-                    use core::sync::atomic::{AtomicPtr, Ordering};
-                    #[cold]
-                    #resolver_signature {
-                        #feature_detection
-                        let __current_fn = __get_fn();
-                        __DISPATCHED_FN.store(__current_fn as *mut (), Ordering::Relaxed);
-                        __current_fn(#(#argument_names),*)
-                    }
-                    static __DISPATCHED_FN: AtomicPtr<()> = AtomicPtr::new(__resolver_fn as *mut ());
-                    let __current_ptr = __DISPATCHED_FN.load(Ordering::Relaxed);
-                    unsafe {
-                        let __current_fn = core::mem::transmute::<*mut (), #fn_ty>(__current_ptr);
-                        __current_fn(#(#argument_names),*)
+                    #detect_index
+                    use #crate_path::once_cell::race::OnceNonZeroUsize;
+                    static __FN_INDEX: OnceNonZeroUsize = OnceNonZeroUsize::new();
+                    let __index = __FN_INDEX.get_or_init(__detect_index).get();
+                    match __index {
+                        #(#match_arm)*
+                        #default_arm
+                        _ => unimplemented!(),
                     }
                 }
             }

@@ -22,6 +22,7 @@ default = ["std"]
 std = ["multiversion-macros/std"]
 
 [dependencies]
+once_cell = { version = "1.7", default-features = false, features = ["race"] }
 multiversion-macros = { version = "0.6.1", path = "../multiversion-macros", default-features = false }
 
 [dev-dependencies]

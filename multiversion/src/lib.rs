@@ -423,3 +423,6 @@ macro_rules! are_cpu_features_detected {
         }
     }
 }
+
+#[doc(hidden)]
+pub use once_cell;
