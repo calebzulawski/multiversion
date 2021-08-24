@@ -26,9 +26,7 @@ Automatic function multiversioning with the `clone` attribute, similar to GCC's 
 ```rust
 use multiversion::multiversion;
 
-#[multiversion]
-#[clone(target = "[x86|x86_64]+avx")]
-#[clone(target = "x86+sse")]
+#[multiversion(clones("[x86|x86_64]+avx", "x86+sse"))]
 fn square(x: &mut [f32]) {
     for v in x {
         *v *= *v;
@@ -54,9 +52,9 @@ unsafe fn square_sse(x: &mut [f32]) {
     }
 }
 
-#[multiversion]
-#[specialize(target = "[x86|x86_64]+avx", fn = "square_avx", unsafe = true)]
-#[specialize(target = "x86+sse", fn = "square_sse", unsafe = true)]
+#[multiversion(versions(
+    alternative(target = "[x86|x86_64]+avx", fn = "square_avx", unsafe = true)]
+    alternative(target = "x86+sse", fn = "square_sse", unsafe = true)]
 fn square(x: &mut [f32]) {
     for v in x {
         *v *= *v;
