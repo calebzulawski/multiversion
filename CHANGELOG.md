@@ -13,6 +13,7 @@ This change may slightly reduce performance for simple function dispatch on some
 - Increased minimum required Rust version to 1.46.0.
 ### Fixed
 - Fixed broken `impl Trait` support.  Using `impl Trait` in return position now results in an error.
+- Improved associated fn support by adding `associated_fn` configuration option, and made default behavior more obvious.
 
 ## [0.6.1] - 2020-08-18
 ### Fixed
