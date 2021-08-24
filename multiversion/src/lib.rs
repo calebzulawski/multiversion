@@ -19,8 +19,12 @@
 //! be used in `#[no_std]` crates.
 //!
 //! # Capabilities
-//! The intention of this crate is to allow any function, other than trait methods, to be
-//! multiversioned.  If any functions do not work please file an issue on GitHub.
+//! The intention of this crate is to allow nearly any function to be multiversioned.
+//! The following cases are not supported:
+//! * trait methods
+//! * `impl Trait` return types (arguments are fine)
+//!
+//! If any other functions do not work please file an issue on GitHub.
 //!
 //! The [`multiversion`] macro produces additional functions adjacent to the tagged function which
 //! do not correspond to a trait member.  If you would like to multiversion a trait method, instead
@@ -60,9 +64,7 @@
 //! ```
 //! use multiversion::multiversion;
 //!
-//! #[multiversion]
-//! #[clone(target = "[x86|x86_64]+avx")]
-//! #[clone(target = "x86+sse")]
+//! #[multiversion(clones("[x86|x86_64]+avx", "x86+sse"))]
 //! fn square(x: &mut [f32]) {
 //!     for v in x {
 //!         *v *= *v;
@@ -91,9 +93,10 @@
 //!     }
 //! }
 //!
-//! #[multiversion]
-//! #[specialize(target = "[x86|x86_64]+avx", fn = "square_avx", unsafe = true)]
-//! #[specialize(target = "x86+sse", fn = "square_sse", unsafe = true)]
+//! #[multiversion(versions(
+//!     alternative(target = "[x86|x86_64]+avx", fn = "square_avx", unsafe = true),
+//!     alternative(target = "x86+sse", fn = "square_sse", unsafe = true)
+//! ))]
 //! fn square(x: &mut [f32]) {
 //!     for v in x {
 //!         *v *= *v;
@@ -113,18 +116,14 @@
 //! # mod fix { // doctests do something weird with modules, this fixes it
 //! use multiversion::multiversion;
 //!
-//! #[multiversion]
-//! #[clone(target = "[x86|x86_64]+avx")]
-//! #[clone(target = "x86+sse")]
+//! #[multiversion(clones("[x86|x86_64]+avx", "x86+sse"))]
 //! fn square(x: &mut [f32]) {
 //!     for v in x {
 //!         *v *= *v
 //!     }
 //! }
 //!
-//! #[multiversion]
-//! #[clone(target = "[x86|x86_64]+avx")]
-//! #[clone(target = "x86+sse")]
+//! #[multiversion(clones("[x86|x86_64]+avx", "x86+sse"))]
 //! fn square_plus_one(x: &mut [f32]) {
 //!     dispatch!(square(x)); // this function call bypasses feature detection
 //!     for v in x {
@@ -159,9 +158,7 @@
 //! the function's target
 //!
 //! ```
-//! #[multiversion::multiversion]
-//! #[clone(target = "[x86|x86_64]+avx")]
-//! #[clone(target = "[arm|aarch64]+neon")]
+//! #[multiversion::multiversion(clones("[x86|x86_64]+avx", "[arm|aarch64]+neon"))]
 //! fn print_arch() {
 //!     #[target_cfg(target = "[x86|x86_64]+avx")]
 //!     println!("avx");
@@ -181,41 +178,45 @@
 
 /// Provides function multiversioning.
 ///
-/// Functions are selected in order, calling the first matching target.  The function tagged by the
-/// attribute is the generic implementation that does not require any specific architecture or
-/// features.
-///
-/// # Helper attributes
-/// * `#[clone]`
-///   * Clones the function for the specified target.
-///   * Arguments:
-///     * `target`: the target specification of the clone
-/// * `#[specialize]`
-///   * Specializes the function for the specified target with another function.
-///   * Arguments:
-///     * `target`: the target specification of the specialization
-///     * `fn`: path to the function specializing the tagged function
-///     * `unsafe` (optional): indicates whether the specialization function is `unsafe`, but safe to
-///       call for this target.
-///       Functions tagged with the [`target`] attribute must be `unsafe`, so marking `unsafe = true`
-///       indicates that the safety contract is fulfilled and`function` is safe to call on the specified
-///       target.  If `function` is unsafe for any other reason, remember to mark the tagged function
-///       `unsafe` as well.
-/// * `#[crate_path]`
+/// Options:
+/// * `clones` or `versions`
+///   * `clones` takes a list of targets, such as `clones("x86_64+avx2", "x86_64+sse4.1")`.
+///   * `versions` takes a list of complete target specifications, either in the form of `clone =
+///   "x86_64+avx"` or `alternative(target = "x86_64+avx", fn = "foo::bar", unsafe = false)`
+///     * If target of the alternative function matches, it's called instead of the tagged
+///     function.
+///     * `target`: The target specification required by this alternative function version.
+///     * `fn`: The alternative function.
+///     * `unsafe`: Defaults to `false`.  If `true`, indicates an `unsafe` alternative function can
+///       be called on the specified target safely and that the safety contract is fulfilled.  If
+///       the function is unsafe for any other reason, remember to mark the tagged function `unsafe`
+///       and do not set this to true.
+///   * Functions version priority is first to last.  The first matching target is used.
+/// * `crate_path`
 ///   * Specifies the location of the multiversion crate (useful for re-exporting).
-///   * Arguments:
-///     * `path`: the path to the multiversion crate
+/// * `associated_fn`
+///   * Indicates whether or not this function is an associated function.  If the first argument is
+///   a form of `self`, this defaults to `true`, otherwise defaults to `false`.
 ///
 /// # Examples
-/// ## Cloning
+/// ## Function cloning
 /// The following compiles `square` three times, once for each target and once for the generic
 /// target.  Calling `square` selects the appropriate version at runtime.
 /// ```
 /// use multiversion::multiversion;
 ///
-/// #[multiversion]
-/// #[clone(target = "[x86|x86_64]+avx")]
-/// #[clone(target = "x86+sse")]
+/// #[multiversion(versions(clone = "[x86|x86_64]+avx", clone = "x86+sse"))]
+/// fn square(x: &mut [f32]) {
+///     for v in x {
+///         *v *= *v
+///     }
+/// }
+/// ```
+/// or more simply:
+/// ```
+/// use multiversion::multiversion;
+///
+/// #[multiversion(clones("[x86|x86_64]+avx", "x86+sse"))]
 /// fn square(x: &mut [f32]) {
 ///     for v in x {
 ///         *v *= *v
@@ -223,7 +224,7 @@
 /// }
 /// ```
 ///
-/// ## Specialization
+/// ## Function alternatives
 /// This example creates a function `where_am_i` that prints the detected CPU feature.
 /// ```
 /// use multiversion::multiversion;
@@ -240,10 +241,11 @@
 ///     println!("neon");
 /// }
 ///
-/// #[multiversion]
-/// #[specialize(target = "[x86|x86_64]+avx", fn  = "where_am_i_avx")]
-/// #[specialize(target = "x86+sse", fn = "where_am_i_sse")]
-/// #[specialize(target = "[arm|aarch64]+neon", fn = "where_am_i_neon")]
+/// #[multiversion(versions(
+///     alternative(target = "[x86|x86_64]+avx", fn  = "where_am_i_avx"),
+///     alternative(target = "x86+sse", fn = "where_am_i_sse"),
+///     alternative(target = "[arm|aarch64]+neon", fn = "where_am_i_neon"),
+/// ))]
 /// fn where_am_i() {
 ///     println!("generic");
 /// }
@@ -251,8 +253,8 @@
 /// # fn main() {}
 /// ```
 /// ## Making `target_feature` functions safe
-/// This example is the same as the above example, but calls `unsafe` specialized functions.  Note
-/// that the `where_am_i` function is still safe, since we know we are only calling specialized
+/// This example is the same as the above example, but calls `unsafe` alternative functions.  Note
+/// that the `where_am_i` function is still safe, since we know we are only calling alternative
 /// functions on supported CPUs.
 /// ```
 /// use multiversion::{multiversion, target};
@@ -272,10 +274,11 @@
 ///     println!("neon");
 /// }
 ///
-/// #[multiversion]
-/// #[specialize(target = "[x86|x86_64]+avx", fn = "where_am_i_avx", unsafe = true)]
-/// #[specialize(target = "x86+sse", fn = "where_am_i_sse", unsafe = true)]
-/// #[specialize(target = "[arm|aarch64]+neon", fn = "where_am_i_neon")]
+/// #[multiversion(versions(
+///     alternative(target = "[x86|x86_64]+avx", fn = "where_am_i_avx", unsafe = true),
+///     alternative(target = "x86+sse", fn = "where_am_i_sse", unsafe = true),
+///     alternative(target = "[arm|aarch64]+neon", fn = "where_am_i_neon")
+/// ))]
 /// fn where_am_i() {
 ///     println!("generic");
 /// }
@@ -300,8 +303,7 @@
 ///
 /// The following creates two functions, `foo_avx_sse41_version` and `foo_default_version`.
 /// ```
-/// #[multiversion::multiversion]
-/// #[clone(target = "[x86|x86_64]+sse4.1+avx")]
+/// #[multiversion::multiversion(clones("[x86|x86_64]+sse4.1+avx"))]
 /// fn foo() {}
 ///
 /// #[multiversion::target("[x86|x86_64]+sse4.1+avx")]
@@ -425,3 +427,6 @@ macro_rules! are_cpu_features_detected {
 
 #[doc(hidden)]
 pub use once_cell;
+
+mod features;
+pub use features::*;

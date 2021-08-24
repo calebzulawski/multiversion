@@ -10,12 +10,11 @@ unsafe fn destructure_tuple_avx((x, y): (i64, i64)) -> (i64, i64) {
     (x, y)
 }
 
-#[multiversion::multiversion]
-#[specialize(
+#[multiversion::multiversion(versions(alternative(
     target = "[x86|x86_64]+avx",
     fn = "destructure_tuple_avx",
     unsafe = true
-)]
+)))]
 fn destructure_tuple_multiversion((x, y): (i64, i64)) -> (i64, i64) {
     (x, y)
 }
@@ -25,33 +24,26 @@ unsafe fn destructure_struct_avx(Foo { bar, baz }: Foo) -> (i64, i64) {
     (bar, baz)
 }
 
-#[multiversion::multiversion]
-#[specialize(
+#[multiversion::multiversion(versions(alternative(
     target = "[x86|x86_64]+avx",
     fn = "destructure_struct_avx",
     unsafe = true
-)]
+)))]
 fn destructure_struct_multiversion(Foo { bar, baz }: Foo) -> (i64, i64) {
     (bar, baz)
 }
 
-#[multiversion::multiversion]
-#[clone(target = "[x86|x86_64]+avx")]
-#[clone(target = "[arm|aarch64]+neon")]
+#[multiversion::multiversion(versions(clone = "[x86|x86_64]+avx", clone = "[arm|aarch64]+neon"))]
 fn destructure_tuple((x, y): (i64, i64)) -> (i64, i64) {
     (x, y)
 }
 
-#[multiversion::multiversion]
-#[clone(target = "[x86|x86_64]+avx")]
-#[clone(target = "[arm|aarch64]+neon")]
+#[multiversion::multiversion(versions(clone = "[x86|x86_64]+avx", clone = "[arm|aarch64]+neon"))]
 fn destructure_struct(Foo { bar, baz }: Foo) -> (i64, i64) {
     (bar, baz)
 }
 
-#[multiversion::multiversion]
-#[clone(target = "[x86|x86_64]+avx")]
-#[clone(target = "[arm|aarch64]+neon")]
+#[multiversion::multiversion(versions(clone = "[x86|x86_64]+avx", clone = "[arm|aarch64]+neon"))]
 fn destructure_tuple_generic<T>((x, y): (T, T)) -> (T, T) {
     (x, y)
 }

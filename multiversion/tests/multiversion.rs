@@ -13,33 +13,37 @@ fn test_fn_safe(a: i64) -> i64 {
     a
 }
 
-#[multiversion]
-#[specialize(target = "x86_64+avx2", fn = "test_fn_unsafe", unsafe = true)]
-#[specialize(target = "x86_64", fn = "test_fn_safe")]
+#[multiversion(versions(
+    alternative(target = "x86_64+avx2", fn = "test_fn_unsafe", unsafe = true),
+    alternative(target = "x86_64", fn = "test_fn_safe")
+))]
 pub fn pub_test_fn(a: i64) -> i64 {
     println!("fallback");
     a
 }
 
-#[multiversion]
-#[specialize(target = "x86_64+avx2", fn = "test_fn_unsafe", unsafe = true)]
-#[specialize(target = "x86_64", fn = "test_fn_safe")]
+#[multiversion(versions(
+    alternative(target = "x86_64+avx2", fn = "test_fn_unsafe", unsafe = true),
+    alternative(target = "x86_64", fn = "test_fn_safe")
+))]
 fn priv_test_fn(a: i64) -> i64 {
     println!("fallback");
     a
 }
 
-#[multiversion]
-#[specialize(target = "x86_64+avx2", fn = "test_fn_unsafe")]
-#[specialize(target = "x86_64", fn = "test_fn_safe")]
+#[multiversion(versions(
+    alternative(target = "x86_64+avx2", fn = "test_fn_unsafe"),
+    alternative(target = "x86_64", fn = "test_fn_safe")
+))]
 pub unsafe fn pub_test_unsafe_fn(a: i64) -> i64 {
     println!("fallback");
     a
 }
 
-#[multiversion]
-#[specialize(target = "x86_64+avx2", fn = "test_fn_unsafe")]
-#[specialize(target = "x86_64", fn = "test_fn_safe")]
+#[multiversion(versions(
+    alternative(target = "x86_64+avx2", fn = "test_fn_unsafe"),
+    alternative(target = "x86_64", fn = "test_fn_safe")
+))]
 unsafe fn priv_test_unsafe_fn(a: i64) -> i64 {
     println!("fallback");
     a
@@ -58,33 +62,37 @@ impl Foo {
         a
     }
 
-    #[multiversion]
-    #[specialize(target = "x86_64+avx2", fn = "test_fn_unsafe", unsafe = true)]
-    #[specialize(target = "x86_64", fn = "test_fn_safe")]
+    #[multiversion(versions(
+        alternative(target = "x86_64+avx2", fn = "test_fn_unsafe", unsafe = true),
+        alternative(target = "x86_64", fn = "test_fn_safe")
+    ))]
     pub fn pub_test_fn(&self, a: i64) -> i64 {
         println!("fallback");
         a
     }
 
-    #[multiversion]
-    #[specialize(target = "x86_64+avx2", fn = "test_fn_unsafe", unsafe = true)]
-    #[specialize(target = "x86_64", fn = "test_fn_safe")]
+    #[multiversion(versions(
+        alternative(target = "x86_64+avx2", fn = "test_fn_unsafe", unsafe = true),
+        alternative(target = "x86_64", fn = "test_fn_safe")
+    ))]
     fn priv_test_fn(&self, a: i64) -> i64 {
         println!("fallback");
         a
     }
 
-    #[multiversion]
-    #[specialize(target = "x86_64+avx2", fn = "test_fn_unsafe")]
-    #[specialize(target = "x86_64", fn = "test_fn_safe")]
+    #[multiversion(versions(
+        alternative(target = "x86_64+avx2", fn = "test_fn_unsafe"),
+        alternative(target = "x86_64", fn = "test_fn_safe")
+    ))]
     pub unsafe fn pub_test_unsafe_fn(&self, a: i64) -> i64 {
         println!("fallback");
         a
     }
 
-    #[multiversion]
-    #[specialize(target = "x86_64+avx2", fn = "test_fn_unsafe")]
-    #[specialize(target = "x86_64", fn = "test_fn_safe")]
+    #[multiversion(versions(
+        alternative(target = "x86_64+avx2", fn = "test_fn_unsafe"),
+        alternative(target = "x86_64", fn = "test_fn_safe")
+    ))]
     unsafe fn priv_test_unsafe_fn(&self, a: i64) -> i64 {
         println!("fallback");
         a

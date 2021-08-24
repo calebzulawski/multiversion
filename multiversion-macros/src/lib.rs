@@ -1,9 +1,6 @@
 //! Implementation crate for `multiversion`.
 extern crate proc_macro;
 
-#[macro_use]
-mod meta;
-
 mod dispatcher;
 mod multiversion;
 mod safe_inner;
@@ -13,16 +10,15 @@ mod target_cfg;
 mod util;
 
 use quote::ToTokens;
-use syn::{parse::Nothing, parse_macro_input, ItemFn};
+use syn::{parse_macro_input, ItemFn};
 
 #[proc_macro_attribute]
 pub fn multiversion(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    parse_macro_input!(attr as Nothing);
     let func = parse_macro_input!(input as ItemFn);
-    match multiversion::make_multiversioned_fn(func) {
+    match multiversion::make_multiversioned_fn(attr.into(), func) {
         Ok(tokens) => tokens.into_token_stream(),
         Err(err) => err.to_compile_error(),
     }

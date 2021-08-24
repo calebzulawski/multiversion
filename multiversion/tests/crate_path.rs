@@ -8,9 +8,10 @@ pub mod multiversion_export {
 #[allow(unused_imports)]
 use core as multiversion; // override the multiversion name
 
-#[multiversion_export::nested::multiversion]
-#[clone(target = "[x86|x86_64]+avx")]
-#[crate_path(path = "multiversion_export::nested")]
+#[multiversion_export::nested::multiversion(
+    versions(clone = "[x86|x86_64]+avx"),
+    crate_path = "multiversion_export::nested"
+)]
 fn foo() {}
 
 #[test]

@@ -1,10 +1,11 @@
 #![allow(clippy::needless_lifetimes)]
 
 #[rustversion::since(1.51)]
-#[multiversion::multiversion]
-#[clone(target = "[x86|x86_64]+avx2+avx")]
-#[clone(target = "[x86|x86_64]+avx")]
-#[clone(target = "x86+sse")]
+#[multiversion::multiversion(versions(
+    clone = "[x86|x86_64]+avx2+avx",
+    clone = "[x86|x86_64]+avx",
+    clone = "x86+sse"
+))]
 fn double<'a, T: Copy + std::ops::AddAssign, const N: usize>(x: &'a mut [T; N]) -> &'a mut T {
     assert!(!x.is_empty());
     for v in x.iter_mut() {
@@ -17,10 +18,11 @@ struct Doubler<'a>(&'a bool);
 
 impl<'a> Doubler<'a> {
     #[rustversion::since(1.51)]
-    #[multiversion::multiversion]
-    #[clone(target = "[x86|x86_64]+avx2+avx")]
-    #[clone(target = "[x86|x86_64]+avx")]
-    #[clone(target = "x86+sse")]
+    #[multiversion::multiversion(versions(
+        clone = "[x86|x86_64]+avx2+avx",
+        clone = "[x86|x86_64]+avx",
+        clone = "x86+sse"
+    ))]
     fn double<'b, T: Copy + std::ops::AddAssign, const N: usize>(
         &self,
         x: &'b mut [T; N],

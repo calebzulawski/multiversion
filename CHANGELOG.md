@@ -5,7 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Fixed broken `impl Trait` support.  Using `impl Trait` in return position now results in an error.
 ### Changed
+- Changed macro API.  New API uses a single attribute macro, rather than helper attributes.
 - Changed function dispatcher to use direct function calls.
 This improves performance for generic/`async` functions, as well as when using retpolines or other indirect branch exploit mitigation.
 This change may slightly reduce performance for simple function dispatch on some CPUs.
