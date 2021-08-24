@@ -53,8 +53,9 @@ unsafe fn square_sse(x: &mut [f32]) {
 }
 
 #[multiversion(versions(
-    alternative(target = "[x86|x86_64]+avx", fn = "square_avx", unsafe = true)]
-    alternative(target = "x86+sse", fn = "square_sse", unsafe = true)]
+    alternative(target = "[x86|x86_64]+avx", fn = "square_avx", unsafe = true),
+    alternative(target = "x86+sse", fn = "square_sse", unsafe = true)
+))]
 fn square(x: &mut [f32]) {
     for v in x {
         *v *= *v;
