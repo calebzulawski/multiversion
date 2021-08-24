@@ -3,8 +3,7 @@ use multiversion::multiversion;
 use rand::distributions::Standard;
 use rand::Rng;
 
-#[multiversion]
-#[clone(target = "[x86|x86_64]+avx")]
+#[multiversion(clones("[x86|x86_64]+avx"))]
 fn square(i: &[f32], o: &mut [f32]) {
     for (i, o) in i.iter().zip(o) {
         *o = i * i;

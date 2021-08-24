@@ -197,11 +197,11 @@ impl Function {
         let associated = map
             .try_remove("associated_fn")
             .map(|x| lit_bool(meta_kv_value(x)?))
-            .unwrap_or(Ok(func.sig.receiver().is_some()))?;
+            .unwrap_or_else(|| Ok(func.sig.receiver().is_some()))?;
         let crate_path = map
             .try_remove("crate_path")
             .map(|x| lit_str(meta_kv_value(x)?)?.parse())
-            .unwrap_or(Ok(parse_quote!(multiversion)))?;
+            .unwrap_or_else(|| Ok(parse_quote!(multiversion)))?;
         map.finish()?;
         Ok(Self {
             specializations,

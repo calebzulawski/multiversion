@@ -152,7 +152,7 @@ mod test {
         let s = LitStr::new("x86", Span::call_site());
         let target = Target::parse(&s).unwrap();
         assert_eq!(target.architectures, vec!["x86"]);
-        assert_eq!(target.features.is_empty(), true);
+        assert!(target.features.is_empty());
     }
 
     #[test]

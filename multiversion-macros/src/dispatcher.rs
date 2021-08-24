@@ -49,7 +49,7 @@ impl Specialization {
             }
 
             // create unsafe/target fn
-            let fn_params = crate::util::fn_params(&sig);
+            let fn_params = crate::util::fn_params(sig);
             let maybe_await = sig.asyncness.map(|_| util::await_tokens());
             let unsafe_sig = Signature {
                 ident: fn_name,
@@ -226,7 +226,7 @@ impl Dispatcher {
             let match_arm = ordered_targets.iter().enumerate().map(|(index, target)| {
                 let index = index + 2; // 0 is not cached, 1 is default features
                 let target_arch = target.target_arch();
-                let function = feature_fn_name(&self.sig.ident, Some(&target)).1;
+                let function = feature_fn_name(&self.sig.ident, Some(target)).1;
                 let arm = call_function(function);
                 quote! {
                     #target_arch
@@ -269,7 +269,7 @@ impl Dispatcher {
                         if target.has_features_specified() {
                             let target_arch = target.target_arch();
                             let features_detected = target.features_detected(&self.crate_path);
-                            let function = feature_fn_name(&self.sig.ident, Some(&target)).1;
+                            let function = feature_fn_name(&self.sig.ident, Some(target)).1;
                             Some(quote! {
                                 #target_arch
                                 {
