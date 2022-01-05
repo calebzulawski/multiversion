@@ -172,7 +172,7 @@ impl Dispatcher {
         Ok(fns)
     }
 
-    fn dispatcher_fn(&self) -> ItemFn {
+    fn static_dispatcher_fn(&self) -> ItemFn {
         let fn_params = util::fn_params(&self.sig);
         let (normalized_signature, argument_names) = util::normalize_signature(&self.sig);
         let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
@@ -181,88 +181,7 @@ impl Dispatcher {
         } else {
             Default::default()
         };
-        let crate_path = &self.crate_path;
-        let block: Block = if cfg!(feature = "std") {
-            let ordered_targets = self
-                .specializations
-                .iter()
-                .filter_map(|Specialization { target, .. }| {
-                    if target.has_features_specified() {
-                        Some(target)
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>();
-
-            let detect_index = {
-                let detect_feature = ordered_targets.iter().enumerate().map(|(index, target)| {
-                    let index = index + 2; // 0 is not cached, 1 is default features
-                    let target_arch = target.target_arch();
-                    let features_detected = target.features_detected(&self.crate_path);
-                    quote! {
-                        #target_arch
-                        {
-                            if #features_detected {
-                                return core::num::NonZeroUsize::new(#index).unwrap()
-                            }
-                        }
-                    }
-                });
-                quote! {
-                    fn __detect_index() -> core::num::NonZeroUsize {
-                        #(#detect_feature)*
-                        core::num::NonZeroUsize::new(1).unwrap() // default feature
-                    }
-                }
-            };
-
-            let call_function = |function| {
-                quote! {
-                    #maybe_self#function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
-                }
-            };
-
-            let match_arm = ordered_targets.iter().enumerate().map(|(index, target)| {
-                let index = index + 2; // 0 is not cached, 1 is default features
-                let target_arch = target.target_arch();
-                let function = feature_fn_name(&self.sig.ident, Some(target)).1;
-                let arm = call_function(function);
-                quote! {
-                    #target_arch
-                    #index => #arm,
-                }
-            });
-            let default_arm = {
-                let default_function = feature_fn_name(&self.sig.ident, None).1;
-                let arm = call_function(default_function);
-                quote! {
-                    1 => #arm,
-                }
-            };
-            parse_quote! {
-                {
-                    #detect_index
-                    use #crate_path::once_cell::race::OnceNonZeroUsize;
-                    static __FN_INDEX: OnceNonZeroUsize = OnceNonZeroUsize::new();
-                    let __index = __FN_INDEX.get_or_init(__detect_index).get();
-                    match __index {
-                        #(#match_arm)*
-                        #default_arm
-                        _ => unimplemented!(),
-                    }
-                }
-            }
-        } else {
-            // Dispatch the function via branching if runtime-dispatching is disabled, or it is
-            // generic/async/impl Trait
-            let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
-            let maybe_self = if self.associated {
-                quote! { Self:: }
-            } else {
-                Default::default()
-            };
-            let return_if_detected =
+        let return_if_detected =
                 self.specializations
                     .iter()
                     .filter_map(|Specialization { target, .. }| {
@@ -282,11 +201,98 @@ impl Dispatcher {
                             None
                         }
                     });
-            let default_fn = feature_fn_name(&self.sig.ident, None).1;
-            parse_quote! {
-                {
-                    #(#return_if_detected)*
-                    #maybe_self#default_fn::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
+        let default_fn = feature_fn_name(&self.sig.ident, None).1;
+        let block = parse_quote! {
+            {
+                #(#return_if_detected)*
+                #maybe_self#default_fn::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
+            }
+        };
+        ItemFn {
+            attrs: Vec::new(),
+            vis: self.vis.clone(),
+            sig: normalized_signature,
+            block: Box::new(block),
+        }
+    }
+
+    fn direct_dispatcher_fn(&self) -> ItemFn {
+        let fn_params = util::fn_params(&self.sig);
+        let (normalized_signature, argument_names) = util::normalize_signature(&self.sig);
+        let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
+        let maybe_self = if self.associated {
+            quote! { Self:: }
+        } else {
+            Default::default()
+        };
+        let crate_path = &self.crate_path;
+        let ordered_targets = self
+            .specializations
+            .iter()
+            .filter_map(|Specialization { target, .. }| {
+                if target.has_features_specified() {
+                    Some(target)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let detect_index = {
+            let detect_feature = ordered_targets.iter().enumerate().map(|(index, target)| {
+                let index = index + 2; // 0 is not cached, 1 is default features
+                let target_arch = target.target_arch();
+                let features_detected = target.features_detected(&self.crate_path);
+                quote! {
+                    #target_arch
+                    {
+                        if #features_detected {
+                            return core::num::NonZeroUsize::new(#index).unwrap()
+                        }
+                    }
+                }
+            });
+            quote! {
+                fn __detect_index() -> core::num::NonZeroUsize {
+                    #(#detect_feature)*
+                    core::num::NonZeroUsize::new(1).unwrap() // default feature
+                }
+            }
+        };
+
+        let call_function = |function| {
+            quote! {
+                #maybe_self#function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
+            }
+        };
+
+        let match_arm = ordered_targets.iter().enumerate().map(|(index, target)| {
+            let index = index + 2; // 0 is not cached, 1 is default features
+            let target_arch = target.target_arch();
+            let function = feature_fn_name(&self.sig.ident, Some(target)).1;
+            let arm = call_function(function);
+            quote! {
+                #target_arch
+                #index => #arm,
+            }
+        });
+        let default_arm = {
+            let default_function = feature_fn_name(&self.sig.ident, None).1;
+            let arm = call_function(default_function);
+            quote! {
+                1 => #arm,
+            }
+        };
+        let block = parse_quote! {
+            {
+                #detect_index
+                use #crate_path::once_cell::race::OnceNonZeroUsize;
+                static __FN_INDEX: OnceNonZeroUsize = OnceNonZeroUsize::new();
+                let __index = __FN_INDEX.get_or_init(__detect_index).get();
+                match __index {
+                    #(#match_arm)*
+                    #default_arm
+                    _ => unimplemented!(),
                 }
             }
         };
@@ -305,6 +311,11 @@ impl ToTokens for Dispatcher {
             Ok(val) => quote! { #(#val)* },
             Err(err) => err.to_compile_error(),
         });
-        tokens.extend(self.dispatcher_fn().into_token_stream())
+        let dispatcher = if cfg!(feature = "std") {
+            self.direct_dispatcher_fn()
+        } else {
+            self.static_dispatcher_fn()
+        };
+        tokens.extend(dispatcher.into_token_stream())
     }
 }
