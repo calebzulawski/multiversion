@@ -197,6 +197,15 @@
 /// * `associated_fn`
 ///   * Indicates whether or not this function is an associated function.  If the first argument is
 ///   a form of `self`, this defaults to `true`, otherwise defaults to `false`.
+/// * `dispatcher`
+///   * Selects the preferred dispatcher. Defaults to `default`.
+///     * `default`: If the `std` feature is enabled, uses either `direct` or `indirect`,
+///       attempting to choose the fastest choice.  If the `std` feature is not enabled, uses `static`.
+///     * `static`: Detects features at compile time from the enabled target features.
+///     * `direct`: Detects features at runtime, and dispatches with direct function calls.
+///     * `indirect`: Detect features at runtime, and dispatches with an indirect function call.
+///       Cannot be used for generic functions, associated functions, `async` functions, or
+///       functions that take or return an `impl Trait`.
 ///
 /// # Examples
 /// ## Function cloning

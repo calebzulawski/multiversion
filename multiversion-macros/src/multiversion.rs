@@ -1,4 +1,4 @@
-use crate::dispatcher::Dispatcher;
+use crate::dispatcher::{DispatchMethod, Dispatcher};
 use crate::target::Target;
 use crate::util;
 use proc_macro2::{Span, TokenStream};
@@ -147,6 +147,7 @@ struct Function {
     func: ItemFn,
     associated: bool,
     crate_path: Path,
+    dispatcher: DispatchMethod,
 }
 
 impl Function {
@@ -194,6 +195,22 @@ impl Function {
             Err(Error::new(map.span(), "expected `clones` or `versions`"))
         }?;
 
+        let dispatcher = map
+            .try_remove("dispatcher")
+            .map(|x| {
+                let s = lit_str(meta_kv_value(x)?)?;
+                match s.value().as_str() {
+                    "default" => Ok(DispatchMethod::Default),
+                    "static" => Ok(DispatchMethod::Static),
+                    "direct" => Ok(DispatchMethod::Direct),
+                    "indirect" => Ok(DispatchMethod::Indirect),
+                    _ => Err(Error::new(
+                        s.span(),
+                        "expected `default`, `static`, `direct`, or `indirect`",
+                    )),
+                }
+            })
+            .unwrap_or_else(|| Ok(DispatchMethod::Default))?;
         let associated = map
             .try_remove("associated_fn")
             .map(|x| lit_bool(meta_kv_value(x)?))
@@ -207,6 +224,7 @@ impl Function {
             specializations,
             associated,
             crate_path,
+            dispatcher,
             func,
         })
     }
@@ -261,6 +279,7 @@ impl TryFrom<Function> for Dispatcher {
             default: *item.func.block,
             associated: item.associated,
             crate_path: item.crate_path,
+            dispatcher: item.dispatcher,
         })
     }
 }

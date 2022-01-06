@@ -2,9 +2,11 @@ use crate::{
     target::{make_target_fn_items, Target},
     util,
 };
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
-use syn::{parse_quote, Attribute, Block, Ident, ItemFn, Path, Result, Signature, Visibility};
+use syn::{
+    parse_quote, Attribute, Block, Error, Ident, ItemFn, Path, Result, Signature, Visibility,
+};
 
 pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> (Ident, Ident) {
     if let Some(target) = target {
@@ -113,7 +115,15 @@ impl Specialization {
     }
 }
 
+pub(crate) enum DispatchMethod {
+    Default,
+    Static,
+    Direct,
+    Indirect,
+}
+
 pub(crate) struct Dispatcher {
+    pub dispatcher: DispatchMethod,
     pub attrs: Vec<Attribute>,
     pub vis: Visibility,
     pub sig: Signature,
@@ -216,7 +226,108 @@ impl Dispatcher {
         }
     }
 
-    fn direct_dispatcher_fn(&self) -> ItemFn {
+    fn indirect_dispatcher_fn(&self) -> Result<ItemFn> {
+        if !cfg!(feature = "std") {
+            return Err(Error::new(
+                Span::call_site(),
+                "indirect function dispatch only available with the `std` cargo feature",
+            ));
+        }
+        if !util::fn_params(&self.sig).is_empty() {
+            return Err(Error::new(
+                Span::call_site(),
+                "indirect function dispatch does not support type generic or const generic parameters",
+            ));
+        }
+        if self.sig.asyncness.is_some() {
+            return Err(Error::new(
+                Span::call_site(),
+                "indirect function dispatch does not support async functions",
+            ));
+        }
+        if util::impl_trait_present(&self.sig) {
+            return Err(Error::new(
+                Span::call_site(),
+                "indirect function dispatch does not support impl trait",
+            ));
+        }
+        if self.associated {
+            return Err(Error::new(
+                Span::call_site(),
+                "indirect function dispatch does not support associated functions",
+            ));
+        }
+
+        let fn_ty = util::fn_type_from_signature(&self.sig)?;
+        let (normalized_signature, argument_names) = util::normalize_signature(&self.sig);
+
+        let feature_detection = {
+            let return_if_detected =
+                self.specializations
+                    .iter()
+                    .filter_map(|Specialization { target, .. }| {
+                        if target.has_features_specified() {
+                            let target_arch = target.target_arch();
+                            let features_detected = target.features_detected(&self.crate_path);
+                            let function = feature_fn_name(&self.sig.ident, Some(&target)).1;
+                            Some(quote! {
+                               #target_arch
+                               {
+                                   if #features_detected {
+                                       return #function
+                                   }
+                               }
+                            })
+                        } else {
+                            None
+                        }
+                    });
+            let default_fn = feature_fn_name(&self.sig.ident, None).1;
+            quote! {
+                fn __get_fn() -> #fn_ty {
+                    #(#return_if_detected)*
+                    #default_fn
+                };
+            }
+        };
+        let resolver_signature = Signature {
+            ident: Ident::new("__resolver_fn", Span::call_site()),
+            ..normalized_signature.clone()
+        };
+        let block = parse_quote! {
+            {
+                use core::sync::atomic::{AtomicPtr, Ordering};
+                #[cold]
+                #resolver_signature {
+                    #feature_detection
+                    let __current_fn = __get_fn();
+                    __DISPATCHED_FN.store(__current_fn as *mut (), Ordering::Relaxed);
+                    __current_fn(#(#argument_names),*)
+                }
+                static __DISPATCHED_FN: AtomicPtr<()> = AtomicPtr::new(__resolver_fn as *mut ());
+                let __current_ptr = __DISPATCHED_FN.load(Ordering::Relaxed);
+                unsafe {
+                    let __current_fn = core::mem::transmute::<*mut (), #fn_ty>(__current_ptr);
+                    __current_fn(#(#argument_names),*)
+                }
+            }
+        };
+        Ok(ItemFn {
+            attrs: Vec::new(),
+            vis: self.vis.clone(),
+            sig: normalized_signature,
+            block: Box::new(block),
+        })
+    }
+
+    fn direct_dispatcher_fn(&self) -> Result<ItemFn> {
+        if !cfg!(feature = "std") {
+            return Err(Error::new(
+                Span::call_site(),
+                "indirect function dispatch only available with the `std` cargo feature",
+            ));
+        }
+
         let fn_params = util::fn_params(&self.sig);
         let (normalized_signature, argument_names) = util::normalize_signature(&self.sig);
         let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
@@ -296,12 +407,12 @@ impl Dispatcher {
                 }
             }
         };
-        ItemFn {
+        Ok(ItemFn {
             attrs: Vec::new(),
             vis: self.vis.clone(),
             sig: normalized_signature,
             block: Box::new(block),
-        }
+        })
     }
 }
 
@@ -311,11 +422,52 @@ impl ToTokens for Dispatcher {
             Ok(val) => quote! { #(#val)* },
             Err(err) => err.to_compile_error(),
         });
-        let dispatcher = if cfg!(feature = "std") {
-            self.direct_dispatcher_fn()
-        } else {
-            self.static_dispatcher_fn()
+
+        let dispatchers = match self.dispatcher {
+            DispatchMethod::Default => {
+                if cfg!(feature = "std") {
+                    if self.associated
+                        || !crate::util::fn_params(&self.sig).is_empty()
+                        || self.sig.asyncness.is_some()
+                        || util::impl_trait_present(&self.sig)
+                    {
+                        vec![self.direct_dispatcher_fn()]
+                    } else {
+                        let indirect = self.indirect_dispatcher_fn().map(|f| {
+                            parse_quote! {
+                                #[cfg(not(any(
+                                    target_feature = "retpoline",
+                                    target_feature = "retpoline-indirect-branches",
+                                    target_feature = "retpoline-indirect-calls",
+                                )))]
+                                #f
+                            }
+                        });
+                        let direct = self.direct_dispatcher_fn().map(|f| {
+                            parse_quote! {
+                                #[cfg(any(
+                                    target_feature = "retpoline",
+                                    target_feature = "retpoline-indirect-branches",
+                                    target_feature = "retpoline-indirect-calls",
+                                ))]
+                                #f
+                            }
+                        });
+                        vec![indirect, direct]
+                    }
+                } else {
+                    vec![Ok(self.static_dispatcher_fn())]
+                }
+            }
+            DispatchMethod::Static => vec![Ok(self.static_dispatcher_fn())],
+            DispatchMethod::Direct => vec![self.direct_dispatcher_fn()],
+            DispatchMethod::Indirect => vec![self.indirect_dispatcher_fn()],
         };
-        tokens.extend(dispatcher.into_token_stream())
+        for dispatcher in dispatchers {
+            tokens.extend(match dispatcher {
+                Ok(val) => val.into_token_stream(),
+                Err(err) => err.to_compile_error(),
+            })
+        }
     }
 }
