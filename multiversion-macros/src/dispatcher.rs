@@ -90,6 +90,9 @@ impl Specialization {
                 vis: vis.clone(),
                 block: Box::new(parse_quote! {
                     {
+                        // Safety: this isn't actually safe, but this function is a hidden detail
+                        // of the macro, and is only called when the target feature is available.
+                        #[allow(clippy::undocumented_unsafe_blocks)]
                         unsafe { #maybe_self#target_fn_ident::<#(#fn_params),*>(#(#args),*)#maybe_await }
                     }
                 }),
@@ -306,6 +309,9 @@ impl Dispatcher {
                 }
                 static __DISPATCHED_FN: AtomicPtr<()> = AtomicPtr::new(__resolver_fn as *mut ());
                 let __current_ptr = __DISPATCHED_FN.load(Ordering::Relaxed);
+                // Safety: the pointer is a fn pointer, so we can transmute it back to its original
+                // representation.
+                #[allow(clippy::undocumented_unsafe_blocks)]
                 unsafe {
                     let __current_fn = core::mem::transmute::<*mut (), #fn_ty>(__current_ptr);
                     __current_fn(#(#argument_names),*)
