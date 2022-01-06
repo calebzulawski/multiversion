@@ -71,7 +71,7 @@ impl Target {
     }
 
     pub fn features_string(&self) -> String {
-        self.features.join("_").replace(".", "")
+        self.features.join("_").replace('.', "")
     }
 
     pub fn has_features_specified(&self) -> bool {
