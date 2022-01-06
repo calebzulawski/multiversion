@@ -23,7 +23,6 @@ fn priv_add(a: &mut [f32], b: &[f32]) {
     clone = "[x86|x86_64]+sse",
     clone = "[arm|aarch64]+neon",
 ))]
-#[inline]
 pub unsafe fn pub_unsafe_add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
@@ -33,7 +32,6 @@ pub unsafe fn pub_unsafe_add(a: &mut [f32], b: &[f32]) {
     clone = "[x86|x86_64]+sse",
     clone = "[arm|aarch64]+neon",
 ))]
-#[inline]
 unsafe fn priv_unsafe_add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
@@ -46,7 +44,6 @@ impl Adder {
         clone = "[x86|x86_64]+sse",
         clone = "[arm|aarch64]+neon",
     ))]
-    #[inline]
     pub fn pub_add(&self, x: &mut [f32]) {
         x.iter_mut().for_each(|x| *x += self.0);
     }
@@ -56,7 +53,6 @@ impl Adder {
         clone = "[x86|x86_64]+sse",
         clone = "[arm|aarch64]+neon",
     ))]
-    #[inline]
     fn priv_add(&self, x: &mut [f32]) {
         x.iter_mut().for_each(|x| *x += self.0);
     }
@@ -66,7 +62,6 @@ impl Adder {
         clone = "[x86|x86_64]+sse",
         clone = "[arm|aarch64]+neon",
     ))]
-    #[inline]
     pub unsafe fn pub_unsafe_add(&self, x: &mut [f32]) {
         x.iter_mut().for_each(|x| *x += self.0);
     }
@@ -76,7 +71,6 @@ impl Adder {
         clone = "[x86|x86_64]+sse",
         clone = "[arm|aarch64]+neon",
     ))]
-    #[inline]
     unsafe fn priv_unsafe_add(&self, x: &mut [f32]) {
         x.iter_mut().for_each(|x| *x += self.0);
     }
