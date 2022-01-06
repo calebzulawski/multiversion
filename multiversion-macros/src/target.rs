@@ -10,7 +10,6 @@ use syn::{parse_quote, Attribute, Error, ItemFn, Lit, LitStr, Path, Result};
 pub(crate) struct Target {
     architectures: Vec<String>,
     features: Vec<String>,
-    span: proc_macro2::Span,
 }
 
 impl PartialEq for Target {
@@ -64,7 +63,6 @@ impl Target {
         Ok(Self {
             architectures,
             features,
-            span: s.span(),
         })
     }
 

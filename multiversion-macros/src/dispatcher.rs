@@ -269,7 +269,7 @@ impl Dispatcher {
                         if target.has_features_specified() {
                             let target_arch = target.target_arch();
                             let features_detected = target.features_detected(&self.crate_path);
-                            let function = feature_fn_name(&self.sig.ident, Some(&target)).1;
+                            let function = feature_fn_name(&self.sig.ident, Some(target)).1;
                             Some(quote! {
                                #target_arch
                                {
