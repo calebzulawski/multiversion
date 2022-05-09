@@ -78,6 +78,10 @@ impl Target {
         !self.features.is_empty()
     }
 
+    pub fn features(&self) -> &Vec<String> {
+        &self.features
+    }
+
     pub fn target_arch(&self) -> Attribute {
         let arch = self.architectures.iter().map(|x| x.as_str());
         parse_quote! {

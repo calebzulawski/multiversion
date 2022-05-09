@@ -434,5 +434,21 @@ macro_rules! are_cpu_features_detected {
     }
 }
 
+pub use multiversion_macros::Dispatcher;
+
 #[doc(hidden)]
 pub use once_cell;
+
+pub trait Dispatcher: Sized {
+    const FEATURES: &'static [&'static [&'static str]];
+
+    fn dispatch<Output>(f: impl Fn(Features<Self>) -> Output) -> Output;
+}
+
+pub struct Features<D: Dispatcher>(usize, std::marker::PhantomData<D>);
+
+#[derive(Dispatcher)]
+#[crate_path = "crate"]
+#[target = "x86_64+avx2+avx"]
+#[target = "x86_64+sse4.1"]
+pub struct SimdDispatcher;

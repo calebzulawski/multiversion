@@ -5,7 +5,8 @@ use crate::{
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
-    parse_quote, Attribute, Block, Error, Ident, ItemFn, Path, Result, Signature, Visibility,
+    parse_quote, spanned::Spanned, Attribute, Block, Error, Ident, ItemFn, ItemStruct, Lit, Meta,
+    Path, Result, Signature, Visibility,
 };
 
 pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> (Ident, Ident) {
@@ -476,4 +477,116 @@ impl ToTokens for Dispatcher {
             })
         }
     }
+}
+
+pub(crate) fn derive_dispatcher(dispatcher: ItemStruct) -> Result<TokenStream> {
+    if !dispatcher.fields.is_empty() {
+        return Err(Error::new(
+            dispatcher.fields.span(),
+            "expected a unit struct",
+        ));
+    }
+    let mut targets = Vec::new();
+    let mut crate_path: Path = parse_quote!(multiversion);
+    let parse_attr_string = |attr: &Attribute| {
+        if let Meta::NameValue(nv) = attr.parse_meta()? {
+            if let Lit::Str(s) = nv.lit {
+                Ok(s)
+            } else {
+                Err(Error::new(nv.lit.span(), "expected a literal string"))
+            }
+        } else {
+            Err(Error::new_spanned(attr, "expected a name-value pair"))
+        }
+    };
+    for attr in dispatcher.attrs {
+        if let Some(ident) = attr.path.get_ident() {
+            match ident.to_string().as_str() {
+                "target" => targets.push(Target::parse(&parse_attr_string(&attr)?)?),
+                "crate_path" => crate_path = parse_attr_string(&attr)?.parse()?,
+                _ => {}
+            }
+        }
+    }
+
+    let name = dispatcher.ident;
+
+    let target_fn_name = |target: &Target| {
+        Ident::new(
+            &format!("features_{}", target.features_string()),
+            Span::call_site(),
+        )
+    };
+
+    let target_fns = targets.iter().enumerate().map(|(i, target)| {
+        let target_arch = target.target_arch();
+        let target_features = target.target_feature();
+        let name = target_fn_name(target);
+        let index = i + 1;
+        quote! {
+            #target_arch
+            #(#target_features)*
+            unsafe fn #name<Output>(f: impl FnOnce(#crate_path::Features<Self>) -> Output) -> Output {
+                f(Features(#index, core::marker::PhantomData))
+            }
+        }
+    });
+
+    let target_arm = targets.iter().enumerate().map(|(i, target)| {
+        let name = target_fn_name(target);
+        let index = i + 1;
+        quote! { #index => unsafe { Self::#name(f) }, }
+    });
+
+    let features_lists = targets.iter().map(|target| target.features());
+
+    let detects = targets.iter().enumerate().map(|(i, target)| {
+        let detect = target.features_detected(&crate_path);
+        let index = i + 1;
+        quote! {
+            if #detect {
+                return #index;
+            }
+        }
+    });
+
+    Ok(quote! {
+        impl #name {
+            #(#target_fns)*
+
+            fn none<Output>(f: impl FnOnce(#crate_path::Features<Self>) -> Output) -> Output {
+                f(Features(0, core::marker::PhantomData))
+            }
+
+            #[cold]
+            fn detect() -> usize {
+                #(#detects)*
+
+                0
+            }
+        }
+
+        impl #crate_path::Dispatcher for #name {
+            const FEATURES: &'static [&'static [&'static str]] = &[&[], #(&[#(#features_lists),*]),*];
+
+            fn dispatch<Output>(f: impl Fn(Features<Self>) -> Output) -> Output {
+                use core::sync::atomic::{AtomicUsize, Ordering};
+                static SELECTED: AtomicUsize = AtomicUsize::new(usize::MAX);
+                let selected = SELECTED.load(Ordering::Relaxed);
+                let selected = if selected == usize::MAX {
+                    let selected = Self::detect();
+                    SELECTED.store(selected, Ordering::Relaxed);
+                    selected
+                } else {
+                    selected
+                };
+
+                match selected {
+                    0 => Self::none(f),
+                    #(#target_arm)*
+                    _ => unsafe { std::hint::unreachable_unchecked() },
+                }
+            }
+        }
+    })
 }
