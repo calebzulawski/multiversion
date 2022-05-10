@@ -442,7 +442,7 @@ pub use once_cell;
 pub trait Dispatcher: Sized {
     const FEATURES: &'static [&'static [&'static str]];
 
-    fn dispatch<Output>(f: impl Fn(Features<Self>) -> Output) -> Output;
+    fn dispatch<Output>(f: impl FnMut(Features<Self>) -> Output) -> Output;
 }
 
 pub struct Features<D: Dispatcher>(usize, std::marker::PhantomData<D>);

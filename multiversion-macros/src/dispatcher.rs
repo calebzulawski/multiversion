@@ -526,7 +526,7 @@ pub(crate) fn derive_dispatcher(dispatcher: ItemStruct) -> Result<TokenStream> {
         quote! {
             #target_arch
             #(#target_features)*
-            unsafe fn #name<Output>(f: impl FnOnce(#crate_path::Features<Self>) -> Output) -> Output {
+            unsafe fn #name<Output>(mut f: impl FnMut(#crate_path::Features<Self>) -> Output) -> Output {
                 f(Features(#index, core::marker::PhantomData))
             }
         }
@@ -554,7 +554,7 @@ pub(crate) fn derive_dispatcher(dispatcher: ItemStruct) -> Result<TokenStream> {
         impl #name {
             #(#target_fns)*
 
-            fn none<Output>(f: impl FnOnce(#crate_path::Features<Self>) -> Output) -> Output {
+            fn none<Output>(mut f: impl FnMut(#crate_path::Features<Self>) -> Output) -> Output {
                 f(Features(0, core::marker::PhantomData))
             }
 
@@ -569,7 +569,7 @@ pub(crate) fn derive_dispatcher(dispatcher: ItemStruct) -> Result<TokenStream> {
         impl #crate_path::Dispatcher for #name {
             const FEATURES: &'static [&'static [&'static str]] = &[&[], #(&[#(#features_lists),*]),*];
 
-            fn dispatch<Output>(f: impl Fn(Features<Self>) -> Output) -> Output {
+            fn dispatch<Output>(mut f: impl FnMut(Features<Self>) -> Output) -> Output {
                 use core::sync::atomic::{AtomicUsize, Ordering};
                 static SELECTED: AtomicUsize = AtomicUsize::new(usize::MAX);
                 let selected = SELECTED.load(Ordering::Relaxed);
