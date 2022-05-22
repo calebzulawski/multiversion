@@ -2,8 +2,10 @@
 
 #[rustversion::since(1.51)]
 #[multiversion::multiversion(versions(
-    clone = "[x86|x86_64]+avx2+avx",
-    clone = "[x86|x86_64]+avx",
+    clone = "x86_64+avx2+avx",
+    clone = "x86_64+avx",
+    clone = "x86+avx2+avx",
+    clone = "x86+avx",
     clone = "x86+sse"
 ))]
 fn pass<'a>(x: &'a i32) -> &'a i32 {
@@ -12,8 +14,10 @@ fn pass<'a>(x: &'a i32) -> &'a i32 {
 
 #[rustversion::since(1.51)]
 #[multiversion::multiversion(versions(
-    clone = "[x86|x86_64]+avx2+avx",
-    clone = "[x86|x86_64]+avx",
+    clone = "x86_64+avx2+avx",
+    clone = "x86_64+avx",
+    clone = "x86+avx2+avx",
+    clone = "x86+avx",
     clone = "x86+sse"
 ))]
 fn double<'a, T: Copy + std::ops::AddAssign, const N: usize>(x: &'a mut [T; N]) -> &'a mut T {
@@ -29,8 +33,10 @@ struct Doubler<'a>(&'a bool);
 impl<'a> Doubler<'a> {
     #[rustversion::since(1.51)]
     #[multiversion::multiversion(versions(
-        clone = "[x86|x86_64]+avx2+avx",
-        clone = "[x86|x86_64]+avx",
+        clone = "x86_64+avx2+avx",
+        clone = "x86_64+avx",
+        clone = "x86+avx2+avx",
+        clone = "x86+avx",
         clone = "x86+sse"
     ))]
     fn double<'b, T: Copy + std::ops::AddAssign, const N: usize>(

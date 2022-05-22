@@ -1,36 +1,40 @@
 use multiversion::multiversion;
 
 #[multiversion(versions(
-    clone = "[x86|x86_64]+avx",
-    clone = "[x86|x86_64]+sse",
-    clone = "[arm|aarch64]+neon",
+    clone = "x86_64+avx",
+    clone = "x86+avx",
+    clone = "x86+sse",
+    clone = "arm+neon",
 ))]
 pub fn pub_add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
 
 #[multiversion(versions(
-    clone = "[x86|x86_64]+avx",
-    clone = "[x86|x86_64]+sse",
-    clone = "[arm|aarch64]+neon",
+    clone = "x86_64+avx",
+    clone = "x86+avx",
+    clone = "x86+sse",
+    clone = "arm+neon",
 ))]
 fn priv_add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
 
 #[multiversion(versions(
-    clone = "[x86|x86_64]+avx",
-    clone = "[x86|x86_64]+sse",
-    clone = "[arm|aarch64]+neon",
+    clone = "x86_64+avx",
+    clone = "x86+avx",
+    clone = "x86+sse",
+    clone = "arm+neon",
 ))]
 pub unsafe fn pub_unsafe_add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
 
 #[multiversion(versions(
-    clone = "[x86|x86_64]+avx",
-    clone = "[x86|x86_64]+sse",
-    clone = "[arm|aarch64]+neon",
+    clone = "x86_64+avx",
+    clone = "x86+avx",
+    clone = "x86+sse",
+    clone = "arm+neon",
 ))]
 unsafe fn priv_unsafe_add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
@@ -40,36 +44,40 @@ struct Adder(f32);
 
 impl Adder {
     #[multiversion(versions(
-        clone = "[x86|x86_64]+avx",
-        clone = "[x86|x86_64]+sse",
-        clone = "[arm|aarch64]+neon",
+        clone = "x86_64+avx",
+        clone = "x86+avx",
+        clone = "x86+sse",
+        clone = "arm+neon",
     ))]
     pub fn pub_add(&self, x: &mut [f32]) {
         x.iter_mut().for_each(|x| *x += self.0);
     }
 
     #[multiversion(versions(
-        clone = "[x86|x86_64]+avx",
-        clone = "[x86|x86_64]+sse",
-        clone = "[arm|aarch64]+neon",
+        clone = "x86_64+avx",
+        clone = "x86+avx",
+        clone = "x86+sse",
+        clone = "arm+neon",
     ))]
     fn priv_add(&self, x: &mut [f32]) {
         x.iter_mut().for_each(|x| *x += self.0);
     }
 
     #[multiversion(versions(
-        clone = "[x86|x86_64]+avx",
-        clone = "[x86|x86_64]+sse",
-        clone = "[arm|aarch64]+neon",
+        clone = "x86_64+avx",
+        clone = "x86+avx",
+        clone = "x86+sse",
+        clone = "arm+neon",
     ))]
     pub unsafe fn pub_unsafe_add(&self, x: &mut [f32]) {
         x.iter_mut().for_each(|x| *x += self.0);
     }
 
     #[multiversion(versions(
-        clone = "[x86|x86_64]+avx",
-        clone = "[x86|x86_64]+sse",
-        clone = "[arm|aarch64]+neon",
+        clone = "x86_64+avx",
+        clone = "x86+avx",
+        clone = "x86+sse",
+        clone = "arm+neon",
     ))]
     unsafe fn priv_unsafe_add(&self, x: &mut [f32]) {
         x.iter_mut().for_each(|x| *x += self.0);

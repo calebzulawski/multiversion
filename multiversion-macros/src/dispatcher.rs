@@ -5,8 +5,8 @@ use crate::{
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
-    parse_quote, spanned::Spanned, Attribute, Block, Error, Ident, ItemFn, ItemStruct, Lit, Meta,
-    Path, Result, Signature, Visibility,
+    parse_quote, punctuated::Punctuated, token, Attribute, Block, Error, Ident, ItemFn, ItemMod,
+    LitStr, Path, Result, Signature, Visibility,
 };
 
 pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> (Ident, Ident) {
@@ -142,18 +142,18 @@ impl Dispatcher {
     // specialized default
     fn cfg_if_not_defaulted(&self) -> Attribute {
         let mut defaulted_arches = Vec::new();
-        for arches in self
+        for arch in self
             .specializations
             .iter()
             .filter_map(|Specialization { target, .. }| {
                 if !target.has_features_specified() {
-                    Some(target.arches())
+                    Some(target.arch())
                 } else {
                     None
                 }
             })
         {
-            defaulted_arches.extend(arches);
+            defaulted_arches.push(arch);
         }
         parse_quote! { #[cfg(not(any(#(target_arch = #defaulted_arches),*)))] }
     }
@@ -201,7 +201,7 @@ impl Dispatcher {
                     .filter_map(|Specialization { target, .. }| {
                         if target.has_features_specified() {
                             let target_arch = target.target_arch();
-                            let features_detected = target.features_detected(&self.crate_path);
+                            let features_detected = target.features_detected();
                             let function = feature_fn_name(&self.sig.ident, Some(target)).1;
                             Some(quote! {
                                 #target_arch
@@ -272,7 +272,7 @@ impl Dispatcher {
                     .filter_map(|Specialization { target, .. }| {
                         if target.has_features_specified() {
                             let target_arch = target.target_arch();
-                            let features_detected = target.features_detected(&self.crate_path);
+                            let features_detected = target.features_detected();
                             let function = feature_fn_name(&self.sig.ident, Some(target)).1;
                             Some(quote! {
                                #target_arch
@@ -360,7 +360,7 @@ impl Dispatcher {
             let detect_feature = ordered_targets.iter().enumerate().map(|(index, target)| {
                 let index = index + 2; // 0 is not cached, 1 is default features
                 let target_arch = target.target_arch();
-                let features_detected = target.features_detected(&self.crate_path);
+                let features_detected = target.features_detected();
                 quote! {
                     #target_arch
                     {
@@ -479,37 +479,25 @@ impl ToTokens for Dispatcher {
     }
 }
 
-pub(crate) fn derive_dispatcher(dispatcher: ItemStruct) -> Result<TokenStream> {
-    if !dispatcher.fields.is_empty() {
+pub(crate) fn derive_dispatcher(
+    targets: Punctuated<LitStr, token::Comma>,
+    dispatcher: ItemMod,
+) -> Result<TokenStream> {
+    if dispatcher.content.is_none() || !dispatcher.content.as_ref().unwrap().1.is_empty() {
         return Err(Error::new(
-            dispatcher.fields.span(),
-            "expected a unit struct",
+            dispatcher.content.unwrap().0.span,
+            "expected an empty module",
         ));
     }
-    let mut targets = Vec::new();
-    let mut crate_path: Path = parse_quote!(multiversion);
-    let parse_attr_string = |attr: &Attribute| {
-        if let Meta::NameValue(nv) = attr.parse_meta()? {
-            if let Lit::Str(s) = nv.lit {
-                Ok(s)
-            } else {
-                Err(Error::new(nv.lit.span(), "expected a literal string"))
-            }
-        } else {
-            Err(Error::new_spanned(attr, "expected a name-value pair"))
-        }
-    };
-    for attr in dispatcher.attrs {
-        if let Some(ident) = attr.path.get_ident() {
-            match ident.to_string().as_str() {
-                "target" => targets.push(Target::parse(&parse_attr_string(&attr)?)?),
-                "crate_path" => crate_path = parse_attr_string(&attr)?.parse()?,
-                _ => {}
-            }
-        }
-    }
 
-    let name = dispatcher.ident;
+    let targets = targets
+        .iter()
+        .map(Target::parse)
+        .collect::<Result<Vec<_>>>()?;
+
+    let attrs = dispatcher.attrs;
+    let vis = dispatcher.vis;
+    let ident = dispatcher.ident;
 
     let target_fn_name = |target: &Target| {
         Ident::new(
@@ -518,16 +506,16 @@ pub(crate) fn derive_dispatcher(dispatcher: ItemStruct) -> Result<TokenStream> {
         )
     };
 
-    let target_fns = targets.iter().enumerate().map(|(i, target)| {
+    let target_fns = targets.iter().map(|target| {
         let target_arch = target.target_arch();
         let target_features = target.target_feature();
         let name = target_fn_name(target);
-        let index = i + 1;
         quote! {
             #target_arch
             #(#target_features)*
-            unsafe fn #name<Output>(mut f: impl FnMut(#crate_path::Features<Self>) -> Output) -> Output {
-                f(Features(#index, core::marker::PhantomData))
+            unsafe fn #name<Output>(f: impl FnOnce() -> Output) -> Output
+            {
+                f()
             }
         }
     });
@@ -538,10 +526,8 @@ pub(crate) fn derive_dispatcher(dispatcher: ItemStruct) -> Result<TokenStream> {
         quote! { #index => unsafe { Self::#name(f) }, }
     });
 
-    let features_lists = targets.iter().map(|target| target.features());
-
     let detects = targets.iter().enumerate().map(|(i, target)| {
-        let detect = target.features_detected(&crate_path);
+        let detect = target.features_detected();
         let index = i + 1;
         quote! {
             if #detect {
@@ -551,42 +537,52 @@ pub(crate) fn derive_dispatcher(dispatcher: ItemStruct) -> Result<TokenStream> {
     });
 
     Ok(quote! {
-        impl #name {
-            #(#target_fns)*
+        #(#attrs)* #vis mod #ident {
+            #[doc(hidden)]
+            pub struct Dispatcher;
 
-            fn none<Output>(mut f: impl FnMut(#crate_path::Features<Self>) -> Output) -> Output {
-                f(Features(0, core::marker::PhantomData))
-            }
+            impl Dispatcher {
+                pub fn dispatch() -> usize {
+                    #[cold]
+                    fn detect() -> usize {
+                        #(#detects)*
+                        0
+                    }
 
-            #[cold]
-            fn detect() -> usize {
-                #(#detects)*
+                    use core::sync::atomic::{AtomicUsize, Ordering};
+                    static SELECTED: AtomicUsize = AtomicUsize::new(usize::MAX);
+                    let selected = SELECTED.load(Ordering::Relaxed);
+                    if selected == usize::MAX {
+                        let selected = detect();
+                        SELECTED.store(selected, Ordering::Relaxed);
+                        selected
+                    } else {
+                        selected
+                    }
+                }
 
-                0
-            }
-        }
+                #(#target_fns)*
 
-        impl #crate_path::Dispatcher for #name {
-            const FEATURES: &'static [&'static [&'static str]] = &[&[], #(&[#(#features_lists),*]),*];
-
-            fn dispatch<Output>(mut f: impl FnMut(Features<Self>) -> Output) -> Output {
-                use core::sync::atomic::{AtomicUsize, Ordering};
-                static SELECTED: AtomicUsize = AtomicUsize::new(usize::MAX);
-                let selected = SELECTED.load(Ordering::Relaxed);
-                let selected = if selected == usize::MAX {
-                    let selected = Self::detect();
-                    SELECTED.store(selected, Ordering::Relaxed);
-                    selected
-                } else {
-                    selected
-                };
-
-                match selected {
-                    0 => Self::none(f),
-                    #(#target_arm)*
-                    _ => unsafe { std::hint::unreachable_unchecked() },
+                pub fn none<Output>(f: impl FnOnce() -> Output) -> Output
+                {
+                    f()
                 }
             }
+
+            #[doc(hidden)]
+            #[macro_export]
+            macro_rules! dispatch {
+                { $dispatcher:ty, $expr:expr } => {
+                    match <$dispatcher>::detect() {
+                        0 => Self::none(f),
+                        #(#target_arm)*
+                        _ => unsafe { std::hint::unreachable_unchecked() },
+                    }
+                }
+            }
+
+            #[doc(hidden)]
+            pub use dispatch;
         }
     })
 }

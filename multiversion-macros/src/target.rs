@@ -2,20 +2,14 @@ use crate::safe_inner::process_safe_inner;
 use crate::static_dispatch::process_static_dispatch;
 use crate::target_cfg::process_target_cfg;
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use std::convert::TryInto;
-use syn::{parse_quote, Attribute, Error, ItemFn, Lit, LitStr, Path, Result};
+use syn::{parse_quote, Attribute, Error, ItemFn, Lit, LitStr, Result};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Target {
-    architectures: Vec<String>,
+    architecture: String,
     features: Vec<String>,
-}
-
-impl PartialEq for Target {
-    fn eq(&self, other: &Self) -> bool {
-        self.architectures == other.architectures && self.features == other.features
-    }
 }
 
 impl Target {
@@ -24,27 +18,16 @@ impl Target {
 
         let mut it = value.as_str().split('+');
 
-        let arch_specifier = it
+        let architecture = it
             .next()
-            .filter(|x| !x.is_empty())
-            .ok_or_else(|| Error::new(s.span(), "expected architecture specifier"))?;
-        let architectures = if arch_specifier.starts_with('[') && arch_specifier.ends_with(']') {
-            arch_specifier[1..arch_specifier.len() - 1]
-                .split('|')
-                .map(|x| {
-                    if x.is_empty() {
-                        Err(Error::new(s.span(), "architecture string cannot be empty"))
-                    } else {
-                        Ok(x.to_string())
-                    }
-                })
-                .collect::<Result<Vec<_>>>()?
-        } else if arch_specifier
-            .chars()
-            .all(|x| x.is_alphanumeric() || x == '_')
+            .ok_or_else(|| Error::new(s.span(), "expected architecture specifier"))?
+            .to_string();
+
+        if architecture.is_empty()
+            || !architecture
+                .chars()
+                .all(|x| x.is_alphanumeric() || x == '_')
         {
-            vec![arch_specifier.to_string()]
-        } else {
             return Err(Error::new(s.span(), "invalid architecture specifier"));
         };
 
@@ -61,13 +44,13 @@ impl Target {
         features.dedup();
 
         Ok(Self {
-            architectures,
+            architecture,
             features,
         })
     }
 
-    pub fn arches(&self) -> impl Iterator<Item = &str> {
-        self.architectures.iter().map(String::as_str)
+    pub fn arch(&self) -> &str {
+        &self.architecture
     }
 
     pub fn features_string(&self) -> String {
@@ -78,14 +61,10 @@ impl Target {
         !self.features.is_empty()
     }
 
-    pub fn features(&self) -> &Vec<String> {
-        &self.features
-    }
-
     pub fn target_arch(&self) -> Attribute {
-        let arch = self.architectures.iter().map(|x| x.as_str());
+        let arch = &self.architecture;
         parse_quote! {
-            #[cfg(any(#(target_arch = #arch),*))]
+            #[cfg(target_arch = #arch)]
         }
     }
 
@@ -100,12 +79,27 @@ impl Target {
             .collect()
     }
 
-    pub fn features_detected(&self, crate_path: &Path) -> TokenStream {
+    pub fn features_detected(&self) -> TokenStream {
         if self.features.is_empty() {
             quote! { true }
         } else {
-            let features = &self.features;
-            quote! { #crate_path::are_cpu_features_detected!(#(#features),*) }
+            let feature = self.features.iter();
+            if cfg!(feature = "std") {
+                let is_feature_detected = format_ident!(
+                    "is_{}_feature_detected",
+                    match self.architecture.as_str() {
+                        "x86_64" => "x86",
+                        f => f,
+                    }
+                );
+                quote! {
+                    true #( && std::#is_feature_detected!(#feature) )*
+                }
+            } else {
+                quote! {
+                    true #( && core::cfg!(target_feature = #feature) )*
+                }
+            }
         }
     }
 }
@@ -150,50 +144,19 @@ mod test {
     use proc_macro2::Span;
 
     #[test]
-    fn parse_single_arch_no_features() {
+    fn parse_no_features() {
         let s = LitStr::new("x86", Span::call_site());
         let target = Target::parse(&s).unwrap();
-        assert_eq!(target.architectures, vec!["x86"]);
+        assert_eq!(target.architecture, "x86");
         assert!(target.features.is_empty());
     }
 
     #[test]
-    fn parse_multiple_arch_no_features() {
-        let s = LitStr::new("[arm|aarch64|mips|mips64]", Span::call_site());
-        let target = Target::parse(&s).unwrap();
-        assert_eq!(
-            target.architectures,
-            vec!["arm", "aarch64", "mips", "mips64"]
-        );
-        assert_eq!(target.features.len(), 0);
-    }
-
-    #[test]
-    fn parse_single_arch_with_features() {
+    fn parse_features() {
         let s = LitStr::new("x86_64+sse4.2+xsave", Span::call_site());
         let target = Target::parse(&s).unwrap();
-        assert_eq!(target.architectures, vec!["x86_64"]);
+        assert_eq!(target.architecture, "x86_64");
         assert_eq!(target.features, vec!["sse4.2", "xsave"]);
-    }
-
-    #[test]
-    fn parse_multiple_arch_with_features() {
-        let s = LitStr::new("[powerpc|powerpc64]+altivec+power8", Span::call_site());
-        let target = Target::parse(&s).unwrap();
-        assert_eq!(target.architectures, vec!["powerpc", "powerpc64"]);
-        assert_eq!(target.features, vec!["altivec", "power8"]);
-    }
-
-    #[test]
-    fn parse_missing_arch_close() {
-        let s = LitStr::new("[x86+sse4.2+xsave", Span::call_site());
-        Target::parse(&s).unwrap_err();
-    }
-
-    #[test]
-    fn parse_malformed_arch() {
-        let s = LitStr::new("[x86|]+sse4.2+xsave", Span::call_site());
-        Target::parse(&s).unwrap_err();
     }
 
     #[test]
@@ -209,22 +172,12 @@ mod test {
     }
 
     #[test]
-    fn generate_single_target_arch() {
+    fn generate_target_arch() {
         let s = LitStr::new("x86+avx", Span::call_site());
         let target = Target::parse(&s).unwrap();
         assert_eq!(
             target.target_arch(),
-            parse_quote! { #[cfg(any(target_arch = "x86"))] }
-        );
-    }
-
-    #[test]
-    fn generate_multiple_target_arch() {
-        let s = LitStr::new("[x86|x86_64]+avx", Span::call_site());
-        let target = Target::parse(&s).unwrap();
-        assert_eq!(
-            target.target_arch(),
-            parse_quote! { #[cfg(any(target_arch = "x86", target_arch = "x86_64"))] }
+            parse_quote! { #[cfg(target_arch = "x86")] }
         );
     }
 

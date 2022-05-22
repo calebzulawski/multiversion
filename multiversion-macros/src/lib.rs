@@ -10,7 +10,7 @@ mod target_cfg;
 mod util;
 
 use quote::ToTokens;
-use syn::{parse_macro_input, ItemFn, ItemStruct};
+use syn::{parse_macro_input, punctuated::Punctuated, ItemFn, ItemMod};
 
 #[proc_macro_attribute]
 pub fn multiversion(
@@ -39,10 +39,14 @@ pub fn target(
     .into()
 }
 
-#[proc_macro_derive(Dispatcher, attributes(target, crate_path))]
-pub fn derive_dispatcher(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let dispatcher = parse_macro_input!(input as ItemStruct);
-    match dispatcher::derive_dispatcher(dispatcher) {
+#[proc_macro_attribute]
+pub fn dispatcher(
+    attr: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let targets = parse_macro_input!(attr with Punctuated::parse_terminated);
+    let dispatcher = parse_macro_input!(input as ItemMod);
+    match dispatcher::derive_dispatcher(targets, dispatcher) {
         Ok(tokens) => tokens.into_token_stream(),
         Err(err) => err.to_compile_error(),
     }

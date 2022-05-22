@@ -33,24 +33,16 @@
 //! # Target specification strings
 //! Targets for the [`target`] and [`multiversion`] attributes are specified as a combination of
 //! architecture (as specified in the [`target_arch`] attribute) and feature (as specified in the
-//! [`target_feature`] attribute). A single architecture can be specified as:
+//! [`target_feature`] attribute). A target can be specified as:
 //! * `"arch"`
 //! * `"arch+feature"`
 //! * `"arch+feature1+feature2"`
 //!
-//! while multiple architectures can be specified as:
-//! * `"[arch1|arch2]"`
-//! * `"[arch1|arch2]+feature"`
-//! * `"[arch1|arch2]+feature1+feature2"`
-//!
-//! The following are all valid target specification strings:
+//! The following are some valid target specification strings:
 //! * `"x86"` (matches the `"x86"` architecture)
 //! * `"x86_64+avx+avx2"` (matches the `"x86_64"` architecture with the `"avx"` and `"avx2"`
 //! features)
-//! * `"[mips|mips64|powerpc|powerpc64]"` (matches any of the `"mips"`, `"mips64"`, `"powerpc"` or
-//! `"powerpc64"` architectures)
-//! * `"[arm|aarch64]+neon"` (matches either the `"arm"` or `"aarch64"` architectures with the
-//! `"neon"` feature)
+//! * `"arm+neon"` (matches the `arm` architecture with the `"neon"` feature
 //!
 //! # Example
 //! The following example is a good candidate for optimization with SIMD.  The function `square`
@@ -64,7 +56,7 @@
 //! ```
 //! use multiversion::multiversion;
 //!
-//! #[multiversion(clones("[x86|x86_64]+avx", "x86+sse"))]
+//! #[multiversion(clones("x86_64+avx", "x86+sse"))]
 //! fn square(x: &mut [f32]) {
 //!     for v in x {
 //!         *v *= *v;
@@ -79,7 +71,7 @@
 //! ```
 //! use multiversion::{multiversion, target};
 //!
-//! #[target("[x86|x86_64]+avx")]
+//! #[target("x86_64+avx")]
 //! unsafe fn square_avx(x: &mut [f32]) {
 //!     for v in x {
 //!         *v *= *v;
@@ -94,7 +86,7 @@
 //! }
 //!
 //! #[multiversion(versions(
-//!     alternative(target = "[x86|x86_64]+avx", fn = "square_avx", unsafe = true),
+//!     alternative(target = "x86_64+avx", fn = "square_avx", unsafe = true),
 //!     alternative(target = "x86+sse", fn = "square_sse", unsafe = true)
 //! ))]
 //! fn square(x: &mut [f32]) {
@@ -116,14 +108,14 @@
 //! # mod fix { // doctests do something weird with modules, this fixes it
 //! use multiversion::multiversion;
 //!
-//! #[multiversion(clones("[x86|x86_64]+avx", "x86+sse"))]
+//! #[multiversion(clones("x86_64+avx", "x86+sse"))]
 //! fn square(x: &mut [f32]) {
 //!     for v in x {
 //!         *v *= *v
 //!     }
 //! }
 //!
-//! #[multiversion(clones("[x86|x86_64]+avx", "x86+sse"))]
+//! #[multiversion(clones("x86_64+avx", "x86+sse"))]
 //! fn square_plus_one(x: &mut [f32]) {
 //!     dispatch!(square(x)); // this function call bypasses feature detection
 //!     for v in x {
@@ -158,15 +150,15 @@
 //! the function's target
 //!
 //! ```
-//! #[multiversion::multiversion(clones("[x86|x86_64]+avx", "[arm|aarch64]+neon"))]
+//! #[multiversion::multiversion(clones("x86_64+avx", "arm+neon"))]
 //! fn print_arch() {
-//!     #[target_cfg(target = "[x86|x86_64]+avx")]
+//!     #[target_cfg(target = "x86_64+avx")]
 //!     println!("avx");
 //!
-//!     #[target_cfg(target = "[arm|aarch64]+neon")]
+//!     #[target_cfg(target = "arm+neon")]
 //!     println!("neon");
 //!
-//!     #[target_cfg(not(any(target = "[x86|x86_64]+avx", target = "[arm|aarch64]+neon")))]
+//!     #[target_cfg(not(any(target = "x86_64+avx", target = "arm+neon")))]
 //!     println!("generic");
 //! }
 //! ```
@@ -214,7 +206,7 @@
 /// ```
 /// use multiversion::multiversion;
 ///
-/// #[multiversion(versions(clone = "[x86|x86_64]+avx", clone = "x86+sse"))]
+/// #[multiversion(versions(clone = "x86_64+avx", clone = "x86+sse"))]
 /// fn square(x: &mut [f32]) {
 ///     for v in x {
 ///         *v *= *v
@@ -225,7 +217,7 @@
 /// ```
 /// use multiversion::multiversion;
 ///
-/// #[multiversion(clones("[x86|x86_64]+avx", "x86+sse"))]
+/// #[multiversion(clones("x86_64+avx", "x86+sse"))]
 /// fn square(x: &mut [f32]) {
 ///     for v in x {
 ///         *v *= *v
@@ -251,9 +243,9 @@
 /// }
 ///
 /// #[multiversion(versions(
-///     alternative(target = "[x86|x86_64]+avx", fn  = "where_am_i_avx"),
+///     alternative(target = "x86_64+avx", fn  = "where_am_i_avx"),
 ///     alternative(target = "x86+sse", fn = "where_am_i_sse"),
-///     alternative(target = "[arm|aarch64]+neon", fn = "where_am_i_neon"),
+///     alternative(target = "arm+neon", fn = "where_am_i_neon"),
 /// ))]
 /// fn where_am_i() {
 ///     println!("generic");
@@ -268,7 +260,7 @@
 /// ```
 /// use multiversion::{multiversion, target};
 ///
-/// #[target("[x86|x86_64]+avx")]
+/// #[target("x86_64+avx")]
 /// unsafe fn where_am_i_avx() {
 ///     println!("avx");
 /// }
@@ -278,15 +270,15 @@
 ///     println!("sse");
 /// }
 ///
-/// #[target("[arm|aarch64]+neon")]
+/// #[target("arm+neon")]
 /// unsafe fn where_am_i_neon() {
 ///     println!("neon");
 /// }
 ///
 /// #[multiversion(versions(
-///     alternative(target = "[x86|x86_64]+avx", fn = "where_am_i_avx", unsafe = true),
+///     alternative(target = "x86_64+avx", fn = "where_am_i_avx", unsafe = true),
 ///     alternative(target = "x86+sse", fn = "where_am_i_sse", unsafe = true),
-///     alternative(target = "[arm|aarch64]+neon", fn = "where_am_i_neon")
+///     alternative(target = "arm+neon", fn = "where_am_i_neon")
 /// ))]
 /// fn where_am_i() {
 ///     println!("generic");
@@ -312,10 +304,10 @@
 ///
 /// The following creates two functions, `foo_avx_sse41_version` and `foo_default_version`.
 /// ```
-/// #[multiversion::multiversion(clones("[x86|x86_64]+sse4.1+avx"))]
+/// #[multiversion::multiversion(clones("x86_64+sse4.1+avx"))]
 /// fn foo() {}
 ///
-/// #[multiversion::target("[x86|x86_64]+sse4.1+avx")]
+/// #[multiversion::target("x86_64+sse4.1+avx")]
 /// unsafe fn call_foo_avx() {
 ///     foo_avx_sse41_version();
 /// }
@@ -434,21 +426,10 @@ macro_rules! are_cpu_features_detected {
     }
 }
 
-pub use multiversion_macros::Dispatcher;
+pub use multiversion_macros::dispatcher;
 
 #[doc(hidden)]
 pub use once_cell;
 
-pub trait Dispatcher: Sized {
-    const FEATURES: &'static [&'static [&'static str]];
-
-    fn dispatch<Output>(f: impl FnMut(Features<Self>) -> Output) -> Output;
-}
-
-pub struct Features<D: Dispatcher>(usize, std::marker::PhantomData<D>);
-
-#[derive(Dispatcher)]
-#[crate_path = "crate"]
-#[target = "x86_64+avx2+avx"]
-#[target = "x86_64+sse4.1"]
-pub struct SimdDispatcher;
+#[dispatcher("x86_64+avx2+avx", "x86_64+sse4.1")]
+pub mod simd_dispatcher {}
