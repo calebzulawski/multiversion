@@ -6,7 +6,7 @@ use quote::{format_ident, quote};
 use std::convert::TryInto;
 use syn::{parse_quote, Attribute, Error, ItemFn, Lit, LitStr, Result};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Target {
     architecture: String,
     features: Vec<String>,
