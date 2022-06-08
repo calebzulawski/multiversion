@@ -142,8 +142,6 @@
 ///
 /// [`target`]: attr.target.html
 /// [`multiversion`]: attr.multiversion.html
-/// [static dispatching]: index.html#static-dispatching
-/// [conditional compilation]: index.html#conditional-compilation
 pub use multiversion_macros::multiversion;
 
 /// Provides a less verbose equivalent to the `target_arch` and `target_feature` attributes.
@@ -162,18 +160,8 @@ pub use multiversion_macros::multiversion;
 ///   * Indicates that the inner contents of the function are safe and requires the use of `unsafe`
 ///     blocks to call `unsafe` functions.
 ///
-/// # Static dispatching
-/// The [`target`] attribute allows functions called inside the function to be statically dispatched.
-/// See [static dispatching] for more information.
-///
-/// # Conditional compilation
-/// The [`target`] attribute supports conditional compilation with the `#[target_cfg]` helper
-/// attribute. See [conditional compilation] for more information.
-///
 /// [`target`]: attr.target.html
 /// [`multiversion`]: attr.multiversion.html
-/// [static dispatching]: index.html#static-dispatching
-/// [conditional compilation]: index.html#conditional-compilation
 pub use multiversion_macros::target;
 
 /// Detects CPU features.
