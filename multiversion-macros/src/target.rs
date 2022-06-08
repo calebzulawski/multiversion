@@ -1,6 +1,4 @@
 use crate::safe_inner::process_safe_inner;
-use crate::static_dispatch::process_static_dispatch;
-use crate::target_cfg::process_target_cfg;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use std::convert::TryInto;
@@ -125,10 +123,6 @@ pub(crate) fn make_target_fn_items(
     target: Option<&Target>,
     mut func: ItemFn,
 ) -> Result<Vec<ItemFn>> {
-    // Rewrite #[target_cfg] and #[static_dispatch]
-    process_target_cfg(target.cloned(), &mut func.block)?;
-    process_static_dispatch(&mut func, target)?;
-
     // Create the function
     if let Some(target) = target {
         let target_arch = target.target_arch();

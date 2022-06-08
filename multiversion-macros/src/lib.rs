@@ -4,9 +4,7 @@ extern crate proc_macro;
 mod dispatcher;
 mod multiversion;
 mod safe_inner;
-mod static_dispatch;
 mod target;
-mod target_cfg;
 mod util;
 
 use quote::ToTokens;
