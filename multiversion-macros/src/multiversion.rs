@@ -1,8 +1,7 @@
 use crate::dispatcher::{DispatchMethod, Dispatcher};
 use crate::target::Target;
-use crate::util;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens};
+use quote::ToTokens;
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
@@ -27,25 +26,9 @@ fn meta_kv_value(meta: Meta) -> Result<Lit, Error> {
     }
 }
 
-fn meta_map(meta: Meta) -> Result<MetaMap, Error> {
-    if let Meta::List(l) = meta {
-        l.nested.try_into()
-    } else {
-        Err(Error::new(meta.span(), "unexpected value"))
-    }
-}
-
 fn lit_str(lit: Lit) -> Result<LitStr, Error> {
     if let Lit::Str(s) = lit {
         Ok(s)
-    } else {
-        Err(Error::new(lit.span(), "expected string"))
-    }
-}
-
-fn lit_bool(lit: Lit) -> Result<bool, Error> {
-    if let Lit::Bool(b) = lit {
-        Ok(b.value)
     } else {
         Err(Error::new(lit.span(), "expected string"))
     }
@@ -84,12 +67,6 @@ impl MetaMap {
         self.map.remove(key)
     }
 
-    fn remove(&mut self, key: &str) -> Result<Meta, Error> {
-        self.map
-            .remove(key)
-            .ok_or_else(|| Error::new(self.span, format!("expected key `{}`", key)))
-    }
-
     fn span(&self) -> Span {
         self.span
     }
@@ -104,14 +81,7 @@ impl MetaMap {
 }
 
 enum Specialization {
-    Clone {
-        target: Target,
-    },
-    Override {
-        target: Target,
-        func: Path,
-        is_unsafe: bool,
-    },
+    Clone { target: Target },
 }
 
 impl TryFrom<Meta> for Specialization {
@@ -122,21 +92,6 @@ impl TryFrom<Meta> for Specialization {
             "clone" => Ok(Self::Clone {
                 target: Target::parse(&lit_str(meta_kv_value(meta)?)?)?,
             }),
-            "alternative" => {
-                let mut map = meta_map(meta)?;
-                let target = Target::parse(&lit_str(meta_kv_value(map.remove("target")?)?)?)?;
-                let func = lit_str(meta_kv_value(map.remove("fn")?)?)?.parse()?;
-                let is_unsafe = map
-                    .try_remove("unsafe")
-                    .map(|x| lit_bool(meta_kv_value(x)?))
-                    .unwrap_or(Ok(false))?;
-                map.finish()?;
-                Ok(Self::Override {
-                    target,
-                    func,
-                    is_unsafe,
-                })
-            }
             _ => Err(Error::new(meta.span(), "expected `clone` or `alternative`")),
         }
     }
@@ -228,8 +183,6 @@ impl TryFrom<Function> for Dispatcher {
     type Error = Error;
 
     fn try_from(item: Function) -> Result<Self, Self::Error> {
-        let (_, args) = util::normalize_signature(&item.func.sig);
-        let fn_params = util::fn_params(&item.func.sig);
         Ok(Self {
             specializations: item
                 .specializations
@@ -240,26 +193,6 @@ impl TryFrom<Function> for Dispatcher {
                         block: item.func.block.as_ref().clone(),
                         normalize: false,
                     },
-                    Specialization::Override {
-                        target,
-                        func,
-                        is_unsafe,
-                    } => {
-                        let call = quote! { #func::<#(#fn_params),*>(#(#args),*) };
-                        crate::dispatcher::Specialization {
-                            target: target.clone(),
-                            block: if *is_unsafe {
-                                parse_quote! {
-                                    { unsafe { #call } }
-                                }
-                            } else {
-                                parse_quote! {
-                                    { #call }
-                                }
-                            },
-                            normalize: true,
-                        }
-                    }
                 })
                 .collect(),
             attrs: item.func.attrs,

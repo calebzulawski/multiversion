@@ -64,40 +64,6 @@
 //! }
 //! ```
 //!
-//! The following produces a nearly identical function, but instead of cloning the function, the
-//! implementations are manually specified. This is typically more useful when the implementations
-//! aren't identical, such as when using explicit SIMD instructions instead of relying on compiler
-//! optimizations.
-//! ```
-//! use multiversion::{multiversion, target};
-//!
-//! #[target("x86_64+avx")]
-//! unsafe fn square_avx(x: &mut [f32]) {
-//!     for v in x {
-//!         *v *= *v;
-//!     }
-//! }
-//!
-//! #[target("x86+sse")]
-//! unsafe fn square_sse(x: &mut [f32]) {
-//!     for v in x {
-//!         *v *= *v;
-//!     }
-//! }
-//!
-//! #[multiversion(versions(
-//!     alternative(target = "x86_64+avx", fn = "square_avx", unsafe = true),
-//!     alternative(target = "x86+sse", fn = "square_sse", unsafe = true)
-//! ))]
-//! fn square(x: &mut [f32]) {
-//!     for v in x {
-//!         *v *= *v;
-//!     }
-//! }
-//!
-//! # fn main() {}
-//! ```
-//!
 //! [`target`]: attr.target.html
 //! [`multiversion`]: attr.multiversion.html
 //! [`target_arch`]: https://doc.rust-lang.org/reference/conditional-compilation.html#target_arch
@@ -157,98 +123,6 @@
 ///     for v in x {
 ///         *v *= *v
 ///     }
-/// }
-/// ```
-///
-/// ## Function alternatives
-/// This example creates a function `where_am_i` that prints the detected CPU feature.
-/// ```
-/// use multiversion::multiversion;
-///
-/// fn where_am_i_avx() {
-///     println!("avx");
-/// }
-///
-/// fn where_am_i_sse() {
-///     println!("sse");
-/// }
-///
-/// fn where_am_i_neon() {
-///     println!("neon");
-/// }
-///
-/// #[multiversion(versions(
-///     alternative(target = "x86_64+avx", fn  = "where_am_i_avx"),
-///     alternative(target = "x86+sse", fn = "where_am_i_sse"),
-///     alternative(target = "arm+neon", fn = "where_am_i_neon"),
-/// ))]
-/// fn where_am_i() {
-///     println!("generic");
-/// }
-///
-/// # fn main() {}
-/// ```
-/// ## Making `target_feature` functions safe
-/// This example is the same as the above example, but calls `unsafe` alternative functions.  Note
-/// that the `where_am_i` function is still safe, since we know we are only calling alternative
-/// functions on supported CPUs.
-/// ```
-/// use multiversion::{multiversion, target};
-///
-/// #[target("x86_64+avx")]
-/// unsafe fn where_am_i_avx() {
-///     println!("avx");
-/// }
-///
-/// #[target("x86+sse")]
-/// unsafe fn where_am_i_sse() {
-///     println!("sse");
-/// }
-///
-/// #[target("arm+neon")]
-/// unsafe fn where_am_i_neon() {
-///     println!("neon");
-/// }
-///
-/// #[multiversion(versions(
-///     alternative(target = "x86_64+avx", fn = "where_am_i_avx", unsafe = true),
-///     alternative(target = "x86+sse", fn = "where_am_i_sse", unsafe = true),
-///     alternative(target = "arm+neon", fn = "where_am_i_neon")
-/// ))]
-/// fn where_am_i() {
-///     println!("generic");
-/// }
-///
-/// # fn main() {}
-/// ```
-///
-/// # Static dispatching
-/// The [`multiversion`] attribute allows functions called inside the function to be statically dispatched.
-/// Additionally, functions created with this attribute can themselves be statically dispatched.
-/// See [static dispatching] for more information.
-///
-/// # Conditional compilation
-/// The [`multiversion`] attribute supports conditional compilation with the `#[target_cfg]` helper
-/// attribute. See [conditional compilation] for more information.
-///
-/// # Function name mangling
-/// The functions created by this macro are mangled as `{ident}_{features}_version`, where `ident` is
-/// the name of the multiversioned function, and `features` is either `default` (for the default
-/// version with no features enabled) or the list of features, sorted alphabetically.  Dots (`.`)
-/// in the feature names are removed.
-///
-/// The following creates two functions, `foo_avx_sse41_version` and `foo_default_version`.
-/// ```
-/// #[multiversion::multiversion(clones("x86_64+sse4.1+avx"))]
-/// fn foo() {}
-///
-/// #[multiversion::target("x86_64+sse4.1+avx")]
-/// unsafe fn call_foo_avx() {
-///     foo_avx_sse41_version();
-/// }
-///
-/// fn call_foo_default() {
-///     foo_default_version();
 /// }
 /// ```
 ///
