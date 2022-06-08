@@ -145,7 +145,6 @@ impl TryFrom<Meta> for Specialization {
 struct Function {
     specializations: Vec<Specialization>,
     func: ItemFn,
-    associated: bool,
     crate_path: Path,
     dispatcher: DispatchMethod,
 }
@@ -211,10 +210,6 @@ impl Function {
                 }
             })
             .unwrap_or_else(|| Ok(DispatchMethod::Default))?;
-        let associated = map
-            .try_remove("associated_fn")
-            .map(|x| lit_bool(meta_kv_value(x)?))
-            .unwrap_or_else(|| Ok(func.sig.receiver().is_some()))?;
         let crate_path = map
             .try_remove("crate_path")
             .map(|x| lit_str(meta_kv_value(x)?)?.parse())
@@ -222,7 +217,6 @@ impl Function {
         map.finish()?;
         Ok(Self {
             specializations,
-            associated,
             crate_path,
             dispatcher,
             func,
@@ -252,11 +246,6 @@ impl TryFrom<Function> for Dispatcher {
                         is_unsafe,
                     } => {
                         let call = quote! { #func::<#(#fn_params),*>(#(#args),*) };
-                        let call = if item.associated {
-                            quote! { Self::#call }
-                        } else {
-                            call
-                        };
                         crate::dispatcher::Specialization {
                             target: target.clone(),
                             block: if *is_unsafe {
@@ -277,7 +266,6 @@ impl TryFrom<Function> for Dispatcher {
             vis: item.func.vis,
             sig: item.func.sig,
             default: *item.func.block,
-            associated: item.associated,
             crate_path: item.crate_path,
             dispatcher: item.dispatcher,
         })

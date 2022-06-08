@@ -8,20 +8,6 @@ async fn async_add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
 
-struct Adder(f32);
-
-impl Adder {
-    #[rustversion::since(1.39)]
-    #[multiversion::multiversion(versions(
-        clone = "x86_64+avx",
-        clone = "x86_64+sse",
-        clone = "arm+neon",
-    ))]
-    async fn async_add(&self, a: &mut [f32]) {
-        a.iter_mut().for_each(|a| *a += self.0);
-    }
-}
-
 mod test {
 
     // Adapted from David Tolnay's async-trait.
@@ -66,15 +52,6 @@ mod test {
         let mut a = vec![0f32, 2f32, 4f32];
         let b = vec![1f32, 1f32, 1f32];
         let fut = super::async_add(&mut a, &b);
-        block_on(fut);
-        assert_eq!(a, vec![1f32, 3f32, 5f32]);
-    }
-
-    #[rustversion::since(1.39)]
-    #[test]
-    fn async_associated_fn() {
-        let mut a = vec![0f32, 2f32, 4f32];
-        let fut = super::Adder(1.).async_add(&mut a);
         block_on(fut);
         assert_eq!(a, vec![1f32, 3f32, 5f32]);
     }

@@ -37,7 +37,6 @@ impl Specialization {
         vis: &Visibility,
         sig: &Signature,
         attrs: &[Attribute],
-        associated: bool,
     ) -> Result<Vec<ItemFn>> {
         let (fn_name, dispatch_fn_name) = feature_fn_name(&sig.ident, Some(&self.target));
 
@@ -77,11 +76,6 @@ impl Specialization {
                 ..outer_sig
             };
             let target_fn_ident = &target_fn.sig.ident;
-            let maybe_self = if associated {
-                quote! { Self:: }
-            } else {
-                Default::default()
-            };
             let dispatch_fn = ItemFn {
                 attrs: vec![
                     parse_quote! { #[inline(always)] },
@@ -94,7 +88,7 @@ impl Specialization {
                         // Safety: this isn't actually safe, but this function is a hidden detail
                         // of the macro, and is only called when the target feature is available.
                         #[allow(clippy::undocumented_unsafe_blocks)]
-                        unsafe { #maybe_self#target_fn_ident::<#(#fn_params),*>(#(#args),*)#maybe_await }
+                        unsafe { #target_fn_ident::<#(#fn_params),*>(#(#args),*)#maybe_await }
                     }
                 }),
                 sig: outer_sig,
@@ -133,7 +127,6 @@ pub(crate) struct Dispatcher {
     pub sig: Signature,
     pub specializations: Vec<Specialization>,
     pub default: Block,
-    pub associated: bool,
     pub crate_path: Path,
 }
 
@@ -162,7 +155,7 @@ impl Dispatcher {
     fn feature_fns(&self) -> Result<Vec<ItemFn>> {
         let mut fns = Vec::new();
         for f in &self.specializations {
-            fns.extend(f.make_fn(&self.vis, &self.sig, &self.attrs, self.associated)?);
+            fns.extend(f.make_fn(&self.vis, &self.sig, &self.attrs)?);
         }
 
         // Create default fn
@@ -190,11 +183,6 @@ impl Dispatcher {
         let fn_params = util::fn_params(&self.sig);
         let (normalized_signature, argument_names) = util::normalize_signature(&self.sig);
         let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
-        let maybe_self = if self.associated {
-            quote! { Self:: }
-        } else {
-            Default::default()
-        };
         let return_if_detected =
                 self.specializations
                     .iter()
@@ -207,7 +195,7 @@ impl Dispatcher {
                                 #target_arch
                                 {
                                     if #features_detected {
-                                        return #maybe_self#function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
+                                        return #function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
                                     }
                                 }
                             })
@@ -219,7 +207,7 @@ impl Dispatcher {
         let block = parse_quote! {
             {
                 #(#return_if_detected)*
-                #maybe_self#default_fn::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
+                #default_fn::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
             }
         };
         ItemFn {
@@ -253,12 +241,6 @@ impl Dispatcher {
             return Err(Error::new(
                 Span::call_site(),
                 "indirect function dispatch does not support impl trait",
-            ));
-        }
-        if self.associated {
-            return Err(Error::new(
-                Span::call_site(),
-                "indirect function dispatch does not support associated functions",
             ));
         }
 
@@ -338,11 +320,6 @@ impl Dispatcher {
         let fn_params = util::fn_params(&self.sig);
         let (normalized_signature, argument_names) = util::normalize_signature(&self.sig);
         let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
-        let maybe_self = if self.associated {
-            quote! { Self:: }
-        } else {
-            Default::default()
-        };
         let crate_path = &self.crate_path;
         let ordered_targets = self
             .specializations
@@ -380,7 +357,7 @@ impl Dispatcher {
 
         let call_function = |function| {
             quote! {
-                #maybe_self#function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
+                #function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
             }
         };
 
@@ -433,8 +410,7 @@ impl ToTokens for Dispatcher {
         let dispatchers = match self.dispatcher {
             DispatchMethod::Default => {
                 if cfg!(feature = "std") {
-                    if self.associated
-                        || !crate::util::fn_params(&self.sig).is_empty()
+                    if !crate::util::fn_params(&self.sig).is_empty()
                         || self.sig.asyncness.is_some()
                         || util::impl_trait_present(&self.sig)
                     {
