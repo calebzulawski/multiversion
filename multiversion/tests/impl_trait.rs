@@ -1,4 +1,4 @@
-#[multiversion::multiversion(clones("x86_64+avx2"))]
+#[multiversion::multiversion(targets("x86_64+avx2"))]
 fn sum(input: impl AsRef<[i64]>) -> i64 {
     input.as_ref().iter().sum()
 }

@@ -1,24 +1,24 @@
 #![allow(clippy::needless_lifetimes)]
 
 #[rustversion::since(1.51)]
-#[multiversion::multiversion(versions(
-    clone = "x86_64+avx2+avx",
-    clone = "x86_64+avx",
-    clone = "x86+avx2+avx",
-    clone = "x86+avx",
-    clone = "x86+sse"
+#[multiversion::multiversion(targets(
+    "x86_64+avx2+avx",
+    "x86_64+avx",
+    "x86+avx2+avx",
+    "x86+avx",
+    "x86+sse"
 ))]
 fn pass<'a>(x: &'a i32) -> &'a i32 {
     x
 }
 
 #[rustversion::since(1.51)]
-#[multiversion::multiversion(versions(
-    clone = "x86_64+avx2+avx",
-    clone = "x86_64+avx",
-    clone = "x86+avx2+avx",
-    clone = "x86+avx",
-    clone = "x86+sse"
+#[multiversion::multiversion(targets(
+    "x86_64+avx2+avx",
+    "x86_64+avx",
+    "x86+avx2+avx",
+    "x86+avx",
+    "x86+sse"
 ))]
 fn double<'a, T: Copy + std::ops::AddAssign, const N: usize>(x: &'a mut [T; N]) -> &'a mut T {
     assert!(!x.is_empty());

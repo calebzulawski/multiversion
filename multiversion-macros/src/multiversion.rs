@@ -108,7 +108,7 @@ impl Function {
     fn new(attr: Punctuated<NestedMeta, Comma>, func: ItemFn) -> Result<Self, Error> {
         let mut map = MetaMap::try_from(attr)?;
 
-        let specializations = if let Some(clones) = map.try_remove("clones") {
+        let specializations = if let Some(clones) = map.try_remove("targets") {
             if let Meta::List(list) = clones {
                 list.nested
                     .into_iter()
@@ -127,26 +127,8 @@ impl Function {
                     "expected list of function clone targets",
                 ))
             }
-        } else if let Some(versions) = map.try_remove("versions") {
-            if let Meta::List(list) = versions {
-                list.nested
-                    .into_iter()
-                    .map(|x| {
-                        if let NestedMeta::Meta(meta) = x {
-                            meta.try_into()
-                        } else {
-                            Err(Error::new(x.span(), "unexpected value"))
-                        }
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-            } else {
-                Err(Error::new(
-                    versions.span(),
-                    "expected list of function versions",
-                ))
-            }
         } else {
-            Err(Error::new(map.span(), "expected `clones` or `versions`"))
+            Err(Error::new(map.span(), "expected `targets`"))
         }?;
 
         let dispatcher = map

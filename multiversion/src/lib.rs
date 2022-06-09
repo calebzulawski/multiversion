@@ -56,7 +56,7 @@
 //! ```
 //! use multiversion::multiversion;
 //!
-//! #[multiversion(clones("x86_64+avx", "x86+sse"))]
+//! #[multiversion(targets("x86_64+avx", "x86+sse"))]
 //! fn square(x: &mut [f32]) {
 //!     for v in x {
 //!         *v *= *v;
@@ -72,19 +72,9 @@
 /// Provides function multiversioning.
 ///
 /// Options:
-/// * `clones` or `versions`
-///   * `clones` takes a list of targets, such as `clones("x86_64+avx2", "x86_64+sse4.1")`.
-///   * `versions` takes a list of complete target specifications, either in the form of `clone =
-///   "x86_64+avx"` or `alternative(target = "x86_64+avx", fn = "foo::bar", unsafe = false)`
-///     * If target of the alternative function matches, it's called instead of the tagged
-///     function.
-///     * `target`: The target specification required by this alternative function version.
-///     * `fn`: The alternative function.
-///     * `unsafe`: Defaults to `false`.  If `true`, indicates an `unsafe` alternative function can
-///       be called on the specified target safely and that the safety contract is fulfilled.  If
-///       the function is unsafe for any other reason, remember to mark the tagged function `unsafe`
-///       and do not set this to true.
-///   * Functions version priority is first to last.  The first matching target is used.
+/// * `targets`
+///   * Takes a list of targets, such as `targets("x86_64+avx2", "x86_64+sse4.1")`.
+///   * Target priority is first to last.  The first matching target is used.
 /// * `crate_path`
 ///   * Specifies the location of the multiversion crate (useful for re-exporting).
 /// * `associated_fn`
@@ -104,21 +94,11 @@
 /// ## Function cloning
 /// The following compiles `square` three times, once for each target and once for the generic
 /// target.  Calling `square` selects the appropriate version at runtime.
+///
 /// ```
 /// use multiversion::multiversion;
 ///
-/// #[multiversion(versions(clone = "x86_64+avx", clone = "x86+sse"))]
-/// fn square(x: &mut [f32]) {
-///     for v in x {
-///         *v *= *v
-///     }
-/// }
-/// ```
-/// or more simply:
-/// ```
-/// use multiversion::multiversion;
-///
-/// #[multiversion(clones("x86_64+avx", "x86+sse"))]
+/// #[multiversion(targets("x86_64+avx", "x86+sse"))]
 /// fn square(x: &mut [f32]) {
 ///     for v in x {
 ///         *v *= *v

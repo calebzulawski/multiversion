@@ -1,8 +1,8 @@
 #[rustversion::since(1.39)]
-#[multiversion::multiversion(versions(
-    clone = "x86_64+avx",
-    clone = "x86_64+sse",
-    clone = "arm+neon",
+#[multiversion::multiversion(targets(
+    "x86_64+avx",
+    "x86_64+sse",
+    "arm+neon",
 ))]
 async fn async_add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
