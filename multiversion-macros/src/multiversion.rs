@@ -80,25 +80,8 @@ impl MetaMap {
     }
 }
 
-enum Specialization {
-    Clone { target: Target },
-}
-
-impl TryFrom<Meta> for Specialization {
-    type Error = Error;
-
-    fn try_from(meta: Meta) -> Result<Self, Self::Error> {
-        match meta_path_string(&meta)?.as_str() {
-            "clone" => Ok(Self::Clone {
-                target: Target::parse(&lit_str(meta_kv_value(meta)?)?)?,
-            }),
-            _ => Err(Error::new(meta.span(), "expected `clone` or `alternative`")),
-        }
-    }
-}
-
 struct Function {
-    specializations: Vec<Specialization>,
+    targets: Vec<Target>,
     func: ItemFn,
     crate_path: Path,
     dispatcher: DispatchMethod,
@@ -108,14 +91,13 @@ impl Function {
     fn new(attr: Punctuated<NestedMeta, Comma>, func: ItemFn) -> Result<Self, Error> {
         let mut map = MetaMap::try_from(attr)?;
 
-        let specializations = if let Some(clones) = map.try_remove("targets") {
-            if let Meta::List(list) = clones {
+        let targets = if let Some(targets) = map.try_remove("targets") {
+            if let Meta::List(list) = targets {
                 list.nested
                     .into_iter()
                     .map(|x| {
                         if let NestedMeta::Lit(lit) = x {
-                            let target = Target::parse(&lit_str(lit)?)?;
-                            Ok(Specialization::Clone { target })
+                            Ok(Target::parse(&lit_str(lit)?)?)
                         } else {
                             Err(Error::new(x.span(), "expected target string"))
                         }
@@ -123,7 +105,7 @@ impl Function {
                     .collect::<Result<Vec<_>, _>>()
             } else {
                 Err(Error::new(
-                    clones.span(),
+                    targets.span(),
                     "expected list of function clone targets",
                 ))
             }
@@ -153,7 +135,7 @@ impl Function {
             .unwrap_or_else(|| Ok(parse_quote!(multiversion)))?;
         map.finish()?;
         Ok(Self {
-            specializations,
+            targets,
             crate_path,
             dispatcher,
             func,
@@ -166,21 +148,11 @@ impl TryFrom<Function> for Dispatcher {
 
     fn try_from(item: Function) -> Result<Self, Self::Error> {
         Ok(Self {
-            specializations: item
-                .specializations
-                .iter()
-                .map(|specialization| match specialization {
-                    Specialization::Clone { target, .. } => crate::dispatcher::Specialization {
-                        target: target.clone(),
-                        block: item.func.block.as_ref().clone(),
-                        normalize: false,
-                    },
-                })
-                .collect(),
+            targets: item.targets,
+            block: *item.func.block,
             attrs: item.func.attrs,
             vis: item.func.vis,
             sig: item.func.sig,
-            default: *item.func.block,
             crate_path: item.crate_path,
             dispatcher: item.dispatcher,
         })
