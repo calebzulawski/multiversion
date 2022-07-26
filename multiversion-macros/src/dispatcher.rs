@@ -158,9 +158,9 @@ impl Dispatcher {
         Ok(fns)
     }
 
-    fn static_dispatcher_fn(&self) -> ItemFn {
+    fn static_dispatcher_fn(&self) -> Block {
         let fn_params = util::fn_params(&self.sig);
-        let (normalized_signature, argument_names) = util::normalize_signature(&self.sig);
+        let (_, argument_names) = util::normalize_signature(&self.sig);
         let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
         let return_if_detected = self.targets.iter().filter_map(|target| {
             if target.has_features_specified() {
@@ -180,21 +180,15 @@ impl Dispatcher {
             }
         });
         let default_fn = feature_fn_name(&self.sig.ident, None).1;
-        let block = parse_quote! {
+        parse_quote! {
             {
                 #(#return_if_detected)*
                 #default_fn::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
             }
-        };
-        ItemFn {
-            attrs: Vec::new(),
-            vis: self.vis.clone(),
-            sig: normalized_signature,
-            block: Box::new(block),
         }
     }
 
-    fn indirect_dispatcher_fn(&self) -> Result<ItemFn> {
+    fn indirect_dispatcher_fn(&self) -> Result<Block> {
         if !cfg!(feature = "std") {
             return Err(Error::new(
                 Span::call_site(),
@@ -251,9 +245,9 @@ impl Dispatcher {
         };
         let resolver_signature = Signature {
             ident: Ident::new("__resolver_fn", Span::call_site()),
-            ..normalized_signature.clone()
+            ..normalized_signature
         };
-        let block = parse_quote! {
+        Ok(parse_quote! {
             {
                 use core::sync::atomic::{AtomicPtr, Ordering};
                 #[cold]
@@ -273,16 +267,10 @@ impl Dispatcher {
                     __current_fn(#(#argument_names),*)
                 }
             }
-        };
-        Ok(ItemFn {
-            attrs: Vec::new(),
-            vis: self.vis.clone(),
-            sig: normalized_signature,
-            block: Box::new(block),
         })
     }
 
-    fn direct_dispatcher_fn(&self) -> Result<ItemFn> {
+    fn direct_dispatcher_fn(&self) -> Result<Block> {
         if !cfg!(feature = "std") {
             return Err(Error::new(
                 Span::call_site(),
@@ -291,7 +279,7 @@ impl Dispatcher {
         }
 
         let fn_params = util::fn_params(&self.sig);
-        let (normalized_signature, argument_names) = util::normalize_signature(&self.sig);
+        let (_, argument_names) = util::normalize_signature(&self.sig);
         let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
         let crate_path = &self.crate_path;
         let ordered_targets = self
@@ -345,7 +333,7 @@ impl Dispatcher {
                 1 => #arm,
             }
         };
-        let block = parse_quote! {
+        Ok(parse_quote! {
             {
                 #detect_index
                 use #crate_path::once_cell::race::OnceNonZeroUsize;
@@ -357,68 +345,69 @@ impl Dispatcher {
                     _ => unimplemented!(),
                 }
             }
-        };
-        Ok(ItemFn {
-            attrs: Vec::new(),
-            vis: self.vis.clone(),
-            sig: normalized_signature,
-            block: Box::new(block),
         })
     }
-}
 
-impl ToTokens for Dispatcher {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        tokens.extend(match self.feature_fns() {
-            Ok(val) => quote! { #(#val)* },
-            Err(err) => err.to_compile_error(),
-        });
-
-        let dispatchers = match self.dispatcher {
+    fn create_fn(&self) -> Result<ItemFn> {
+        let block = match self.dispatcher {
             DispatchMethod::Default => {
                 if cfg!(feature = "std") {
                     if !crate::util::fn_params(&self.sig).is_empty()
                         || self.sig.asyncness.is_some()
                         || util::impl_trait_present(&self.sig)
                     {
-                        vec![self.direct_dispatcher_fn()]
+                        self.direct_dispatcher_fn()?
                     } else {
-                        let indirect = self.indirect_dispatcher_fn().map(|f| {
-                            parse_quote! {
+                        let indirect = self.indirect_dispatcher_fn()?;
+                        let direct = self.direct_dispatcher_fn()?;
+                        parse_quote! {
+                            {
                                 #[cfg(not(any(
                                     target_feature = "retpoline",
                                     target_feature = "retpoline-indirect-branches",
                                     target_feature = "retpoline-indirect-calls",
                                 )))]
-                                #f
-                            }
-                        });
-                        let direct = self.direct_dispatcher_fn().map(|f| {
-                            parse_quote! {
+                                #indirect
                                 #[cfg(any(
                                     target_feature = "retpoline",
                                     target_feature = "retpoline-indirect-branches",
                                     target_feature = "retpoline-indirect-calls",
                                 ))]
-                                #f
+                                #direct
                             }
-                        });
-                        vec![indirect, direct]
+                        }
                     }
                 } else {
-                    vec![Ok(self.static_dispatcher_fn())]
+                    self.static_dispatcher_fn()
                 }
             }
-            DispatchMethod::Static => vec![Ok(self.static_dispatcher_fn())],
-            DispatchMethod::Direct => vec![self.direct_dispatcher_fn()],
-            DispatchMethod::Indirect => vec![self.indirect_dispatcher_fn()],
+            DispatchMethod::Static => self.static_dispatcher_fn(),
+            DispatchMethod::Direct => self.direct_dispatcher_fn()?,
+            DispatchMethod::Indirect => self.indirect_dispatcher_fn()?,
         };
-        for dispatcher in dispatchers {
-            tokens.extend(match dispatcher {
-                Ok(val) => val.into_token_stream(),
-                Err(err) => err.to_compile_error(),
-            })
-        }
+
+        let (normalized_signature, _) = util::normalize_signature(&self.sig);
+        let feature_fns = self.feature_fns()?;
+        Ok(ItemFn {
+            attrs: Vec::new(),
+            vis: self.vis.clone(),
+            sig: normalized_signature,
+            block: Box::new(parse_quote! {
+                {
+                    #(#feature_fns)*
+                    #block
+                }
+            }),
+        })
+    }
+}
+
+impl ToTokens for Dispatcher {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        tokens.extend(match self.create_fn() {
+            Ok(val) => val.into_token_stream(),
+            Err(err) => err.to_compile_error(),
+        })
     }
 }
 
