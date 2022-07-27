@@ -9,20 +9,18 @@ use syn::{
     LitStr, Path, Result, Signature, Visibility,
 };
 
-pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> (Ident, Ident) {
+pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
     if let Some(target) = target {
         if target.has_features_specified() {
-            let base = format!("{}_{}", ident, target.features_string());
-            return (
-                Ident::new(&format!("{}_version", base), ident.span()),
-                Ident::new(&format!("__{}_static_dispatch", base), ident.span()),
+            return Ident::new(
+                &format!("{}_{}_version", ident, target.features_string()),
+                ident.span(),
             );
         }
     }
 
     // If this is a default fn, it doesn't have a dedicated static dispatcher
-    let default = Ident::new(&format!("{}_default_version", ident), ident.span());
-    (default.clone(), default)
+    Ident::new(&format!("{}_default_version", ident), ident.span())
 }
 
 pub(crate) enum DispatchMethod {
@@ -60,7 +58,7 @@ impl Dispatcher {
     }
 
     fn target_fn(&self, target: &Target) -> Result<Vec<ItemFn>> {
-        let (fn_name, dispatch_fn_name) = feature_fn_name(&self.sig.ident, Some(target));
+        let fn_name = feature_fn_name(&self.sig.ident, Some(target));
 
         let mut target_attrs = vec![parse_quote! { #[inline] }, parse_quote! { #[doc(hidden)] }];
         target_attrs.extend(self.attrs.iter().cloned());
@@ -73,47 +71,18 @@ impl Dispatcher {
             }
 
             // create unsafe/target fn
-            let fn_params = crate::util::fn_params(&self.sig);
-            let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
-            let unsafe_sig = Signature {
-                ident: fn_name,
-                unsafety: parse_quote! { unsafe },
-                ..self.sig.clone()
-            };
             let target_fn = ItemFn {
                 attrs: target_attrs,
                 vis: self.vis.clone(),
-                sig: unsafe_sig,
+                sig: Signature {
+                    ident: fn_name,
+                    unsafety: parse_quote! { unsafe },
+                    ..self.sig.clone()
+                },
                 block: Box::new(self.block.clone()),
             };
 
-            // create safe/dispatch fn
-            let (outer_sig, args) = util::normalize_signature(&self.sig);
-            let outer_sig = Signature {
-                ident: dispatch_fn_name,
-                ..outer_sig
-            };
-            let target_fn_ident = &target_fn.sig.ident;
-            let dispatch_fn = ItemFn {
-                attrs: vec![
-                    parse_quote! { #[inline(always)] },
-                    parse_quote! { #[doc(hidden)] },
-                    target.target_arch(),
-                ],
-                vis: self.vis.clone(),
-                block: Box::new(parse_quote! {
-                    {
-                        // Safety: this isn't actually safe, but this function is a hidden detail
-                        // of the macro, and is only called when the target feature is available.
-                        #[allow(clippy::undocumented_unsafe_blocks)]
-                        unsafe { #target_fn_ident::<#(#fn_params),*>(#(#args),*)#maybe_await }
-                    }
-                }),
-                sig: outer_sig,
-            };
-            let mut fns = vec![dispatch_fn];
-            fns.extend(make_target_fn_items(Some(target), target_fn)?);
-            Ok(fns)
+            make_target_fn_items(Some(target), target_fn)
         } else {
             make_target_fn_items(
                 Some(target),
@@ -148,7 +117,7 @@ impl Dispatcher {
                 attrs,
                 vis: self.vis.clone(),
                 sig: Signature {
-                    ident: feature_fn_name(&self.sig.ident, None).1,
+                    ident: feature_fn_name(&self.sig.ident, None),
                     ..self.sig.clone()
                 },
                 block: Box::new(self.block.clone()),
@@ -166,12 +135,12 @@ impl Dispatcher {
             if target.has_features_specified() {
                 let target_arch = target.target_arch();
                 let features_detected = target.features_detected();
-                let function = feature_fn_name(&self.sig.ident, Some(target)).1;
+                let function = feature_fn_name(&self.sig.ident, Some(target));
                 Some(quote! {
                     #target_arch
                     {
                         if #features_detected {
-                            return #function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
+                            return unsafe { #function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await }
                         }
                     }
                 })
@@ -179,7 +148,7 @@ impl Dispatcher {
                 None
             }
         });
-        let default_fn = feature_fn_name(&self.sig.ident, None).1;
+        let default_fn = feature_fn_name(&self.sig.ident, None);
         parse_quote! {
             {
                 #(#return_if_detected)*
@@ -214,7 +183,10 @@ impl Dispatcher {
             ));
         }
 
-        let fn_ty = util::fn_type_from_signature(&self.sig)?;
+        let fn_ty = util::fn_type_from_signature(&Signature {
+            unsafety: parse_quote! { unsafe },
+            ..self.sig.clone()
+        })?;
         let (normalized_signature, argument_names) = util::normalize_signature(&self.sig);
 
         let feature_detection = {
@@ -222,7 +194,7 @@ impl Dispatcher {
                 if target.has_features_specified() {
                     let target_arch = target.target_arch();
                     let features_detected = target.features_detected();
-                    let function = feature_fn_name(&self.sig.ident, Some(target)).1;
+                    let function = feature_fn_name(&self.sig.ident, Some(target));
                     Some(quote! {
                        #target_arch
                        {
@@ -235,7 +207,7 @@ impl Dispatcher {
                     None
                 }
             });
-            let default_fn = feature_fn_name(&self.sig.ident, None).1;
+            let default_fn = feature_fn_name(&self.sig.ident, None);
             quote! {
                 fn __get_fn() -> #fn_ty {
                     #(#return_if_detected)*
@@ -255,7 +227,7 @@ impl Dispatcher {
                     #feature_detection
                     let __current_fn = __get_fn();
                     __DISPATCHED_FN.store(__current_fn as *mut (), Ordering::Relaxed);
-                    __current_fn(#(#argument_names),*)
+                    unsafe { __current_fn(#(#argument_names),*) }
                 }
                 static __DISPATCHED_FN: AtomicPtr<()> = AtomicPtr::new(__resolver_fn as *mut ());
                 let __current_ptr = __DISPATCHED_FN.load(Ordering::Relaxed);
@@ -312,14 +284,14 @@ impl Dispatcher {
 
         let call_function = |function| {
             quote! {
-                #function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
+                unsafe { #function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await }
             }
         };
 
         let match_arm = ordered_targets.iter().enumerate().map(|(index, target)| {
             let index = index + 2; // 0 is not cached, 1 is default features
             let target_arch = target.target_arch();
-            let function = feature_fn_name(&self.sig.ident, Some(target)).1;
+            let function = feature_fn_name(&self.sig.ident, Some(target));
             let arm = call_function(function);
             quote! {
                 #target_arch
@@ -327,7 +299,7 @@ impl Dispatcher {
             }
         });
         let default_arm = {
-            let default_function = feature_fn_name(&self.sig.ident, None).1;
+            let default_function = feature_fn_name(&self.sig.ident, None);
             let arm = call_function(default_function);
             quote! {
                 1 => #arm,
