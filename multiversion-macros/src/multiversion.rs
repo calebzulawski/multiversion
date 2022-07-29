@@ -26,7 +26,7 @@ fn meta_kv_value(meta: Meta) -> Result<Lit, Error> {
     }
 }
 
-fn lit_str(lit: Lit) -> Result<LitStr, Error> {
+fn lit_str(lit: &Lit) -> Result<&LitStr, Error> {
     if let Lit::Str(s) = lit {
         Ok(s)
     } else {
@@ -96,8 +96,13 @@ impl Function {
                 list.nested
                     .into_iter()
                     .map(|x| {
-                        if let NestedMeta::Lit(lit) = x {
-                            Ok(Target::parse(&lit_str(lit)?)?)
+                        if let NestedMeta::Lit(lit) = &x {
+                            let target = Target::parse(lit_str(lit)?)?;
+                            if target.has_features_specified() {
+                                Ok(target)
+                            } else {
+                                Err(Error::new(x.span(), "target must have features specified"))
+                            }
                         } else {
                             Err(Error::new(x.span(), "expected target string"))
                         }
@@ -116,8 +121,8 @@ impl Function {
         let dispatcher = map
             .try_remove("dispatcher")
             .map(|x| {
-                let s = lit_str(meta_kv_value(x)?)?;
-                match s.value().as_str() {
+                let s = meta_kv_value(x)?;
+                match lit_str(&s)?.value().as_str() {
                     "default" => Ok(DispatchMethod::Default),
                     "static" => Ok(DispatchMethod::Static),
                     "direct" => Ok(DispatchMethod::Direct),
@@ -131,7 +136,7 @@ impl Function {
             .unwrap_or_else(|| Ok(DispatchMethod::Default))?;
         let crate_path = map
             .try_remove("crate_path")
-            .map(|x| lit_str(meta_kv_value(x)?)?.parse())
+            .map(|x| lit_str(&meta_kv_value(x)?)?.parse())
             .unwrap_or_else(|| Ok(parse_quote!(multiversion)))?;
         map.finish()?;
         Ok(Self {

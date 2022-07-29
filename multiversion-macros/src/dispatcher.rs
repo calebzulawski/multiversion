@@ -41,62 +41,32 @@ pub(crate) struct Dispatcher {
 }
 
 impl Dispatcher {
-    // Create an attribute that disables an expression if we're on an architecture with a
-    // specialized default
-    fn cfg_if_not_defaulted(&self) -> Attribute {
-        let mut defaulted_arches = Vec::new();
-        for arch in self.targets.iter().filter_map(|target| {
-            if !target.has_features_specified() {
-                Some(target.arch())
-            } else {
-                None
-            }
-        }) {
-            defaulted_arches.push(arch);
-        }
-        parse_quote! { #[cfg(not(any(#(target_arch = #defaulted_arches),*)))] }
-    }
-
     fn target_fn(&self, target: &Target) -> Result<Vec<ItemFn>> {
+        assert!(target.has_features_specified());
+
         let fn_name = feature_fn_name(&self.sig.ident, Some(target));
 
         let mut target_attrs = vec![parse_quote! { #[inline] }, parse_quote! { #[doc(hidden)] }];
         target_attrs.extend(self.attrs.iter().cloned());
 
-        // If this target doesn't have any features, treat it as a default version
-        if target.has_features_specified() {
-            // if the original function is safe, tag it with #[safe_inner]
-            if self.sig.unsafety.is_none() {
-                target_attrs.push(parse_quote! { #[safe_inner] });
-            }
-
-            // create unsafe/target fn
-            let target_fn = ItemFn {
-                attrs: target_attrs,
-                vis: self.vis.clone(),
-                sig: Signature {
-                    ident: fn_name,
-                    unsafety: parse_quote! { unsafe },
-                    ..self.sig.clone()
-                },
-                block: Box::new(self.block.clone()),
-            };
-
-            make_target_fn_items(Some(target), target_fn)
-        } else {
-            make_target_fn_items(
-                Some(target),
-                ItemFn {
-                    attrs: target_attrs,
-                    vis: self.vis.clone(),
-                    sig: Signature {
-                        ident: fn_name,
-                        ..self.sig.clone()
-                    },
-                    block: Box::new(self.block.clone()),
-                },
-            )
+        // if the original function is safe, tag it with #[safe_inner]
+        if self.sig.unsafety.is_none() {
+            target_attrs.push(parse_quote! { #[safe_inner] });
         }
+
+        // create unsafe/target fn
+        let target_fn = ItemFn {
+            attrs: target_attrs,
+            vis: self.vis.clone(),
+            sig: Signature {
+                ident: fn_name,
+                unsafety: parse_quote! { unsafe },
+                ..self.sig.clone()
+            },
+            block: Box::new(self.block.clone()),
+        };
+
+        make_target_fn_items(Some(target), target_fn)
     }
 
     // Create specialized functions for arch/feature sets
@@ -110,7 +80,6 @@ impl Dispatcher {
         let mut attrs = self.attrs.clone();
         attrs.push(parse_quote! { #[inline(always)] });
         attrs.push(parse_quote! { #[doc(hidden)] });
-        attrs.push(self.cfg_if_not_defaulted());
         fns.extend(make_target_fn_items(
             None,
             ItemFn {
