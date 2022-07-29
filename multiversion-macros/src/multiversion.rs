@@ -7,8 +7,8 @@ use std::{
     convert::{TryFrom, TryInto},
 };
 use syn::{
-    parse::Parser, parse_quote, punctuated::Punctuated, spanned::Spanned, token::Comma, Error,
-    ItemFn, Lit, LitStr, Meta, NestedMeta, Path, ReturnType, Type,
+    parse::Parser, parse_quote, punctuated::Punctuated, spanned::Spanned, token::Comma, Attribute,
+    Error, ItemFn, Lit, LitStr, Meta, NestedMeta, Path, ReturnType, Type,
 };
 
 fn meta_path_string(meta: &Meta) -> Result<String, Error> {
@@ -82,6 +82,7 @@ impl MetaMap {
 
 struct Function {
     targets: Vec<Target>,
+    inner_attrs: Vec<Attribute>,
     func: ItemFn,
     crate_path: Path,
     dispatcher: DispatchMethod,
@@ -118,6 +119,22 @@ impl Function {
             Err(Error::new(map.span(), "expected `targets`"))
         }?;
 
+        let inner_attrs = if let Some(attrs) = map.try_remove("attrs") {
+            if let Meta::List(list) = attrs {
+                Ok(list
+                    .nested
+                    .into_iter()
+                    .map(|x| {
+                        parse_quote! { #[#x] }
+                    })
+                    .collect())
+            } else {
+                Err(Error::new(attrs.span(), "expected list of attributes"))
+            }
+        } else {
+            Ok(Vec::new())
+        }?;
+
         let dispatcher = map
             .try_remove("dispatcher")
             .map(|x| {
@@ -141,6 +158,7 @@ impl Function {
         map.finish()?;
         Ok(Self {
             targets,
+            inner_attrs,
             crate_path,
             dispatcher,
             func,
@@ -155,7 +173,7 @@ impl TryFrom<Function> for Dispatcher {
         Ok(Self {
             targets: item.targets,
             block: *item.func.block,
-            inner_attrs: Vec::new(),
+            inner_attrs: item.inner_attrs,
             outer_attrs: item.func.attrs,
             vis: item.func.vis,
             sig: item.func.sig,
