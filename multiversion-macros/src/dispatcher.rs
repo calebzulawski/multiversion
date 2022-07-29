@@ -1,7 +1,4 @@
-use crate::{
-    target::{make_target_fn_items, Target},
-    util,
-};
+use crate::{target::Target, util};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
@@ -32,7 +29,8 @@ pub(crate) enum DispatchMethod {
 
 pub(crate) struct Dispatcher {
     pub dispatcher: DispatchMethod,
-    pub attrs: Vec<Attribute>,
+    pub outer_attrs: Vec<Attribute>,
+    pub inner_attrs: Vec<Attribute>,
     pub vis: Visibility,
     pub sig: Signature,
     pub targets: Vec<Target>,
@@ -41,57 +39,45 @@ pub(crate) struct Dispatcher {
 }
 
 impl Dispatcher {
-    fn target_fn(&self, target: &Target) -> Result<Vec<ItemFn>> {
-        assert!(target.has_features_specified());
-
-        let fn_name = feature_fn_name(&self.sig.ident, Some(target));
-
-        let mut target_attrs = vec![parse_quote! { #[inline] }, parse_quote! { #[doc(hidden)] }];
-        target_attrs.extend(self.attrs.iter().cloned());
-
-        // if the original function is safe, tag it with #[safe_inner]
-        if self.sig.unsafety.is_none() {
-            target_attrs.push(parse_quote! { #[safe_inner] });
-        }
-
-        // create unsafe/target fn
-        let target_fn = ItemFn {
-            attrs: target_attrs,
-            vis: self.vis.clone(),
-            sig: Signature {
-                ident: fn_name,
-                unsafety: parse_quote! { unsafe },
-                ..self.sig.clone()
-            },
-            block: Box::new(self.block.clone()),
-        };
-
-        make_target_fn_items(Some(target), target_fn)
-    }
-
-    // Create specialized functions for arch/feature sets
+    // Create functions for each target
     fn feature_fns(&self) -> Result<Vec<ItemFn>> {
         let mut fns = Vec::new();
         for target in &self.targets {
-            fns.extend(self.target_fn(target)?);
-        }
-
-        // Create default fn
-        let mut attrs = self.attrs.clone();
-        attrs.push(parse_quote! { #[inline(always)] });
-        attrs.push(parse_quote! { #[doc(hidden)] });
-        fns.extend(make_target_fn_items(
-            None,
-            ItemFn {
+            // This function will always be unsafe, regardless of the safety of the multiversioned
+            // function.
+            //
+            // This could accidentally allow unsafe operations to end up in functions that appear
+            // safe, but the default function below will catch any misuses of unsafe, since it
+            // inherits the original function safety.
+            //
+            // When target_feature 1.1 is available, this function can also use the original
+            // function safety.
+            let mut attrs = self.inner_attrs.clone();
+            attrs.extend(target.fn_attrs());
+            fns.push(ItemFn {
                 attrs,
-                vis: self.vis.clone(),
+                vis: Visibility::Inherited,
                 sig: Signature {
-                    ident: feature_fn_name(&self.sig.ident, None),
+                    ident: feature_fn_name(&self.sig.ident, Some(target)),
+                    unsafety: parse_quote! { unsafe },
                     ..self.sig.clone()
                 },
                 block: Box::new(self.block.clone()),
+            })
+        }
+
+        // Create default fn
+        let mut attrs = self.inner_attrs.clone();
+        attrs.push(parse_quote! { #[inline(always)] });
+        fns.push(ItemFn {
+            attrs,
+            vis: self.vis.clone(),
+            sig: Signature {
+                ident: feature_fn_name(&self.sig.ident, None),
+                ..self.sig.clone()
             },
-        )?);
+            block: Box::new(self.block.clone()),
+        });
 
         Ok(fns)
     }
@@ -330,7 +316,7 @@ impl Dispatcher {
         let (normalized_signature, _) = util::normalize_signature(&self.sig);
         let feature_fns = self.feature_fns()?;
         Ok(ItemFn {
-            attrs: Vec::new(),
+            attrs: self.outer_attrs.clone(),
             vis: self.vis.clone(),
             sig: normalized_signature,
             block: Box::new(parse_quote! {

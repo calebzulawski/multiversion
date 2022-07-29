@@ -155,7 +155,8 @@ impl TryFrom<Function> for Dispatcher {
         Ok(Self {
             targets: item.targets,
             block: *item.func.block,
-            attrs: item.func.attrs,
+            inner_attrs: Vec::new(),
+            outer_attrs: item.func.attrs,
             vis: item.func.vis,
             sig: item.func.sig,
             crate_path: item.crate_path,

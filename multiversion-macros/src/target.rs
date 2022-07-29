@@ -73,6 +73,12 @@ impl Target {
             .collect()
     }
 
+    pub fn fn_attrs(&self) -> Vec<Attribute> {
+        let mut attrs = self.target_feature();
+        attrs.push(self.target_arch());
+        attrs
+    }
+
     pub fn features_detected(&self) -> TokenStream {
         if self.features.is_empty() {
             quote! { true }
