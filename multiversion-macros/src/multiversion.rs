@@ -160,11 +160,8 @@ pub(crate) fn make_multiversioned_fn(
 
     Ok(Dispatcher {
         targets,
-        block: *func.block,
+        func,
         inner_attrs,
-        outer_attrs: func.attrs,
-        vis: func.vis,
-        sig: func.sig,
         crate_path,
         dispatcher,
     }

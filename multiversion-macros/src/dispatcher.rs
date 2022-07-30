@@ -29,13 +29,10 @@ pub(crate) enum DispatchMethod {
 
 pub(crate) struct Dispatcher {
     pub dispatcher: DispatchMethod,
-    pub outer_attrs: Vec<Attribute>,
     pub inner_attrs: Vec<Attribute>,
-    pub vis: Visibility,
-    pub sig: Signature,
     pub targets: Vec<Target>,
-    pub block: Block,
     pub crate_path: Path,
+    pub func: ItemFn,
 }
 
 impl Dispatcher {
@@ -58,12 +55,12 @@ impl Dispatcher {
                 attrs,
                 vis: Visibility::Inherited,
                 sig: Signature {
-                    ident: feature_fn_name(&self.sig.ident, Some(target)),
+                    ident: feature_fn_name(&self.func.sig.ident, Some(target)),
                     unsafety: parse_quote! { unsafe },
-                    ..self.sig.clone()
+                    ..self.func.sig.clone()
                 },
-                block: Box::new(self.block.clone()),
-            })
+                block: self.func.block.clone(),
+            });
         }
 
         // Create default fn
@@ -71,26 +68,26 @@ impl Dispatcher {
         attrs.push(parse_quote! { #[inline(always)] });
         fns.push(ItemFn {
             attrs,
-            vis: self.vis.clone(),
+            vis: self.func.vis.clone(),
             sig: Signature {
-                ident: feature_fn_name(&self.sig.ident, None),
-                ..self.sig.clone()
+                ident: feature_fn_name(&self.func.sig.ident, None),
+                ..self.func.sig.clone()
             },
-            block: Box::new(self.block.clone()),
+            block: self.func.block.clone(),
         });
 
         Ok(fns)
     }
 
     fn static_dispatcher_fn(&self) -> Block {
-        let fn_params = util::fn_params(&self.sig);
-        let (_, argument_names) = util::normalize_signature(&self.sig);
-        let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
+        let fn_params = util::fn_params(&self.func.sig);
+        let (_, argument_names) = util::normalize_signature(&self.func.sig);
+        let maybe_await = self.func.sig.asyncness.map(|_| util::await_tokens());
         let return_if_detected = self.targets.iter().filter_map(|target| {
             if target.has_features_specified() {
                 let target_arch = target.target_arch();
                 let features_detected = target.features_detected();
-                let function = feature_fn_name(&self.sig.ident, Some(target));
+                let function = feature_fn_name(&self.func.sig.ident, Some(target));
                 Some(quote! {
                     #target_arch
                     {
@@ -103,7 +100,7 @@ impl Dispatcher {
                 None
             }
         });
-        let default_fn = feature_fn_name(&self.sig.ident, None);
+        let default_fn = feature_fn_name(&self.func.sig.ident, None);
         parse_quote! {
             {
                 #(#return_if_detected)*
@@ -119,19 +116,19 @@ impl Dispatcher {
                 "indirect function dispatch only available with the `std` cargo feature",
             ));
         }
-        if !util::fn_params(&self.sig).is_empty() {
+        if !util::fn_params(&self.func.sig).is_empty() {
             return Err(Error::new(
                 Span::call_site(),
                 "indirect function dispatch does not support type generic or const generic parameters",
             ));
         }
-        if self.sig.asyncness.is_some() {
+        if self.func.sig.asyncness.is_some() {
             return Err(Error::new(
                 Span::call_site(),
                 "indirect function dispatch does not support async functions",
             ));
         }
-        if util::impl_trait_present(&self.sig) {
+        if util::impl_trait_present(&self.func.sig) {
             return Err(Error::new(
                 Span::call_site(),
                 "indirect function dispatch does not support impl trait",
@@ -140,16 +137,16 @@ impl Dispatcher {
 
         let fn_ty = util::fn_type_from_signature(&Signature {
             unsafety: parse_quote! { unsafe },
-            ..self.sig.clone()
+            ..self.func.sig.clone()
         })?;
-        let (normalized_signature, argument_names) = util::normalize_signature(&self.sig);
+        let (normalized_signature, argument_names) = util::normalize_signature(&self.func.sig);
 
         let feature_detection = {
             let return_if_detected = self.targets.iter().filter_map(|target| {
                 if target.has_features_specified() {
                     let target_arch = target.target_arch();
                     let features_detected = target.features_detected();
-                    let function = feature_fn_name(&self.sig.ident, Some(target));
+                    let function = feature_fn_name(&self.func.sig.ident, Some(target));
                     Some(quote! {
                        #target_arch
                        {
@@ -162,7 +159,7 @@ impl Dispatcher {
                     None
                 }
             });
-            let default_fn = feature_fn_name(&self.sig.ident, None);
+            let default_fn = feature_fn_name(&self.func.sig.ident, None);
             quote! {
                 fn __get_fn() -> #fn_ty {
                     #(#return_if_detected)*
@@ -205,9 +202,9 @@ impl Dispatcher {
             ));
         }
 
-        let fn_params = util::fn_params(&self.sig);
-        let (_, argument_names) = util::normalize_signature(&self.sig);
-        let maybe_await = self.sig.asyncness.map(|_| util::await_tokens());
+        let fn_params = util::fn_params(&self.func.sig);
+        let (_, argument_names) = util::normalize_signature(&self.func.sig);
+        let maybe_await = self.func.sig.asyncness.map(|_| util::await_tokens());
         let crate_path = &self.crate_path;
         let ordered_targets = self
             .targets
@@ -246,7 +243,7 @@ impl Dispatcher {
         let match_arm = ordered_targets.iter().enumerate().map(|(index, target)| {
             let index = index + 2; // 0 is not cached, 1 is default features
             let target_arch = target.target_arch();
-            let function = feature_fn_name(&self.sig.ident, Some(target));
+            let function = feature_fn_name(&self.func.sig.ident, Some(target));
             let arm = call_function(function);
             quote! {
                 #target_arch
@@ -254,7 +251,7 @@ impl Dispatcher {
             }
         });
         let default_arm = {
-            let default_function = feature_fn_name(&self.sig.ident, None);
+            let default_function = feature_fn_name(&self.func.sig.ident, None);
             let arm = call_function(default_function);
             quote! {
                 1 => #arm,
@@ -279,9 +276,9 @@ impl Dispatcher {
         let block = match self.dispatcher {
             DispatchMethod::Default => {
                 if cfg!(feature = "std") {
-                    if !crate::util::fn_params(&self.sig).is_empty()
-                        || self.sig.asyncness.is_some()
-                        || util::impl_trait_present(&self.sig)
+                    if !crate::util::fn_params(&self.func.sig).is_empty()
+                        || self.func.sig.asyncness.is_some()
+                        || util::impl_trait_present(&self.func.sig)
                     {
                         self.direct_dispatcher_fn()?
                     } else {
@@ -313,11 +310,11 @@ impl Dispatcher {
             DispatchMethod::Indirect => self.indirect_dispatcher_fn()?,
         };
 
-        let (normalized_signature, _) = util::normalize_signature(&self.sig);
+        let (normalized_signature, _) = util::normalize_signature(&self.func.sig);
         let feature_fns = self.feature_fns()?;
         Ok(ItemFn {
-            attrs: self.outer_attrs.clone(),
-            vis: self.vis.clone(),
+            attrs: self.func.attrs.clone(),
+            vis: self.func.vis.clone(),
             sig: normalized_signature,
             block: Box::new(parse_quote! {
                 {
