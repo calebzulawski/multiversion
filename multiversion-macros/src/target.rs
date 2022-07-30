@@ -79,27 +79,24 @@ impl Target {
         attrs
     }
 
+    pub fn features_enabled(&self) -> TokenStream {
+        let feature = self.features.iter();
+        quote! {
+            true #( && core::cfg!(target_feature = #feature) )*
+        }
+    }
+
     pub fn features_detected(&self) -> TokenStream {
-        if self.features.is_empty() {
-            quote! { true }
-        } else {
-            let feature = self.features.iter();
-            if cfg!(feature = "std") {
-                let is_feature_detected = format_ident!(
-                    "is_{}_feature_detected",
-                    match self.architecture.as_str() {
-                        "x86_64" => "x86",
-                        f => f,
-                    }
-                );
-                quote! {
-                    true #( && std::#is_feature_detected!(#feature) )*
-                }
-            } else {
-                quote! {
-                    true #( && core::cfg!(target_feature = #feature) )*
-                }
+        let feature = self.features.iter();
+        let is_feature_detected = format_ident!(
+            "is_{}_feature_detected",
+            match self.architecture.as_str() {
+                "x86_64" => "x86",
+                f => f,
             }
+        );
+        quote! {
+            true #( && std::#is_feature_detected!(#feature) )*
         }
     }
 }

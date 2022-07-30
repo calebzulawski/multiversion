@@ -86,12 +86,12 @@ impl Dispatcher {
         let return_if_detected = self.targets.iter().filter_map(|target| {
             if target.has_features_specified() {
                 let target_arch = target.target_arch();
-                let features_detected = target.features_detected();
+                let features_enabled = target.features_enabled();
                 let function = feature_fn_name(&self.func.sig.ident, Some(target));
                 Some(quote! {
                     #target_arch
                     {
-                        if #features_detected {
+                        if #features_enabled {
                             return unsafe { #function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await }
                         }
                     }
