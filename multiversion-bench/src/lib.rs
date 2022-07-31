@@ -6,6 +6,7 @@ pub fn square(i: &[f32], o: &mut [f32]) {
     }
 }
 
+#[allow(clippy::missing_safety_doc)]
 #[target_feature(enable = "avx")]
 pub unsafe fn square_avx(i: &[f32], o: &mut [f32]) {
     for (i, o) in i.iter().zip(o) {
