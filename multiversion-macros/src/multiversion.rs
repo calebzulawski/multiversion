@@ -152,17 +152,12 @@ pub(crate) fn make_multiversioned_fn(
             }
         })
         .unwrap_or_else(|| Ok(DispatchMethod::Default))?;
-    let crate_path = map
-        .try_remove("crate_path")
-        .map(|x| lit_str(&meta_kv_value(x)?)?.parse())
-        .unwrap_or_else(|| Ok(parse_quote!(multiversion)))?;
     map.finish()?;
 
     Ok(Dispatcher {
         targets,
         func,
         inner_attrs,
-        crate_path,
         dispatcher,
     }
     .to_token_stream())

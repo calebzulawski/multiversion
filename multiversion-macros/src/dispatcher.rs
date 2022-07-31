@@ -3,7 +3,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
     parse_quote, punctuated::Punctuated, token, Attribute, Block, Error, Ident, ItemFn, ItemMod,
-    LitStr, Path, Result, Signature, Visibility,
+    LitStr, Result, Signature, Visibility,
 };
 
 pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
@@ -31,7 +31,6 @@ pub(crate) struct Dispatcher {
     pub dispatcher: DispatchMethod,
     pub inner_attrs: Vec<Attribute>,
     pub targets: Vec<Target>,
-    pub crate_path: Path,
     pub func: ItemFn,
 }
 
@@ -205,7 +204,6 @@ impl Dispatcher {
         let fn_params = util::fn_params(&self.func.sig);
         let (_, argument_names) = util::normalize_signature(&self.func.sig);
         let maybe_await = self.func.sig.asyncness.map(|_| util::await_tokens());
-        let crate_path = &self.crate_path;
         let ordered_targets = self
             .targets
             .iter()
@@ -214,22 +212,36 @@ impl Dispatcher {
 
         let detect_index = {
             let detect_feature = ordered_targets.iter().enumerate().map(|(index, target)| {
-                let index = index + 2; // 0 is not cached, 1 is default features
+                let index = index + 1; // 0 is default features
                 let target_arch = target.target_arch();
                 let features_detected = target.features_detected();
                 quote! {
                     #target_arch
                     {
                         if #features_detected {
-                            return core::num::NonZeroUsize::new(#index).unwrap()
+                            return #index
                         }
                     }
                 }
             });
             quote! {
-                fn __detect_index() -> core::num::NonZeroUsize {
-                    #(#detect_feature)*
-                    core::num::NonZeroUsize::new(1).unwrap() // default feature
+                fn __detect_index() -> usize {
+                    #[cold]
+                    fn __detect() -> usize {
+                        #(#detect_feature)*
+                        0
+                    }
+
+                    use core::sync::atomic::{AtomicUsize, Ordering};
+                    static SELECTED: AtomicUsize = AtomicUsize::new(usize::MAX);
+                    let selected = SELECTED.load(Ordering::Relaxed);
+                    if selected == usize::MAX {
+                        let selected = __detect();
+                        SELECTED.store(selected, Ordering::Relaxed);
+                        selected
+                    } else {
+                        selected
+                    }
                 }
             }
         };
@@ -241,7 +253,7 @@ impl Dispatcher {
         };
 
         let match_arm = ordered_targets.iter().enumerate().map(|(index, target)| {
-            let index = index + 2; // 0 is not cached, 1 is default features
+            let index = index + 1; // 0 is default features
             let target_arch = target.target_arch();
             let function = feature_fn_name(&self.func.sig.ident, Some(target));
             let arm = call_function(function);
@@ -250,23 +262,14 @@ impl Dispatcher {
                 #index => #arm,
             }
         });
-        let default_arm = {
-            let default_function = feature_fn_name(&self.func.sig.ident, None);
-            let arm = call_function(default_function);
-            quote! {
-                1 => #arm,
-            }
-        };
+        let call_default = call_function(feature_fn_name(&self.func.sig.ident, None));
         Ok(parse_quote! {
             {
                 #detect_index
-                use #crate_path::once_cell::race::OnceNonZeroUsize;
-                static __FN_INDEX: OnceNonZeroUsize = OnceNonZeroUsize::new();
-                let __index = __FN_INDEX.get_or_init(__detect_index).get();
-                match __index {
+                match __detect_index() {
                     #(#match_arm)*
-                    #default_arm
-                    _ => unimplemented!(),
+                    0 => #call_default,
+                    _ => unsafe { core::hint::unreachable_unchecked() },
                 }
             }
         })
