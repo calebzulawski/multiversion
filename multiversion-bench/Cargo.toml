@@ -5,8 +5,10 @@ authors = ["Caleb Zulawski <caleb.zulawski@gmail.com>"]
 edition = "2018"
 publish = false
 
-[dev-dependencies]
+[dependencies]
 multiversion = { path = "../multiversion" }
+
+[dev-dependencies]
 criterion = "0.3"
 rand = "0.7"
 
