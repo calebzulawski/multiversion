@@ -148,3 +148,5 @@ pub use once_cell;
 
 #[dispatcher("x86_64+avx2+avx", "x86_64+sse4.1")]
 pub mod simd_dispatcher {}
+
+pub mod features;
