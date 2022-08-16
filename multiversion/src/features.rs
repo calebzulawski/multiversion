@@ -23,10 +23,16 @@ macro_rules! const_slice_loop {
 }
 
 impl TargetFeatures {
+    /// Assert that the provided features are supported.
+    ///
+    /// # Safety
+    /// The provided features must be supported by the CPU.  This is usually indicated by feature
+    /// detection.
     pub const unsafe fn with_features(features: &'static [&'static str]) -> Self {
         Self(features)
     }
 
+    /// Check if a feature is supported by the target.
     pub const fn supported(&self, feature: &str) -> bool {
         // Check default features
         const_slice_loop! {
@@ -123,14 +129,10 @@ impl TargetFeatures {
 
             if avx512 {
                 Some(v512)
-            } else if supported!(self, "avx2") {
-                Some(v256)
-            } else if (is_f32 || is_f64) && avx {
+            } else if supported!(self, "avx2") || (is_f32 || is_f64) && avx {
                 // AVX supports f32 and f64
                 Some(v256)
-            } else if sse2 {
-                Some(v128)
-            } else if is_f32 && sse {
+            } else if sse2 || is_f32 && sse {
                 // SSE supports f32
                 Some(v128)
             } else {

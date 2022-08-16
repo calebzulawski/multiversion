@@ -7,7 +7,7 @@ fn main() {
     std::fs::write(
         &dest_path,
         &format!(
-            "const DEFAULT_FEATURES: &'static [&'static str] = &[{}];",
+            "const DEFAULT_FEATURES: &[&str] = &[{}];",
             features.join(", ")
         ),
     )
