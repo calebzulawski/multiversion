@@ -1,3 +1,6 @@
+// Default features from build.rs
+include!(concat!(env!("OUT_DIR"), "/default_features.rs"));
+
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct TargetFeatures(&'static [&'static str]);
 
@@ -25,6 +28,16 @@ impl TargetFeatures {
     }
 
     pub const fn supported(&self, feature: &str) -> bool {
+        // Check default features
+        const_slice_loop! {
+            for x in DEFAULT_FEATURES => {
+                if string::eq(x, feature) {
+                    return true;
+                }
+            }
+        }
+
+        // Check detected features
         const_slice_loop! {
             for x in self.0 => {
                 if string::eq(x, feature) {
@@ -32,10 +45,27 @@ impl TargetFeatures {
                 }
             }
         }
+
         false
     }
 
     const fn any_feature_starts_with(&self, needle: &str, except: Option<&str>) -> bool {
+        // Check default features
+        const_slice_loop! {
+            for feature in DEFAULT_FEATURES => {
+                if string::starts_with(feature, needle) {
+                    if let Some(except) = except {
+                        if !string::eq(feature, except) {
+                            return true;
+                        }
+                    } else {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // Check detected features
         const_slice_loop! {
             for feature in self.0 => {
                 if string::starts_with(feature, needle) {
@@ -49,6 +79,7 @@ impl TargetFeatures {
                 }
             }
         }
+
         false
     }
 
