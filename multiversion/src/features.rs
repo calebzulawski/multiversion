@@ -32,8 +32,8 @@ impl TargetFeatures {
         Self(features)
     }
 
-    /// Check if a feature is supported by the target.
-    pub const fn supported(&self, feature: &str) -> bool {
+    /// Check if the target supports a feature.
+    pub const fn supports(&self, feature: &str) -> bool {
         // Check default features
         const_slice_loop! {
             for x in DEFAULT_FEATURES => {
@@ -55,40 +55,6 @@ impl TargetFeatures {
         false
     }
 
-    const fn any_feature_starts_with(&self, needle: &str, except: Option<&str>) -> bool {
-        // Check default features
-        const_slice_loop! {
-            for feature in DEFAULT_FEATURES => {
-                if string::starts_with(feature, needle) {
-                    if let Some(except) = except {
-                        if !string::eq(feature, except) {
-                            return true;
-                        }
-                    } else {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        // Check detected features
-        const_slice_loop! {
-            for feature in self.0 => {
-                if string::starts_with(feature, needle) {
-                    if let Some(except) = except {
-                        if !string::eq(feature, except) {
-                            return true;
-                        }
-                    } else {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        false
-    }
-
     /// Returns a suggested number of elements for a SIMD vector of the provided type.
     ///
     /// The returned value is an approximation and not necessarily indicative of the optimal vector
@@ -98,12 +64,6 @@ impl TargetFeatures {
     /// * Variable length vector instruction sets, like ARM SVE or RISC-V V, are not taken into
     /// account.
     pub const fn suggested_simd_width<T: SimdType>(&self) -> Option<usize> {
-        macro_rules! supported {
-            { $features:expr, $feature:literal } => {
-                { cfg!(target_feature = $feature) || $features.supported($feature) }
-            }
-        }
-
         let is_f32 = string::eq(T::TYPE, "f32");
         let is_f64 = string::eq(T::TYPE, "f64");
 
@@ -112,27 +72,12 @@ impl TargetFeatures {
         let v512 = 64 / core::mem::size_of::<T>();
 
         if cfg!(any(target_arch = "x86_64", target_arch = "x86")) {
-            // Assume AVX-512 if any feature starting with "avx512" is present
-            let avx512 =
-                cfg!(target_feature = "avx512f") || self.any_feature_starts_with("avx512", None);
-
-            // Assume AVX if any of "avx", "avx2", or "fma" are present.
-            let avx =
-                supported!(self, "avx") || supported!(self, "avx2") || supported!(self, "fma");
-
-            // Assume SSE2 if any feature starting with "sse" is present, except "sse" itself.
-            let sse2 =
-                cfg!(target_feature = "sse2") || self.any_feature_starts_with("sse", Some("sse"));
-
-            // Assume SSE if any feature starting with "sse" is present.
-            let sse = cfg!(target_feature = "sse") || self.any_feature_starts_with("sse", None);
-
-            if avx512 {
+            if self.supports("avx512f") {
                 Some(v512)
-            } else if supported!(self, "avx2") || (is_f32 || is_f64) && avx {
+            } else if self.supports("avx2") || (is_f32 || is_f64) && self.supports("avx") {
                 // AVX supports f32 and f64
                 Some(v256)
-            } else if sse2 || is_f32 && sse {
+            } else if self.supports("sse2") || is_f32 && self.supports("sse") {
                 // SSE supports f32
                 Some(v128)
             } else {
@@ -140,25 +85,25 @@ impl TargetFeatures {
             }
         } else if cfg!(any(target_arch = "arm", target_arch = "aarch64")) {
             // Neon on armv7 doesn't support f64.
-            if supported!(self, "neon") && !(is_f64 && cfg!(target_arch = "arm")) {
+            if self.supports("neon") && !(is_f64 && cfg!(target_arch = "arm")) {
                 Some(v128)
             } else {
                 None
             }
         } else if cfg!(any(target_arch = "mips", target_arch = "mips64")) {
-            if supported!(self, "msa") {
+            if self.supports("msa") {
                 Some(v128)
             } else {
                 None
             }
         } else if cfg!(any(target_arch = "powerpc", target_arch = "powerpc64")) {
             // Altivec without VSX doesn't support f64.
-            if supported!(self, "vsx") || (supported!(self, "altivec") && !is_f64) {
+            if self.supports("vsx") || (self.supports("altivec") && !is_f64) {
                 Some(v128)
             } else {
                 None
             }
-        } else if cfg!(target_arch = "wasm32") && cfg!(target_feature = "simd128") {
+        } else if cfg!(target_arch = "wasm32") && self.supports("simd128") {
             Some(v128)
         } else {
             None
@@ -197,22 +142,6 @@ mod string {
             const_slice_loop! {
                 for (x, i) in a => {
                     if x != b[i] {
-                        return false;
-                    }
-                }
-            }
-            true
-        }
-    }
-
-    pub const fn starts_with(val: &str, needle: &str) -> bool {
-        let (val, needle) = (val.as_bytes(), needle.as_bytes());
-        if val.len() < needle.len() {
-            false
-        } else {
-            const_slice_loop! {
-                for (x, i) in needle => {
-                    if val[i] != x {
                         return false;
                     }
                 }
