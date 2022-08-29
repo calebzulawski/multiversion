@@ -4,6 +4,8 @@ use quote::{format_ident, quote};
 use std::convert::TryInto;
 use syn::{parse_quote, Attribute, Error, ItemFn, Lit, LitStr, Result};
 
+include!(concat!(env!("OUT_DIR"), "/implied_features.rs"));
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Target {
     architecture: String,
@@ -29,7 +31,7 @@ impl Target {
             return Err(Error::new(s.span(), "invalid architecture specifier"));
         };
 
-        let mut features = it
+        let specified_features = it
             .map(|x| {
                 if x.is_empty() {
                     Err(Error::new(s.span(), "feature string cannot be empty"))
@@ -38,6 +40,15 @@ impl Target {
                 }
             })
             .collect::<Result<Vec<_>>>()?;
+
+        let mut features = Vec::new();
+        for feature in specified_features {
+            features.extend(
+                implied_features(&architecture, &feature)
+                    .iter()
+                    .map(ToString::to_string),
+            );
+        }
         features.sort_unstable();
         features.dedup();
 
