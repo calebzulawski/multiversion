@@ -103,6 +103,7 @@ impl Target {
             "is_{}_feature_detected",
             match self.architecture.as_str() {
                 "x86_64" => "x86",
+                "risv64" => "riscv",
                 f => f,
             }
         );
