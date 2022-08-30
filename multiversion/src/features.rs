@@ -1,7 +1,7 @@
 // Default features from build.rs
 include!(concat!(env!("OUT_DIR"), "/default_features.rs"));
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct TargetFeatures(&'static [&'static str]);
 
 macro_rules! const_slice_loop {
@@ -30,6 +30,11 @@ impl TargetFeatures {
     /// detection.
     pub const unsafe fn with_features(features: &'static [&'static str]) -> Self {
         Self(features)
+    }
+
+    /// Create a new target instance, with only default features.
+    pub const fn new() -> Self {
+        Self(&[])
     }
 
     /// Check if the target supports a feature.

@@ -2,15 +2,6 @@
 //! This crate provides the [`target`]  and [`multiversion`] attributes for implementing
 //! function multiversioning.
 //!
-//! <table>
-//! <thead><tr><th>A</th><th>B</th></thead>
-//! <tbody>
-//! <tr><td>A</td><td>B</td>
-//! <tr><td rowspan=2>C</td><td>D</td></tr>
-//! <tr><td>E</td></tr>
-//! </tbody>
-//! </table>
-//!
 //! Many CPU architectures have a variety of instruction set extensions that provide additional
 //! functionality. Common examples are single instruction, multiple data (SIMD) extensions such as
 //! SSE and AVX on x86/x86-64 and NEON on ARM/AArch64. When available, these extended features can
@@ -86,6 +77,8 @@
 ///   * Target priority is first to last.  The first matching target is used.
 /// * `attrs`
 ///   * Takes a list of attributes to attach to each target clone function.
+/// * `selected_target`
+///   * Provides a const [`features::TargetFeatures`] indicating the selected target.
 /// * `dispatcher`
 ///   * Selects the preferred dispatcher. Defaults to `default`.
 ///     * `default`: If the `std` feature is enabled, uses either `direct` or `indirect`,

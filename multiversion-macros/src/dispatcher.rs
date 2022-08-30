@@ -32,6 +32,7 @@ pub(crate) struct Dispatcher {
     pub inner_attrs: Vec<Attribute>,
     pub targets: Vec<Target>,
     pub func: ItemFn,
+    pub selected_target: Option<Ident>,
 }
 
 impl Dispatcher {
@@ -50,6 +51,18 @@ impl Dispatcher {
             // function safety.
             let mut attrs = self.inner_attrs.clone();
             attrs.extend(target.fn_attrs());
+            let block = if let Some(selected_target) = &self.selected_target {
+                let features = target.features_slice();
+                let block = &self.func.block;
+                parse_quote! {
+                    {
+                        const #selected_target: multiversion::features::TargetFeatures = unsafe { multiversion::features::TargetFeatures::with_features(#features) };
+                        #block
+                    }
+                }
+            } else {
+                self.func.block.clone()
+            };
             fns.push(ItemFn {
                 attrs,
                 vis: Visibility::Inherited,
@@ -58,13 +71,24 @@ impl Dispatcher {
                     unsafety: parse_quote! { unsafe },
                     ..self.func.sig.clone()
                 },
-                block: self.func.block.clone(),
+                block,
             });
         }
 
         // Create default fn
         let mut attrs = self.inner_attrs.clone();
         attrs.push(parse_quote! { #[inline(always)] });
+        let block = if let Some(selected_target) = &self.selected_target {
+            let block = &self.func.block;
+            parse_quote! {
+                {
+                    const #selected_target: multiversion::features::TargetFeatures = multiversion::features::TargetFeatures::new();
+                    #block
+                }
+            }
+        } else {
+            self.func.block.clone()
+        };
         fns.push(ItemFn {
             attrs,
             vis: self.func.vis.clone(),
@@ -72,7 +96,7 @@ impl Dispatcher {
                 ident: feature_fn_name(&self.func.sig.ident, None),
                 ..self.func.sig.clone()
             },
-            block: self.func.block.clone(),
+            block,
         });
 
         Ok(fns)

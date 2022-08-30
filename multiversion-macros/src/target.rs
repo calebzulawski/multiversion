@@ -111,6 +111,13 @@ impl Target {
             true #( && std::#is_feature_detected!(#feature) )*
         }
     }
+
+    pub fn features_slice(&self) -> TokenStream {
+        let feature = self.features.iter().map(|f| format!("\"{f}\""));
+        quote! {
+            &[#(#feature),*]
+        }
+    }
 }
 
 impl std::convert::TryFrom<&Lit> for Target {
@@ -161,7 +168,8 @@ mod test {
         let s = LitStr::new("x86_64+sse4.2+xsave", Span::call_site());
         let target = Target::parse(&s).unwrap();
         assert_eq!(target.architecture, "x86_64");
-        assert_eq!(target.features, vec!["sse4.2", "xsave"]);
+        assert!(target.features.iter().any(|f| f == "sse4.2"));
+        assert!(target.features.iter().any(|f| f == "xsave"));
     }
 
     #[test]
@@ -187,25 +195,14 @@ mod test {
     }
 
     #[test]
-    fn generate_single_target_feature() {
-        let s = LitStr::new("x86+avx", Span::call_site());
-        let target = Target::parse(&s).unwrap();
-        assert_eq!(
-            target.target_feature(),
-            vec![parse_quote! { #[target_feature(enable = "avx")] }]
-        );
-    }
-
-    #[test]
-    fn generate_multiple_target_feature() {
+    fn generate_target_feature() {
         let s = LitStr::new("x86+avx+xsave", Span::call_site());
         let target = Target::parse(&s).unwrap();
-        assert_eq!(
-            target.target_feature(),
-            vec![
-                parse_quote! { #[target_feature(enable = "avx")] },
-                parse_quote! { #[target_feature(enable = "xsave")] }
-            ]
-        );
+        assert!(target
+            .target_feature()
+            .contains(&parse_quote! { #[target_feature(enable = "avx")] }));
+        assert!(target
+            .target_feature()
+            .contains(&parse_quote! { #[target_feature(enable = "xsave")] }));
     }
 }
