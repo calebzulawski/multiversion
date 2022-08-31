@@ -110,6 +110,33 @@ pub(crate) fn make_multiversioned_fn(
                     }
                 })
                 .collect::<Result<Vec<_>, _>>()
+        } else if let Meta::NameValue(nv) = targets {
+            match lit_str(&nv.lit)?.value().as_str() {
+                "simd" => {
+                    let targets = [
+                        // "x86_64+avx512f+avx512bw+avx512cd+avx512dq+avx512vl",
+                        "x86_64+avx2+fma",
+                        "x86_64+sse4.2",
+                        // "x86+avx512f+avx512bw+avx512cd+avx512dq+avx512vl",
+                        "x86+avx2+fma",
+                        "x86+sse4.2",
+                        "x86+sse2",
+                        "aarch64+neon",
+                        "arm+neon",
+                        "mips+msa",
+                        "mips64+msa",
+                        "powerpc+vsx",
+                        "powerpc+altivec",
+                        "powerpc64+vsx",
+                        "powerpc64+altivec",
+                    ];
+                    targets
+                        .iter()
+                        .map(|x| Target::parse(&LitStr::new(x, nv.lit.span())))
+                        .collect()
+                }
+                _ => Err(Error::new(nv.lit.span(), "expected \"simd\"")),
+            }
         } else {
             Err(Error::new(
                 targets.span(),
