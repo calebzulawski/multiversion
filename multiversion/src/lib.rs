@@ -143,12 +143,4 @@ pub use multiversion_macros::multiversion;
 /// [`multiversion`]: attr.multiversion.html
 pub use multiversion_macros::target;
 
-pub use multiversion_macros::dispatcher;
-
-#[doc(hidden)]
-pub use once_cell;
-
-#[dispatcher("x86_64+avx2+avx", "x86_64+sse4.1")]
-pub mod simd_dispatcher {}
-
 pub mod features;

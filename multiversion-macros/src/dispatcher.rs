@@ -1,10 +1,7 @@
 use crate::{target::Target, util};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
-use syn::{
-    parse_quote, punctuated::Punctuated, token, Attribute, Block, Error, Ident, ItemFn, ItemMod,
-    LitStr, Result, Signature, Visibility,
-};
+use syn::{parse_quote, Attribute, Block, Error, Ident, ItemFn, Result, Signature, Visibility};
 
 pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
     if let Some(target) = target {
@@ -360,112 +357,4 @@ impl ToTokens for Dispatcher {
             Err(err) => err.to_compile_error(),
         })
     }
-}
-
-pub(crate) fn derive_dispatcher(
-    targets: Punctuated<LitStr, token::Comma>,
-    dispatcher: ItemMod,
-) -> Result<TokenStream> {
-    if dispatcher.content.is_none() || !dispatcher.content.as_ref().unwrap().1.is_empty() {
-        return Err(Error::new(
-            dispatcher.content.unwrap().0.span,
-            "expected an empty module",
-        ));
-    }
-
-    let targets = targets
-        .iter()
-        .map(Target::parse)
-        .collect::<Result<Vec<_>>>()?;
-
-    let attrs = dispatcher.attrs;
-    let vis = dispatcher.vis;
-    let ident = dispatcher.ident;
-
-    let target_fn_name = |target: &Target| {
-        Ident::new(
-            &format!("features_{}", target.features_string()),
-            Span::call_site(),
-        )
-    };
-
-    let target_fns = targets.iter().map(|target| {
-        let target_arch = target.target_arch();
-        let target_features = target.target_feature();
-        let name = target_fn_name(target);
-        quote! {
-            #target_arch
-            #(#target_features)*
-            unsafe fn #name<Output>(f: impl FnOnce() -> Output) -> Output
-            {
-                f()
-            }
-        }
-    });
-
-    let target_arm = targets.iter().enumerate().map(|(i, target)| {
-        let name = target_fn_name(target);
-        let index = i + 1;
-        quote! { #index => unsafe { Self::#name(f) }, }
-    });
-
-    let detects = targets.iter().enumerate().map(|(i, target)| {
-        let detect = target.features_detected();
-        let index = i + 1;
-        quote! {
-            if #detect {
-                return #index;
-            }
-        }
-    });
-
-    Ok(quote! {
-        #(#attrs)* #vis mod #ident {
-            #[doc(hidden)]
-            pub struct Dispatcher;
-
-            impl Dispatcher {
-                pub fn dispatch() -> usize {
-                    #[cold]
-                    fn detect() -> usize {
-                        #(#detects)*
-                        0
-                    }
-
-                    use core::sync::atomic::{AtomicUsize, Ordering};
-                    static SELECTED: AtomicUsize = AtomicUsize::new(usize::MAX);
-                    let selected = SELECTED.load(Ordering::Relaxed);
-                    if selected == usize::MAX {
-                        let selected = detect();
-                        SELECTED.store(selected, Ordering::Relaxed);
-                        selected
-                    } else {
-                        selected
-                    }
-                }
-
-                #(#target_fns)*
-
-                pub fn none<Output>(f: impl FnOnce() -> Output) -> Output
-                {
-                    f()
-                }
-            }
-
-            #[doc(hidden)]
-            #[macro_export]
-            macro_rules! dispatch {
-                { $dispatcher:ty, $expr:expr } => {
-                    match <$dispatcher>::detect() {
-                        0 => Self::none(f),
-                        #(#target_arm)*
-                        _ => unsafe { std::hint::unreachable_unchecked() },
-                    }
-                }
-            }
-
-            #[doc(hidden)]
-            pub use dispatch;
-        }
-    })
 }
