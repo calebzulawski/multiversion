@@ -66,8 +66,8 @@ impl TargetFeatures {
     /// width.  A few caveats:
     /// * Every instruction set is different, and this function doesn't take into account any
     /// particular operations--it's just a guess, and should be accurate at least for basic arithmetic.
-    /// * Variable length vector instruction sets, like ARM SVE or RISC-V V, are not taken into
-    /// account.
+    /// * Variable length vector instruction sets (ARM SVE and RISC-V V) only use the minimum
+    /// vector length.
     pub const fn suggested_simd_width<T: SimdType>(&self) -> Option<usize> {
         let is_f32 = string::eq(T::TYPE, "f32");
         let is_f64 = string::eq(T::TYPE, "f64");
@@ -104,6 +104,13 @@ impl TargetFeatures {
         } else if cfg!(any(target_arch = "powerpc", target_arch = "powerpc64")) {
             // Altivec without VSX doesn't support f64.
             if self.supports("vsx") || (self.supports("altivec") && !is_f64) {
+                Some(v128)
+            } else {
+                None
+            }
+        } else if cfg!(any(target_arch = "riscv32", target_arch = "riscv64")) {
+            // V provides at least 128-bit vectors
+            if self.supports("v") {
                 Some(v128)
             } else {
                 None
