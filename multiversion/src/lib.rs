@@ -143,6 +143,9 @@ pub use multiversion_macros::multiversion;
 /// [`multiversion`]: attr.multiversion.html
 pub use multiversion_macros::target;
 
+/// Inherit the `target_feature` attributes of the selected target in a multiversioned function.
+pub use multiversion_macros::inherit_target;
+
 pub mod features;
 
 /// Get the selected target in a multiversioned function.

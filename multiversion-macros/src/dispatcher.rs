@@ -56,6 +56,7 @@ impl Dispatcher {
                         macro_rules! inherit_target {
                             { $f:item } => { #(#feature_attrs)* $f }
                         }
+                        pub(crate) use inherit_target;
                     }
                     #block
                 }
