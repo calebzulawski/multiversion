@@ -29,12 +29,39 @@ pub(crate) struct Dispatcher {
     pub inner_attrs: Vec<Attribute>,
     pub targets: Vec<Target>,
     pub func: ItemFn,
-    pub selected_target: Option<Ident>,
 }
 
 impl Dispatcher {
     // Create functions for each target
     fn feature_fns(&self) -> Result<Vec<ItemFn>> {
+        let make_block = |target: Option<&Target>| {
+            let block = &self.func.block;
+            let features = if let Some(target) = target {
+                let features = target.features_slice();
+                quote! { unsafe { multiversion::features::TargetFeatures::with_features(#features) } }
+            } else {
+                quote! { multiversion::features::TargetFeatures::new() }
+            };
+            let feature_attrs = if let Some(target) = target {
+                target.target_feature()
+            } else {
+                Vec::new()
+            };
+            parse_quote! {
+                {
+                    #[allow(unused)]
+                    pub mod __multiversion {
+                        pub const FEATURES: multiversion::features::TargetFeatures = #features;
+
+                        macro_rules! inherit_target {
+                            { $f:item } => { #(#feature_attrs)* $f }
+                        }
+                    }
+                    #block
+                }
+            }
+        };
+
         let mut fns = Vec::new();
         for target in &self.targets {
             // This function will always be unsafe, regardless of the safety of the multiversioned
@@ -48,18 +75,7 @@ impl Dispatcher {
             // function safety.
             let mut attrs = self.inner_attrs.clone();
             attrs.extend(target.fn_attrs());
-            let block = if let Some(selected_target) = &self.selected_target {
-                let features = target.features_slice();
-                let block = &self.func.block;
-                parse_quote! {
-                    {
-                        const #selected_target: multiversion::features::TargetFeatures = unsafe { multiversion::features::TargetFeatures::with_features(#features) };
-                        #block
-                    }
-                }
-            } else {
-                self.func.block.clone()
-            };
+            let block = make_block(Some(target));
             fns.push(ItemFn {
                 attrs,
                 vis: Visibility::Inherited,
@@ -75,17 +91,7 @@ impl Dispatcher {
         // Create default fn
         let mut attrs = self.inner_attrs.clone();
         attrs.push(parse_quote! { #[inline(always)] });
-        let block = if let Some(selected_target) = &self.selected_target {
-            let block = &self.func.block;
-            parse_quote! {
-                {
-                    const #selected_target: multiversion::features::TargetFeatures = multiversion::features::TargetFeatures::new();
-                    #block
-                }
-            }
-        } else {
-            self.func.block.clone()
-        };
+        let block = make_block(None);
         fns.push(ItemFn {
             attrs,
             vis: self.func.vis.clone(),

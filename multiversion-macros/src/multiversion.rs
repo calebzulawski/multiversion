@@ -180,14 +180,6 @@ pub(crate) fn make_multiversioned_fn(
         })
         .unwrap_or_else(|| Ok(DispatchMethod::Default))?;
 
-    let selected_target = map
-        .try_remove("selected_target")
-        .map(|x| {
-            let s = meta_kv_value(x)?;
-            lit_str(&s)?.parse()
-        })
-        .transpose()?;
-
     map.finish()?;
 
     Ok(Dispatcher {
@@ -195,7 +187,6 @@ pub(crate) fn make_multiversioned_fn(
         func,
         inner_attrs,
         dispatcher,
-        selected_target,
     }
     .to_token_stream())
 }

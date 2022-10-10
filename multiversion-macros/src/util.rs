@@ -2,8 +2,8 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
     parse_quote, spanned::Spanned, visit_mut::VisitMut, BareFnArg, Error, Expr, FnArg,
-    GenericParam, Ident, Item, ItemFn, Lifetime, Pat, PatIdent, PatType, Result, ReturnType,
-    Signature, Type, TypeBareFn,
+    GenericParam, Ident, Item, Lifetime, Pat, PatIdent, PatType, Result, ReturnType, Signature,
+    Type, TypeBareFn,
 };
 
 struct HasSelfType(bool);
@@ -16,15 +16,6 @@ impl VisitMut for HasSelfType {
     fn visit_item_mut(&mut self, _: &mut Item) {
         // Nested items may have `Self` tokens
     }
-}
-
-pub(crate) fn is_associated_fn(item: &mut ItemFn) -> bool {
-    if item.sig.receiver().is_some() {
-        return true;
-    }
-    let mut v = HasSelfType(false);
-    v.visit_item_fn_mut(item);
-    v.0
 }
 
 pub(crate) fn arg_exprs(sig: &Signature) -> Vec<Expr> {

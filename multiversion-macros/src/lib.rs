@@ -3,7 +3,6 @@ extern crate proc_macro;
 
 mod dispatcher;
 mod multiversion;
-mod safe_inner;
 mod target;
 mod util;
 
@@ -28,7 +27,7 @@ pub fn target(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let target = parse_macro_input!(attr as Option<syn::Lit>);
+    let target = parse_macro_input!(attr as syn::LitStr);
     let func = parse_macro_input!(input as ItemFn);
     match target::make_target_fn(target, func) {
         Ok(tokens) => tokens.into_token_stream(),

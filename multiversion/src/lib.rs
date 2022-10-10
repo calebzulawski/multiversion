@@ -144,3 +144,12 @@ pub use multiversion_macros::multiversion;
 pub use multiversion_macros::target;
 
 pub mod features;
+
+/// Get the selected target in a multiversioned function.
+///
+/// Returns the selected target as a [`features::TargetFeatures`].  This macro only works in a
+/// function marked with [`multiversion`].
+#[macro_export]
+macro_rules! selected_target {
+    {} => { __multiversion::FEATURES }
+}

@@ -1,7 +1,5 @@
-use crate::safe_inner::process_safe_inner;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use std::convert::TryInto;
 use syn::{parse_quote, Attribute, Error, ItemFn, Lit, LitStr, Result};
 
 include!(concat!(env!("OUT_DIR"), "/implied_features.rs"));
@@ -131,23 +129,11 @@ impl std::convert::TryFrom<&Lit> for Target {
     }
 }
 
-pub(crate) fn make_target_fn(target: Option<Lit>, func: ItemFn) -> Result<TokenStream> {
-    let target = target.as_ref().map(|s| s.try_into()).transpose()?;
-    let functions = make_target_fn_items(target.as_ref(), func)?;
-    Ok(quote! { #(#functions)* })
-}
-
-pub(crate) fn make_target_fn_items(
-    target: Option<&Target>,
-    mut func: ItemFn,
-) -> Result<Vec<ItemFn>> {
-    // Create the function
-    if let Some(target) = target {
-        let target_arch = target.target_arch();
-        let target_feature = target.target_feature();
-        func = parse_quote! { #target_arch #(#target_feature)* #func };
-    }
-    process_safe_inner(func)
+pub(crate) fn make_target_fn(target: LitStr, func: ItemFn) -> Result<TokenStream> {
+    let target = Target::parse(&target)?;
+    let target_arch = target.target_arch();
+    let target_feature = target.target_feature();
+    Ok(parse_quote! { #target_arch #(#target_feature)* #func })
 }
 
 #[cfg(test)]
