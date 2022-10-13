@@ -77,8 +77,6 @@
 ///   * Target priority is first to last.  The first matching target is used.
 /// * `attrs`
 ///   * Takes a list of attributes to attach to each target clone function.
-/// * `selected_target`
-///   * Provides a const [`features::TargetFeatures`] indicating the selected target.
 /// * `dispatcher`
 ///   * Selects the preferred dispatcher. Defaults to `default`.
 ///     * `default`: If the `std` feature is enabled, uses either `direct` or `indirect`,
