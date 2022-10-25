@@ -38,9 +38,9 @@ impl Dispatcher {
             let block = &self.func.block;
             let features = if let Some(target) = target {
                 let features = target.features_slice();
-                quote! { unsafe { multiversion::features::TargetFeatures::with_features(#features) } }
+                quote! { unsafe { multiversion::target::TargetFeatures::with_features(#features) } }
             } else {
-                quote! { multiversion::features::TargetFeatures::new() }
+                quote! { multiversion::target::TargetFeatures::new() }
             };
             let feature_attrs = if let Some(target) = target {
                 target.target_feature()
@@ -51,7 +51,7 @@ impl Dispatcher {
                 {
                     #[allow(unused)]
                     pub mod __multiversion {
-                        pub const FEATURES: multiversion::features::TargetFeatures = #features;
+                        pub const FEATURES: multiversion::target::TargetFeatures = #features;
 
                         macro_rules! inherit_target {
                             { $f:item } => { #(#feature_attrs)* $f }

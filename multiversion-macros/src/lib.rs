@@ -48,3 +48,12 @@ pub fn inherit_target(
     }
     .into()
 }
+
+#[proc_macro]
+pub fn selected(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    parse_macro_input!(input as Nothing);
+    quote! {
+        __multiversion::FEATURES
+    }
+    .into()
+}

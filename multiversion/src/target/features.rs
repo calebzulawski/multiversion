@@ -1,6 +1,7 @@
 // Default features from build.rs
 include!(concat!(env!("OUT_DIR"), "/default_features.rs"));
 
+/// Available target features.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct TargetFeatures(&'static [&'static str]);
 
@@ -23,6 +24,8 @@ macro_rules! const_slice_loop {
 }
 
 impl TargetFeatures {
+    #[doc(hidden)]
+    // This API might change in the future
     /// Assert that the provided features are supported.
     ///
     /// # Safety
@@ -38,6 +41,9 @@ impl TargetFeatures {
     }
 
     /// Check if the target supports a feature.
+    ///
+    /// This includes not just detected features, but features implied by other features, and
+    /// features enabled for the entire program.
     pub const fn supports(&self, feature: &str) -> bool {
         // Check default features
         const_slice_loop! {
@@ -127,6 +133,7 @@ mod sealed {
     pub trait Sealed {}
 }
 
+/// A helper trait for [`TargetFeatures::suggested_simd_width`]
 pub trait SimdType: sealed::Sealed {
     #[doc(hidden)]
     const TYPE: &'static str;

@@ -21,14 +21,10 @@
 //! # Capabilities
 //! The intention of this crate is to allow nearly any function to be multiversioned.
 //! The following cases are not supported:
-//! * trait methods
+//! * functions that use `self` or `Self`
 //! * `impl Trait` return types (arguments are fine)
 //!
 //! If any other functions do not work please file an issue on GitHub.
-//!
-//! The [`multiversion`] macro produces additional functions adjacent to the tagged function which
-//! do not correspond to a trait member.  If you would like to multiversion a trait method, instead
-//! try multiversioning a free function or struct method and calling it from the trait method.
 //!
 //! # Target specification strings
 //! Targets for the [`target`] and [`multiversion`] attributes are specified as a combination of
@@ -75,6 +71,8 @@
 /// * `targets`
 ///   * Takes a list of targets, such as `targets("x86_64+avx2", "x86_64+sse4.1")`.
 ///   * Target priority is first to last.  The first matching target is used.
+///   * May also take a special value `targets = "simd"` to automatically multiversion for common
+///     SIMD target features.
 /// * `attrs`
 ///   * Takes a list of attributes to attach to each target clone function.
 /// * `dispatcher`
@@ -82,10 +80,12 @@
 ///     * `default`: If the `std` feature is enabled, uses either `direct` or `indirect`,
 ///       attempting to choose the fastest choice.  If the `std` feature is not enabled, uses `static`.
 ///     * `static`: Detects features at compile time from the enabled target features.
-///     * `direct`: Detects features at runtime, and dispatches with direct function calls.
 ///     * `indirect`: Detect features at runtime, and dispatches with an indirect function call.
-///       Cannot be used for generic functions, associated functions, `async` functions, or
-///       functions that take or return an `impl Trait`.
+///       Cannot be used for generic functions, `async` functions, or functions that take or return an
+///       `impl Trait`.  This is usually the default.
+///     * `direct`: Detects features at runtime, and dispatches with direct function calls. This is
+///       the default on functions that do not support indirect dispatch, or in the presence of
+///       indirect branch exploit mitigations such as retpolines.
 ///
 /// # Examples
 /// ## Function cloning
@@ -104,18 +104,15 @@
 /// ```
 ///
 /// # Implementation details
-/// The function version dispatcher performs function selection on the first invocation.
-/// This is implemented with a static atomic variable containing the selected function.
+/// The `direct` and `indirect` function version dispatcher performs function selection on the
+/// first invocation. This is implemented with a static atomic variable containing the selected
+/// function.
 ///
 /// This implementation has a few benefits:
 /// * The function selector is typically only invoked once.  Subsequent calls are reduced to an
 /// atomic load.
 /// * If called in multiple threads, there is no contention.  Both threads may perform feature
 /// detection, but the atomic ensures these are synchronized correctly.
-/// * The selected function is represented by an integer, rather than a function pointer.  This
-/// allows caching function selection in generic and `async` functions.  This also allows the
-/// function calls to be direct, rather than indirect, improving performance in the presence of
-/// indirect branch exploit mitigations such as retpolines.
 ///
 /// [`target`]: attr.target.html
 /// [`multiversion`]: attr.multiversion.html
@@ -132,25 +129,50 @@ pub use multiversion_macros::multiversion;
 /// The [`target`] attribute is intended to be used in tandem with the [`multiversion`] attribute
 /// to produce hand-written multiversioned functions.
 ///
-/// # Helper attributes
-/// * `#[safe_inner]`
-///   * Indicates that the inner contents of the function are safe and requires the use of `unsafe`
-///     blocks to call `unsafe` functions.
-///
 /// [`target`]: attr.target.html
 /// [`multiversion`]: attr.multiversion.html
 pub use multiversion_macros::target;
 
 /// Inherit the `target_feature` attributes of the selected target in a multiversioned function.
+///
+/// # Example
+/// ```
+/// use multiversion::{multiversion, inherit_target};
+/// #[multiversion(targets = "simd")]
+/// fn select_sum() -> unsafe fn(x: &mut[f32]) -> f32 {
+///     #[inherit_target]
+///     unsafe fn sum(x: &mut[f32]) -> f32 {
+///         x.iter().sum()
+///     }
+///     sum as unsafe fn(&mut[f32]) -> f32
+/// }
 pub use multiversion_macros::inherit_target;
 
-pub mod features;
+/// Information related to the current target.
+pub mod target {
+    // used by docs
+    #[allow(unused)]
+    use super::*;
 
-/// Get the selected target in a multiversioned function.
-///
-/// Returns the selected target as a [`features::TargetFeatures`].  This macro only works in a
-/// function marked with [`multiversion`].
-#[macro_export]
-macro_rules! selected_target {
-    {} => { __multiversion::FEATURES }
+    /// Get the selected target in a multiversioned function.
+    ///
+    /// Returns the selected target as a [`TargetFeatures`].  This macro only works in a
+    /// function marked with [`multiversion`].
+    ///
+    /// # Example
+    /// ```
+    /// use multiversion::{multiversion, target};
+    ///
+    /// #[multiversion(targets = "simd")]
+    /// fn foo() {
+    ///     if target::selected!().supports("avx") {
+    ///         println!("AVX detected");
+    ///     } else {
+    ///         println!("AVX not detected");
+    ///     }
+    /// }
+    pub use multiversion_macros::selected;
+
+    mod features;
+    pub use features::*;
 }
