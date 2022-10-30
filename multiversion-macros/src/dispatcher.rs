@@ -69,13 +69,15 @@ impl Dispatcher {
             // function.
             //
             // This could accidentally allow unsafe operations to end up in functions that appear
-            // safe, but the default function below will catch any misuses of unsafe, since it
-            // inherits the original function safety.
+            // safe, but the deny lint should catch it.
             //
             // When target_feature 1.1 is available, this function can also use the original
             // function safety.
             let mut attrs = self.inner_attrs.clone();
             attrs.extend(target.fn_attrs());
+            if self.func.sig.unsafety.is_none() {
+                attrs.push(parse_quote!(#[deny(unsafe_op_in_unsafe_fn)]));
+            }
             let block = make_block(Some(target));
             fns.push(ItemFn {
                 attrs,
