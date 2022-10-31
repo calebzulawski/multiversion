@@ -15,7 +15,7 @@ include = [
     "/src/**",
     "/tests/**",
 ]
-edition = "2018"
+edition = "2021"
 
 [lib]
 proc-macro = true

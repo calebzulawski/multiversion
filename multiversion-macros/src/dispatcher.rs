@@ -36,7 +36,7 @@ impl Dispatcher {
     fn feature_fns(&self) -> Result<Vec<ItemFn>> {
         let make_block = |target: Option<&Target>| {
             let block = &self.func.block;
-            let features = if let Some(target) = target {
+            let features_init = if let Some(target) = target {
                 let features = target.features_slice();
                 quote! { unsafe { multiversion::target::TargetFeatures::with_features(#features) } }
             } else {
@@ -47,16 +47,37 @@ impl Dispatcher {
             } else {
                 Vec::new()
             };
+            let features = if let Some(target) = target {
+                let s = target
+                    .features()
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>();
+                s.join(",")
+            } else {
+                String::new()
+            };
             parse_quote! {
                 {
                     #[allow(unused)]
                     pub mod __multiversion {
-                        pub const FEATURES: multiversion::target::TargetFeatures = #features;
+                        pub const FEATURES: multiversion::target::TargetFeatures = #features_init;
 
                         macro_rules! inherit_target {
                             { $f:item } => { #(#feature_attrs)* $f }
                         }
+
+                        macro_rules! cfg_selected {
+                            { [$cfg:meta] $($attached:tt)* } => { #[multiversion::target::cfg_selected_impl(#features, $cfg)] $($attached)* };
+                        }
+
+                        macro_rules! cfg_attr_selected {
+                            { [$cfg:meta, $attr:meta] $($attached:tt)* } => { #[multiversion::target::cfg_attr_selected_impl(#features, $cfg, $attr)] $($attached)* };
+                        }
+
                         pub(crate) use inherit_target;
+                        pub(crate) use cfg_selected;
+                        pub(crate) use cfg_attr_selected;
                     }
                     #block
                 }

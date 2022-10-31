@@ -1,13 +1,15 @@
 //! Implementation crate for `multiversion`.
 extern crate proc_macro;
 
+mod cfg;
 mod dispatcher;
 mod multiversion;
 mod target;
 mod util;
 
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{parse::Nothing, parse_macro_input, ItemFn};
+use syn::{parse::Nothing, parse_macro_input, punctuated::Punctuated, ItemFn};
 
 #[proc_macro_attribute]
 pub fn multiversion(
@@ -54,6 +56,65 @@ pub fn selected(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     parse_macro_input!(input as Nothing);
     quote! {
         __multiversion::FEATURES
+    }
+    .into()
+}
+
+#[proc_macro_attribute]
+pub fn cfg_selected(
+    attr: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let attr = TokenStream::from(attr);
+    let input = TokenStream::from(input);
+    quote! {
+        __multiversion::cfg_selected!{ [#attr] #input }
+    }
+    .into()
+}
+
+#[proc_macro_attribute]
+pub fn cfg_attr_selected(
+    attr: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let attr = TokenStream::from(attr);
+    let input = TokenStream::from(input);
+    quote! {
+        __multiversion::cfg_attr_selected!{ [#attr] #input }
+    }
+    .into()
+}
+
+#[proc_macro_attribute]
+pub fn cfg_selected_impl(
+    attr: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let meta = parse_macro_input!(attr with Punctuated::parse_terminated);
+    let input = TokenStream::from(input);
+
+    let meta = cfg::transform(meta);
+    quote! {
+        #[cfg(#meta)]
+        #input
+    }
+    .into()
+}
+
+#[proc_macro_attribute]
+pub fn cfg_attr_selected_impl(
+    attr: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let mut meta = parse_macro_input!(attr with Punctuated::parse_terminated);
+    let input = TokenStream::from(input);
+
+    let attr = meta.pop().unwrap();
+    let meta = cfg::transform(meta);
+    quote! {
+        #[cfg_attr(#meta, #attr)]
+        #input
     }
     .into()
 }

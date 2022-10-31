@@ -173,6 +173,15 @@ pub mod target {
     /// }
     pub use multiversion_macros::selected;
 
+    /// Equivalent to `#[cfg]`, but considers `target_feature`s detected at runtime.
+    pub use multiversion_macros::cfg_selected;
+
+    /// Equivalent to `#[cfg_attr]`, but considers `target_feature`s detected at runtime.
+    pub use multiversion_macros::cfg_attr_selected;
+
+    #[doc(hidden)]
+    pub use multiversion_macros::{cfg_attr_selected_impl, cfg_selected_impl};
+
     mod features;
     pub use features::*;
 }

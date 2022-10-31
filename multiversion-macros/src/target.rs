@@ -56,6 +56,10 @@ impl Target {
         })
     }
 
+    pub fn features(&self) -> &[String] {
+        self.features.as_ref()
+    }
+
     pub fn features_string(&self) -> String {
         self.features.join("_").replace('.', "")
     }
@@ -111,7 +115,7 @@ impl Target {
     }
 
     pub fn features_slice(&self) -> TokenStream {
-        let feature = self.features.iter().map(|f| format!("\"{f}\""));
+        let feature = self.features.iter().map(|f| format!("{f}"));
         quote! {
             &[#(#feature),*]
         }
