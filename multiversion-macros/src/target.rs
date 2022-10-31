@@ -115,7 +115,7 @@ impl Target {
     }
 
     pub fn features_slice(&self) -> TokenStream {
-        let feature = self.features.iter().map(|f| format!("{f}"));
+        let feature = self.features.iter().map(ToString::to_string);
         quote! {
             &[#(#feature),*]
         }
