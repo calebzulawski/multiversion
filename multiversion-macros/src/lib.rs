@@ -52,7 +52,7 @@ pub fn inherit_target(
 }
 
 #[proc_macro]
-pub fn selected(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn selected_target(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     parse_macro_input!(input as Nothing);
     quote! {
         __multiversion::FEATURES
@@ -61,33 +61,33 @@ pub fn selected(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn cfg_selected(
+pub fn target_cfg(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     let attr = TokenStream::from(attr);
     let input = TokenStream::from(input);
     quote! {
-        __multiversion::cfg_selected!{ [#attr] #input }
+        __multiversion::target_cfg!{ [#attr] #input }
     }
     .into()
 }
 
 #[proc_macro_attribute]
-pub fn cfg_attr_selected(
+pub fn target_cfg_attr(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     let attr = TokenStream::from(attr);
     let input = TokenStream::from(input);
     quote! {
-        __multiversion::cfg_attr_selected!{ [#attr] #input }
+        __multiversion::target_cfg_attr!{ [#attr] #input }
     }
     .into()
 }
 
 #[proc_macro_attribute]
-pub fn cfg_selected_impl(
+pub fn target_cfg_impl(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
@@ -103,7 +103,7 @@ pub fn cfg_selected_impl(
 }
 
 #[proc_macro_attribute]
-pub fn cfg_attr_selected_impl(
+pub fn target_cfg_attr_impl(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {

@@ -67,17 +67,17 @@ impl Dispatcher {
                             { $f:item } => { #(#feature_attrs)* $f }
                         }
 
-                        macro_rules! cfg_selected {
-                            { [$cfg:meta] $($attached:tt)* } => { #[multiversion::target::cfg_selected_impl(#features, $cfg)] $($attached)* };
+                        macro_rules! target_cfg {
+                            { [$cfg:meta] $($attached:tt)* } => { #[multiversion::target::target_cfg_impl(#features, $cfg)] $($attached)* };
                         }
 
-                        macro_rules! cfg_attr_selected {
-                            { [$cfg:meta, $attr:meta] $($attached:tt)* } => { #[multiversion::target::cfg_attr_selected_impl(#features, $cfg, $attr)] $($attached)* };
+                        macro_rules! target_cfg_attr {
+                            { [$cfg:meta, $attr:meta] $($attached:tt)* } => { #[multiversion::target::target_cfg_attr_impl(#features, $cfg, $attr)] $($attached)* };
                         }
 
                         pub(crate) use inherit_target;
-                        pub(crate) use cfg_selected;
-                        pub(crate) use cfg_attr_selected;
+                        pub(crate) use target_cfg;
+                        pub(crate) use target_cfg_attr;
                     }
                     #block
                 }

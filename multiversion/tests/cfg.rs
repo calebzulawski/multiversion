@@ -1,23 +1,23 @@
 use multiversion::{
     multiversion,
-    target::{cfg_attr_selected, cfg_selected, selected},
+    target::{selected_target, target_cfg, target_cfg_attr},
 };
 
 #[test]
 fn cfg() {
     #[multiversion(targets = "simd")]
     fn foo() {
-        #[cfg_selected(all(target_arch = "x86_64", target_feature = "avx"))]
+        #[target_cfg(all(target_arch = "x86_64", target_feature = "avx"))]
         fn test_avx(has_avx: bool) {
             assert!(has_avx);
         }
 
-        #[cfg_selected(not(all(target_arch = "x86_64", target_feature = "avx")))]
+        #[target_cfg(not(all(target_arch = "x86_64", target_feature = "avx")))]
         fn test_avx(has_avx: bool) {
             assert!(!has_avx);
         }
 
-        let has_avx = std::env::consts::ARCH == "x86_64" && selected!().supports("avx");
+        let has_avx = std::env::consts::ARCH == "x86_64" && selected_target!().supports("avx");
         test_avx(has_avx);
     }
 
@@ -28,19 +28,19 @@ fn cfg() {
 fn cfg_attr() {
     #[multiversion(targets = "simd")]
     fn foo() {
-        #[cfg_attr_selected(all(target_arch = "x86_64", target_feature = "avx"), cfg(all()))]
-        #[cfg_attr_selected(not(all(target_arch = "x86_64", target_feature = "avx")), cfg(any()))]
+        #[target_cfg_attr(all(target_arch = "x86_64", target_feature = "avx"), cfg(all()))]
+        #[target_cfg_attr(not(all(target_arch = "x86_64", target_feature = "avx")), cfg(any()))]
         fn test_avx(has_avx: bool) {
             assert!(has_avx);
         }
 
-        #[cfg_attr_selected(all(target_arch = "x86_64", target_feature = "avx"), cfg(any()))]
-        #[cfg_attr_selected(not(all(target_arch = "x86_64", target_feature = "avx")), cfg(all()))]
+        #[target_cfg_attr(all(target_arch = "x86_64", target_feature = "avx"), cfg(any()))]
+        #[target_cfg_attr(not(all(target_arch = "x86_64", target_feature = "avx")), cfg(all()))]
         fn test_avx(has_avx: bool) {
             assert!(!has_avx);
         }
 
-        let has_avx = std::env::consts::ARCH == "x86_64" && selected!().supports("avx");
+        let has_avx = std::env::consts::ARCH == "x86_64" && selected_target!().supports("avx");
         test_avx(has_avx);
     }
 

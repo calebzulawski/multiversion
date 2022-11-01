@@ -87,8 +87,7 @@
 ///       the default on functions that do not support indirect dispatch, or in the presence of
 ///       indirect branch exploit mitigations such as retpolines.
 ///
-/// # Examples
-/// ## Function cloning
+/// # Example
 /// The following compiles `square` three times, once for each target and once for the generic
 /// target.  Calling `square` selects the appropriate version at runtime.
 ///
@@ -118,11 +117,11 @@
 /// [`multiversion`]: attr.multiversion.html
 pub use multiversion_macros::multiversion;
 
-/// Provides a less verbose equivalent to the `target_arch` and `target_feature` attributes.
+/// Provides a less verbose equivalent to the `cfg(target_arch)` and `target_feature` attributes.
 ///
-/// A function tagged with `#[target("[x86|x86_64]+avx+avx2")]`, for example, is equivalent to a
+/// A function tagged with `#[target("x86_64+avx+avx2")]`, for example, is equivalent to a
 /// function tagged with each of:
-/// * `#[target_arch(any(target_arch = "x86", target_arch = "x86_64"))]`
+/// * `#[cfg(target_arch = "x86_64")]`
 /// * `#[target_feature(enable = "avx")]`
 /// * `#[target_feature(enable = "avx2")]`
 ///
@@ -161,26 +160,26 @@ pub mod target {
     ///
     /// # Example
     /// ```
-    /// use multiversion::{multiversion, target};
+    /// use multiversion::{multiversion, target::selected_target};
     ///
     /// #[multiversion(targets = "simd")]
     /// fn foo() {
-    ///     if target::selected!().supports("avx") {
+    ///     if selected_target!().supports("avx") {
     ///         println!("AVX detected");
     ///     } else {
     ///         println!("AVX not detected");
     ///     }
     /// }
-    pub use multiversion_macros::selected;
+    pub use multiversion_macros::selected_target;
 
     /// Equivalent to `#[cfg]`, but considers `target_feature`s detected at runtime.
-    pub use multiversion_macros::cfg_selected;
+    pub use multiversion_macros::target_cfg;
 
     /// Equivalent to `#[cfg_attr]`, but considers `target_feature`s detected at runtime.
-    pub use multiversion_macros::cfg_attr_selected;
+    pub use multiversion_macros::target_cfg_attr;
 
     #[doc(hidden)]
-    pub use multiversion_macros::{cfg_attr_selected_impl, cfg_selected_impl};
+    pub use multiversion_macros::{target_cfg_attr_impl, target_cfg_impl};
 
     mod features;
     pub use features::*;
