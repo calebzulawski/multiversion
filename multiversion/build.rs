@@ -5,8 +5,8 @@ fn main() {
         .map(|x| x.split(',').map(|f| format!("\"{}\"", f)).collect())
         .unwrap_or_else(|_| Vec::new());
     std::fs::write(
-        &dest_path,
-        &format!(
+        dest_path,
+        format!(
             "const DEFAULT_FEATURES: &[&str] = &[{}];",
             features.join(", ")
         ),
