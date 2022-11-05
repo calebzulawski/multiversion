@@ -17,6 +17,34 @@ pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
     Ident::new(&format!("{}_default_version", ident), ident.span())
 }
 
+fn unsafe_fn_safe_block(f: ItemFn) -> ItemFn {
+    let safe_fn = ItemFn {
+        vis: Visibility::Inherited,
+        sig: Signature {
+            unsafety: None,
+            ident: Ident::new("__safe_inner", f.sig.ident.span()),
+            ..f.sig.clone()
+        },
+        ..f.clone()
+    };
+
+    let (unsafe_sig, args) = crate::util::normalize_signature(&f.sig);
+    let maybe_await = f.sig.asyncness.map(|_| crate::util::await_tokens());
+    let safe_ident = &safe_fn.sig.ident;
+    let fn_params = crate::util::fn_params(&unsafe_sig);
+    ItemFn {
+        block: parse_quote! {
+            {
+                #[inline(always)]
+                #safe_fn
+                #safe_ident::<#(#fn_params),*>(#(#args),*)#maybe_await
+            }
+        },
+        sig: unsafe_sig,
+        ..f
+    }
+}
+
 pub(crate) enum DispatchMethod {
     Default,
     Static,
@@ -92,24 +120,22 @@ impl Dispatcher {
             // This could accidentally allow unsafe operations to end up in functions that appear
             // safe, but the deny lint should catch it.
             //
-            // When target_feature 1.1 is available, this function can also use the original
+            // For now, nest a safe copy in the unsafe version. This is imperfect, but sound.
+            //
+            // When target_feature 1.1 is available, this function can instead use the original
             // function safety.
-            let mut attrs = self.inner_attrs.clone();
-            attrs.extend(target.fn_attrs());
-            if self.func.sig.unsafety.is_none() {
-                attrs.push(parse_quote!(#[deny(unsafe_op_in_unsafe_fn)]));
-            }
-            let block = make_block(Some(target));
-            fns.push(ItemFn {
-                attrs,
+            let mut f = unsafe_fn_safe_block(ItemFn {
+                attrs: self.inner_attrs.clone(),
                 vis: Visibility::Inherited,
                 sig: Signature {
                     ident: feature_fn_name(&self.func.sig.ident, Some(target)),
                     unsafety: parse_quote! { unsafe },
                     ..self.func.sig.clone()
                 },
-                block,
+                block: make_block(Some(target)),
             });
+            f.attrs.extend(target.fn_attrs());
+            fns.push(f);
         }
 
         // Create default fn
