@@ -1,7 +1,10 @@
 use crate::{target::Target, util};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
-use syn::{parse_quote, Attribute, Block, Error, Ident, ItemFn, Result, Signature, Visibility};
+use std::collections::HashSet;
+use syn::{
+    parse_quote, Attribute, Block, Error, Expr, Ident, ItemFn, Result, Signature, Visibility,
+};
 
 pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
     if let Some(target) = target {
@@ -155,20 +158,27 @@ impl Dispatcher {
         Ok(fns)
     }
 
-    fn static_dispatcher_fn(&self) -> Block {
+    fn call_target_fn(&self, target: Option<&Target>) -> Expr {
+        let function = feature_fn_name(&self.func.sig.ident, target);
         let fn_params = util::fn_params(&self.func.sig);
         let (_, argument_names) = util::normalize_signature(&self.func.sig);
         let maybe_await = self.func.sig.asyncness.map(|_| util::await_tokens());
+        parse_quote! {
+            unsafe { #function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await }
+        }
+    }
+
+    fn static_dispatcher_fn(&self) -> Block {
         let return_if_detected = self.targets.iter().filter_map(|target| {
             if target.has_features_specified() {
                 let target_arch = target.target_arch();
                 let features_enabled = target.features_enabled();
-                let function = feature_fn_name(&self.func.sig.ident, Some(target));
+                let call = self.call_target_fn(Some(target));
                 Some(quote! {
                     #target_arch
                     {
                         if #features_enabled {
-                            return unsafe { #function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await }
+                            return #call
                         }
                     }
                 })
@@ -176,11 +186,11 @@ impl Dispatcher {
                 None
             }
         });
-        let default_fn = feature_fn_name(&self.func.sig.ident, None);
+        let call_default = self.call_target_fn(None);
         parse_quote! {
             {
                 #(#return_if_detected)*
-                #default_fn::<#(#fn_params),*>(#(#argument_names),*)#maybe_await
+                #call_default
             }
         }
     }
@@ -278,9 +288,6 @@ impl Dispatcher {
             ));
         }
 
-        let fn_params = util::fn_params(&self.func.sig);
-        let (_, argument_names) = util::normalize_signature(&self.func.sig);
-        let maybe_await = self.func.sig.asyncness.map(|_| util::await_tokens());
         let ordered_targets = self
             .targets
             .iter()
@@ -323,23 +330,16 @@ impl Dispatcher {
             }
         };
 
-        let call_function = |function| {
-            quote! {
-                unsafe { #function::<#(#fn_params),*>(#(#argument_names),*)#maybe_await }
-            }
-        };
-
         let match_arm = ordered_targets.iter().enumerate().map(|(index, target)| {
             let index = index + 1; // 0 is default features
             let target_arch = target.target_arch();
-            let function = feature_fn_name(&self.func.sig.ident, Some(target));
-            let arm = call_function(function);
+            let arm = self.call_target_fn(Some(target));
             quote! {
                 #target_arch
                 #index => #arm,
             }
         });
-        let call_default = call_function(feature_fn_name(&self.func.sig.ident, None));
+        let call_default = self.call_target_fn(None);
         Ok(parse_quote! {
             {
                 #detect_index
@@ -353,6 +353,19 @@ impl Dispatcher {
     }
 
     fn create_fn(&self) -> Result<ItemFn> {
+        //
+        // First, we determine which dispatcher to use.
+        //
+        // If the dispatcher is unspecified, decide on the following criteria:
+        // * If the std feature is not enabled, dispatch statically, since we can't do CPU feature
+        //   detection.
+        // * If the function is generic, async, or has impl Trait, use direct dispatch, since we
+        //   can't take a function pointer.
+        // * If any retpoline features are enabled use direct dispatch, since retpolines hurt
+        //   performance of indirect dispatch significantly.
+        // * Otherwise, prefer indirect dispatch, since it appears to have better performance on
+        //   average.  On machines with worse branch prediction, it may be significantly better.
+        //
         let block = match self.dispatcher {
             DispatchMethod::Default => {
                 if cfg!(feature = "std") {
@@ -390,6 +403,44 @@ impl Dispatcher {
             DispatchMethod::Indirect => self.indirect_dispatcher_fn()?,
         };
 
+        //
+        // If we already know that the current build target supports the best function choice, we
+        // can skip dispatching entirely.
+        //
+        // Here we check for one of two possibilities:
+        // * If the globally enabled features (the target-feature or target-cpu codegen options)
+        //   already support the highest priority function, skip dispatch entirely and call that
+        //   function.
+        // * If the current target isn't specified in the multiversioned list at all, we can skip
+        //   dispatch entirely and call the default function.
+        //
+        let mut specified_arches = HashSet::new(); // architectures that have a clone at all
+        let mut skipped_targets = Vec::new(); // targets that don't require dispatch
+        let mut skips = Vec::new(); // dispatch skipping code
+        for target in &self.targets {
+            let arch = target.arch();
+            let feature = target.features();
+            if specified_arches.insert(arch) {
+                let call = self.call_target_fn(Some(target));
+                let skipped_target =
+                    quote! { all(target_arch = #arch #(, target_feature = #feature)*) };
+                skipped_targets.push(skipped_target.clone());
+                skips.push(quote! {
+                    #[cfg(#skipped_target)]
+                    { #call }
+                });
+            }
+        }
+
+        let specified_arches = specified_arches.iter();
+        let call_default = self.call_target_fn(None);
+        let defaulted_target = quote! { not(any(#(target_arch = #specified_arches),*)) };
+        skipped_targets.push(defaulted_target.clone());
+        skips.push(quote! {
+            #[cfg(#defaulted_target)]
+            { #call_default }
+        });
+
         let (normalized_signature, _) = util::normalize_signature(&self.func.sig);
         let feature_fns = self.feature_fns()?;
         Ok(ItemFn {
@@ -399,6 +450,10 @@ impl Dispatcher {
             block: Box::new(parse_quote! {
                 {
                     #(#feature_fns)*
+
+                    #(#skips)*
+
+                    #[cfg(not(any(#(#skipped_targets),*)))]
                     #block
                 }
             }),

@@ -26,6 +26,10 @@ fn direct_dispatch() {}
 )]
 fn indirect_dispatch() {}
 
+// Since x86_64 always has sse, this should never result in runtime dispatch
+#[multiversion(targets("x86_64+sse"), dispatcher = "default")]
+fn skip_dispatch() {}
+
 #[test]
 fn dispatchers() {
     default_dispatch();
@@ -34,4 +38,5 @@ fn dispatchers() {
     direct_dispatch();
     #[cfg(feature = "std")]
     indirect_dispatch();
+    skip_dispatch();
 }

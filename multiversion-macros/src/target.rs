@@ -56,6 +56,10 @@ impl Target {
         })
     }
 
+    pub fn arch(&self) -> &str {
+        &self.architecture
+    }
+
     pub fn features(&self) -> &[String] {
         self.features.as_ref()
     }
