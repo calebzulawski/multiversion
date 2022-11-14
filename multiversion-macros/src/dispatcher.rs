@@ -67,11 +67,9 @@ impl Dispatcher {
     fn feature_fns(&self) -> Result<Vec<ItemFn>> {
         let make_block = |target: Option<&Target>| {
             let block = &self.func.block;
-            let features_init = if let Some(target) = target {
-                let features = target.features_slice();
-                quote! { unsafe { multiversion::target::TargetFeatures::with_features(#features) } }
-            } else {
-                quote! { multiversion::target::TargetFeatures::new() }
+            let features = target.map(|t| t.features()).unwrap_or(&[]);
+            let features_init = quote! {
+                (multiversion::target_features::CURRENT_TARGET)#(.with_feature_str(#features))*
             };
             let feature_attrs = if let Some(target) = target {
                 target.target_feature()
@@ -92,7 +90,7 @@ impl Dispatcher {
                 {
                     #[allow(unused)]
                     pub mod __multiversion {
-                        pub const FEATURES: multiversion::target::TargetFeatures = #features_init;
+                        pub const FEATURES: multiversion::target::Target = #features_init;
 
                         macro_rules! inherit_target {
                             { $f:item } => { #(#feature_attrs)* $f }

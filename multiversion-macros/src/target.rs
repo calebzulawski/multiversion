@@ -1,8 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{parse_quote, Attribute, Error, ItemFn, Lit, LitStr, Result};
-
-include!(concat!(env!("OUT_DIR"), "/implied_features.rs"));
+use target_features::{Architecture, Feature};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Target {
@@ -41,10 +40,13 @@ impl Target {
 
         let mut features = Vec::new();
         for feature in specified_features {
+            features.push(feature.to_string());
             features.extend(
-                implied_features(&architecture, &feature)
+                Feature::new(Architecture::from_str(&architecture), &feature)
+                    .map_err(|e| Error::new(s.span(), format!("{feature}: {e}")))?
+                    .implies()
                     .iter()
-                    .map(ToString::to_string),
+                    .map(|f| f.name().to_string()),
             );
         }
         features.sort_unstable();
@@ -115,13 +117,6 @@ impl Target {
         );
         quote! {
             true #( && std::#is_feature_detected!(#feature) )*
-        }
-    }
-
-    pub fn features_slice(&self) -> TokenStream {
-        let feature = self.features.iter().map(ToString::to_string);
-        quote! {
-            &[#(#feature),*]
         }
     }
 }

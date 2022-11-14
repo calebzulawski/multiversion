@@ -23,6 +23,7 @@ std = ["multiversion-macros/std"]
 
 [dependencies]
 multiversion-macros = { version = "0.6.1", path = "../multiversion-macros", default-features = false }
+target-features = { git = "https://github.com/calebzulawski/target-features" }
 
 [dev-dependencies]
 rustversion = "1"

@@ -17,7 +17,8 @@ fn cfg() {
             assert!(!has_avx);
         }
 
-        let has_avx = std::env::consts::ARCH == "x86_64" && selected_target!().supports("avx");
+        let has_avx =
+            std::env::consts::ARCH == "x86_64" && selected_target!().supports_feature_str("avx");
         test_avx(has_avx);
     }
 
@@ -40,7 +41,8 @@ fn cfg_attr() {
             assert!(!has_avx);
         }
 
-        let has_avx = std::env::consts::ARCH == "x86_64" && selected_target!().supports("avx");
+        let has_avx =
+            std::env::consts::ARCH == "x86_64" && selected_target!().supports_feature_str("avx");
         test_avx(has_avx);
     }
 

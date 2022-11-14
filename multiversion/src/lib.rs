@@ -155,7 +155,7 @@ pub mod target {
 
     /// Get the selected target in a multiversioned function.
     ///
-    /// Returns the selected target as a [`TargetFeatures`].  This macro only works in a
+    /// Returns the selected target as a [`Target`].  This macro only works in a
     /// function marked with [`multiversion`].
     ///
     /// # Example
@@ -164,7 +164,7 @@ pub mod target {
     ///
     /// #[multiversion(targets = "simd")]
     /// fn foo() {
-    ///     if selected_target!().supports("avx") {
+    ///     if selected_target!().supports_feature_str("avx") {
     ///         println!("AVX detected");
     ///     } else {
     ///         println!("AVX not detected");
@@ -181,6 +181,9 @@ pub mod target {
     #[doc(hidden)]
     pub use multiversion_macros::{target_cfg_attr_impl, target_cfg_impl};
 
-    mod features;
-    pub use features::*;
+    #[doc(no_inline)]
+    pub use target_features::Target;
 }
+
+#[doc(hidden)]
+pub use target_features;

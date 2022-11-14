@@ -1,5 +1,0 @@
-[workspace]
-members = [
-    "generate",
-    "list-features",
-]
