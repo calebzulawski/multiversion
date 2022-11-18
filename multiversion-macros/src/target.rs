@@ -17,8 +17,15 @@ impl Target {
 
         let architecture = it
             .next()
+            .ok_or_else(|| Error::new(s.span(), "expected architecture specifier"))?;
+
+        // Architecture can be either "architecture" or "architecture/cpu"
+        let mut maybe_cpu = architecture.splitn(2, |c| c == '/');
+        let architecture = maybe_cpu
+            .next()
             .ok_or_else(|| Error::new(s.span(), "expected architecture specifier"))?
             .to_string();
+        let cpu = maybe_cpu.next();
 
         if architecture.is_empty()
             || !architecture
@@ -38,19 +45,27 @@ impl Target {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let mut features = Vec::new();
-        for feature in specified_features {
-            features.push(feature.to_string());
-            features.extend(
-                Feature::new(Architecture::from_str(&architecture), &feature)
-                    .map_err(|e| Error::new(s.span(), format!("{feature}: {e}")))?
-                    .implies()
-                    .iter()
-                    .map(|f| f.name().to_string()),
-            );
-        }
+        let target = {
+            let architecture = Architecture::from_str(&architecture);
+            let mut target = if let Some(cpu) = cpu {
+                target_features::Target::from_cpu(architecture, cpu)
+                    .map_err(|_| Error::new(s.span(), format!("unknown target CPU: {cpu}")))?
+            } else {
+                target_features::Target::new(architecture)
+            };
+            for feature in specified_features {
+                target =
+                    target.with_feature(Feature::new(architecture, &feature).map_err(|_| {
+                        Error::new(s.span(), format!("unknown target feature: {feature}"))
+                    })?);
+            }
+            target
+        };
+        let mut features = target
+            .features()
+            .map(|f| f.name().to_string())
+            .collect::<Vec<_>>();
         features.sort_unstable();
-        features.dedup();
 
         Ok(Self {
             architecture,
@@ -145,6 +160,9 @@ mod test {
     use proc_macro2::Span;
 
     #[test]
+    fn parse_architecture() {}
+
+    #[test]
     fn parse_no_features() {
         let s = LitStr::new("x86", Span::call_site());
         let target = Target::parse(&s).unwrap();
@@ -171,6 +189,24 @@ mod test {
     fn parse_extra_plus_end() {
         let s = LitStr::new("x86+sse4.2+xsave+", Span::call_site());
         Target::parse(&s).unwrap_err();
+    }
+
+    #[test]
+    fn parse_cpu() {
+        let s = LitStr::new("powerpc64/pwr7", Span::call_site());
+        let target = Target::parse(&s).unwrap();
+        assert_eq!(target.architecture, "powerpc64");
+        assert!(target.features.iter().any(|f| f == "altivec"));
+        assert!(target.features.iter().any(|f| f == "vsx"));
+    }
+
+    #[test]
+    fn parse_cpu_features() {
+        let s = LitStr::new("x86/i686+xsave", Span::call_site());
+        let target = Target::parse(&s).unwrap();
+        assert_eq!(target.architecture, "x86");
+        assert!(target.features.iter().any(|f| f == "sse2"));
+        assert!(target.features.iter().any(|f| f == "xsave"));
     }
 
     #[test]

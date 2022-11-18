@@ -34,10 +34,17 @@
 //! * `"arch+feature"`
 //! * `"arch+feature1+feature2"`
 //!
+//! A particular CPU can also be specified with a slash:
+//! * `"arch/cpu"`
+//! * `"arch/cpu+feature"`
+//!
 //! The following are some valid target specification strings:
 //! * `"x86"` (matches the `"x86"` architecture)
 //! * `"x86_64+avx+avx2"` (matches the `"x86_64"` architecture with the `"avx"` and `"avx2"`
 //! features)
+//! * `"x86_64/x86-64-v2"` (matches the `"x86_64"` architecture with the `"x86-64-v2"` CPU)
+//! * `"x86/i686+avx"` (matches the `"x86"` architecture with the `"i686"` CPU and `"avx"`
+//! feature)
 //! * `"arm+neon"` (matches the `arm` architecture with the `"neon"` feature
 //!
 //! # Example
