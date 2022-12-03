@@ -52,7 +52,7 @@ pub(crate) fn normalize_signature(sig: &Signature) -> (Signature, Vec<Expr>) {
                     mutability: None,
                     ident: match arg.pat.as_ref() {
                         Pat::Ident(pat) => pat.ident.clone(),
-                        _ => Ident::new(&format!("__multiversion_arg_{}", i), x.span()),
+                        _ => Ident::new(&format!("__multiversion_arg_{i}"), x.span()),
                     },
                     subpat: None,
                 })),

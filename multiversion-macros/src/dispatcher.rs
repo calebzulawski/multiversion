@@ -17,7 +17,7 @@ pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
     }
 
     // If this is a default fn, it doesn't have a dedicated static dispatcher
-    Ident::new(&format!("{}_default_version", ident), ident.span())
+    Ident::new(&format!("{ident}_default_version"), ident.span())
 }
 
 fn unsafe_fn_safe_block(f: ItemFn) -> ItemFn {
