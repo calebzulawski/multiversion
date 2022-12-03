@@ -2,7 +2,7 @@
 fn foo() {
     const WIDTH: Option<usize> =
         multiversion::target::selected_target!().suggested_simd_width::<f32>();
-    println!("{:?}", WIDTH);
+    println!("{WIDTH:?}");
 
     #[allow(unused)]
     #[multiversion::inherit_target]
