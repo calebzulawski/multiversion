@@ -30,6 +30,10 @@ fn indirect_dispatch() {}
 #[multiversion(targets("x86_64+sse"), dispatcher = "default")]
 fn skip_dispatch() {}
 
+// Since aarch64 always has neon, this should never result in runtime dispatch
+#[multiversion(targets("aarch64+neon"), dispatcher = "default")]
+fn skip_dispatch_2() {}
+
 #[test]
 fn dispatchers() {
     default_dispatch();
@@ -39,4 +43,5 @@ fn dispatchers() {
     #[cfg(feature = "std")]
     indirect_dispatch();
     skip_dispatch();
+    skip_dispatch_2();
 }

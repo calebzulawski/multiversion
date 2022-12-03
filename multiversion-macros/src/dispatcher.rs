@@ -413,32 +413,23 @@ impl Dispatcher {
         //   dispatch entirely and call the default function.
         //
         let mut specified_arches = HashSet::new(); // architectures that have a clone at all
-        let mut skipped_targets = Vec::new(); // targets that don't require dispatch
         let mut skips = Vec::new(); // dispatch skipping code
         for target in &self.targets {
             let arch = target.arch();
             let feature = target.features();
             if specified_arches.insert(arch) {
                 let call = self.call_target_fn(Some(target));
-                let skipped_target =
-                    quote! { all(target_arch = #arch #(, target_feature = #feature)*) };
-                skipped_targets.push(skipped_target.clone());
                 skips.push(quote! {
-                    #[cfg(#skipped_target)]
-                    { #call }
+                    #[cfg(target_arch = #arch)]
+                    if cfg!(all(#(target_feature = #feature),*)) {
+                        return #call
+                    }
                 });
             }
         }
 
-        let specified_arches = specified_arches.iter();
+        let specified_arches = specified_arches.iter().collect::<Vec<_>>();
         let call_default = self.call_target_fn(None);
-        let defaulted_target = quote! { not(any(#(target_arch = #specified_arches),*)) };
-        skipped_targets.push(defaulted_target.clone());
-        skips.push(quote! {
-            #[cfg(#defaulted_target)]
-            { #call_default }
-        });
-
         let (normalized_signature, _) = util::normalize_signature(&self.func.sig);
         let feature_fns = self.feature_fns()?;
         Ok(ItemFn {
@@ -451,7 +442,10 @@ impl Dispatcher {
 
                     #(#skips)*
 
-                    #[cfg(not(any(#(#skipped_targets),*)))]
+                    #[cfg(not(any(#(target_arch = #specified_arches),*)))]
+                    { return #call_default }
+
+                    #[cfg(any(#(target_arch = #specified_arches),*))]
                     #block
                 }
             }),
