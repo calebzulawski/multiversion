@@ -6,14 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- Changed macro API.  New API uses a single attribute macro, rather than helper attributes.
-- Changed function dispatcher to use direct function calls.
-This improves performance for generic/`async` functions, as well as when using retpolines or other indirect branch exploit mitigation.
-This change may slightly reduce performance for simple function dispatch on some CPUs.
-- Increased minimum required Rust version to 1.46.0.
+- The `multiversion` macro has been overhauled.
+  - Now uses a single attribute macro, rather than helper attributes.
+  - Various modes, such as `clone`, `specialize` have been removed. All targets now indicate a function clone.
+- Increased minimum required Rust version to 1.61.0.
+### Added
+- The function dispatch method is now selectable, between direct or indirect dispatch, as well as compile-time static dispatch.
+- Added a variety of macros in the `multiversion::target` module for querying the selected target features.
+- Targets can now be specified by CPU (e.g. `x86-64-v2` or `skylake`).
+- Added option to pass attributes to clones.
+- Added special `targets = "simd"` option to automatically target all SIMD instruction sets.
 ### Fixed
 - Fixed broken `impl Trait` support.  Using `impl Trait` in return position now results in an error.
-- Improved associated fn support by adding `associated_fn` configuration option, and made default behavior more obvious.
+- Improved performance of direct dispatch.
+- Avoid indirect dispatch in some situations, such as when using retpolines
 
 ## [0.6.1] - 2020-08-18
 ### Fixed
