@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added special `targets = "simd"` option to automatically target all SIMD instruction sets.
 ### Fixed
 - Fixed broken `impl Trait` support.  Using `impl Trait` in return position now results in an error.
+- Dispatch is now bypassed in scenarios where no targets are specified for the target architecture, or if the first matching target features are known to exist at compile time.
 - Improved performance of direct dispatch.
 - Avoid indirect dispatch in some situations, such as when using retpolines
 
