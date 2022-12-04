@@ -282,7 +282,7 @@ impl Dispatcher {
         if !cfg!(feature = "std") {
             return Err(Error::new(
                 Span::call_site(),
-                "indirect function dispatch only available with the `std` cargo feature",
+                "direct function dispatch only available with the `std` cargo feature",
             ));
         }
 

@@ -6,9 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- The `multiversion` macro has been overhauled.
-  - Now uses a single attribute macro, rather than helper attributes.
-  - Various modes, such as `clone`, `specialize` have been removed. All targets now indicate a function clone.
+- The `multiversion` macro has been overhauled. Now uses a single attribute macro, rather than helper attributes.
 - Increased minimum required Rust version to 1.61.0.
 ### Added
 - The function dispatch method is now selectable, between direct or indirect dispatch, as well as compile-time static dispatch.
@@ -16,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Targets can now be specified by CPU (e.g. `x86-64-v2` or `skylake`).
 - Added option to pass attributes to clones.
 - Added special `targets = "simd"` option to automatically target all SIMD instruction sets.
+### Removed
+- Removed the `specialize` mode. All targets now specify clones. Specialization should be implemented by querying the selected targets.
+- Removed support for functions that reference `self` or `Self`. Previous support was inconsistent and difficult to use correctly.
 ### Fixed
 - Fixed broken `impl Trait` support.  Using `impl Trait` in return position now results in an error.
 - Dispatch is now bypassed in scenarios where no targets are specified for the target architecture, or if the first matching target features are known to exist at compile time.
