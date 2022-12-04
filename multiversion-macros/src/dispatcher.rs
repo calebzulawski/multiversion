@@ -1,7 +1,7 @@
 use crate::{target::Target, util};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
-use std::collections::HashSet;
+use std::collections::HashMap;
 use syn::{
     parse_quote, Attribute, Block, Error, Expr, Ident, ItemFn, Result, Signature, Visibility,
 };
@@ -401,7 +401,6 @@ impl Dispatcher {
             DispatchMethod::Indirect => self.indirect_dispatcher_fn()?,
         };
 
-        //
         // If we already know that the current build target supports the best function choice, we
         // can skip dispatching entirely.
         //
@@ -412,23 +411,21 @@ impl Dispatcher {
         // * If the current target isn't specified in the multiversioned list at all, we can skip
         //   dispatch entirely and call the default function.
         //
-        let mut specified_arches = HashSet::new(); // architectures that have a clone at all
-        let mut skips = Vec::new(); // dispatch skipping code
-        for target in &self.targets {
-            let arch = target.arch();
+        // In these cases, the default function is called instead.
+        let best_targets = self
+            .targets
+            .iter()
+            .rev()
+            .map(|t| (t.arch(), t))
+            .collect::<HashMap<_, _>>();
+        let mut skips = Vec::new();
+        for (arch, target) in best_targets.iter() {
             let feature = target.features();
-            if specified_arches.insert(arch) {
-                let call = self.call_target_fn(Some(target));
-                skips.push(quote! {
-                    #[cfg(target_arch = #arch)]
-                    if cfg!(all(#(target_feature = #feature),*)) {
-                        return #call
-                    }
-                });
-            }
+            skips.push(quote! {
+                all(target_arch = #arch, #(target_feature = #feature),*)
+            });
         }
-
-        let specified_arches = specified_arches.iter().collect::<Vec<_>>();
+        let specified_arches = best_targets.keys().collect::<Vec<_>>();
         let call_default = self.call_target_fn(None);
         let (normalized_signature, _) = util::normalize_signature(&self.func.sig);
         let feature_fns = self.feature_fns()?;
@@ -440,12 +437,16 @@ impl Dispatcher {
                 {
                     #(#feature_fns)*
 
-                    #(#skips)*
-
-                    #[cfg(not(any(#(target_arch = #specified_arches),*)))]
+                    #[cfg(any(
+                        not(any(#(target_arch = #specified_arches),*)),
+                        #(#skips),*
+                    ))]
                     { return #call_default }
 
-                    #[cfg(any(#(target_arch = #specified_arches),*))]
+                    #[cfg(not(any(
+                        not(any(#(target_arch = #specified_arches),*)),
+                        #(#skips),*
+                    )))]
                     #block
                 }
             }),
