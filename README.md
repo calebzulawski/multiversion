@@ -17,45 +17,15 @@ These optional features cannot be haphazardly compiled into programs--executing 
 **Function multiversioning** is the practice of compiling multiple versions of a function with various features enabled and safely detecting which version to use at runtime.
 
 ## Features
-* Dynamic dispatching, using runtime CPU feature detection
-* Static dispatching, avoiding repeated feature detection for nested multiversioned functions (and allowing inlining!)
-* Support for all functions, including generic and `async`
+* Dynamic dispatching with minimal overhead, using runtime CPU feature detection
+* Support for most functions, including generic and `async`
 
 ## Example
-Automatic function multiversioning with the `clone` attribute, similar to GCC's `target_clones` attribute:
+Automatic function multiversioning with the `multiversion` attribute, similar to GCC's `target_clones` attribute:
 ```rust
 use multiversion::multiversion;
 
-#[multiversion(clones("[x86|x86_64]+avx", "x86+sse"))]
-fn square(x: &mut [f32]) {
-    for v in x {
-        *v *= *v;
-    }
-}
-```
-
-Manual function multiversioning with the `multiversion` and `target` attributes:
-```rust
-use multiversion::{multiversion, target};
-
-#[target("[x86|x86_64]+avx")]
-unsafe fn square_avx(x: &mut [f32]) {
-    for v in x {
-        *v *= *v;
-    }
-}
-
-#[target("x86+sse")]
-unsafe fn square_sse(x: &mut [f32]) {
-    for v in x {
-        *v *= *v;
-    }
-}
-
-#[multiversion(versions(
-    alternative(target = "[x86|x86_64]+avx", fn = "square_avx", unsafe = true),
-    alternative(target = "x86+sse", fn = "square_sse", unsafe = true)
-))]
+#[multiversion(targets("x86_64+avx", "aarch64+neon"))]
 fn square(x: &mut [f32]) {
     for v in x {
         *v *= *v;
