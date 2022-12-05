@@ -28,8 +28,8 @@
 //!
 //! # Target specification strings
 //! Targets for the [`target`] and [`multiversion`] attributes are specified as a combination of
-//! architecture (as specified in the [`target_arch`] attribute) and feature (as specified in the
-//! [`target_feature`] attribute). A target can be specified as:
+//! architecture (as specified in [`target_arch`]) and feature (as specified in [`target_feature`]).
+//! A target can be specified as:
 //! * `"arch"`
 //! * `"arch+feature"`
 //! * `"arch+feature1+feature2"`
@@ -46,26 +46,6 @@
 //! * `"x86/i686+avx"` (matches the `"x86"` architecture with the `"i686"` CPU and `"avx"`
 //! feature)
 //! * `"arm+neon"` (matches the `arm` architecture with the `"neon"` feature
-//!
-//! # Example
-//! The following example is a good candidate for optimization with SIMD.  The function `square`
-//! optionally uses the AVX instruction set extension on x86 or x86-64.  The SSE instruction set
-//! extension is part of x86-64, but is optional on x86 so the square function optionally detects
-//! that as well.  This is automatically implemented by the [`multiversion`] attribute.
-//!
-//! The following works by compiling multiple *clones* of the function with various features enabled
-//! and detecting which to use at runtime. If none of the targets match the current CPU (e.g. an older
-//! x86-64 CPU, or another architecture such as ARM), a clone without any features enabled is used.
-//! ```
-//! use multiversion::multiversion;
-//!
-//! #[multiversion(targets("x86_64+avx", "x86+sse"))]
-//! fn square(x: &mut [f32]) {
-//!     for v in x {
-//!         *v *= *v;
-//!     }
-//! }
-//! ```
 //!
 //! [`target`]: attr.target.html
 //! [`multiversion`]: attr.multiversion.html
@@ -95,6 +75,7 @@
 ///       indirect branch exploit mitigations such as retpolines.
 ///
 /// # Example
+/// This function is a good candidate for optimization using SIMD.
 /// The following compiles `square` three times, once for each target and once for the generic
 /// target.  Calling `square` selects the appropriate version at runtime.
 ///
@@ -102,6 +83,19 @@
 /// use multiversion::multiversion;
 ///
 /// #[multiversion(targets("x86_64+avx", "x86+sse"))]
+/// fn square(x: &mut [f32]) {
+///     for v in x {
+///         *v *= *v
+///     }
+/// }
+/// ```
+///
+/// This example is similar, but targets all supported SIMD instruction sets (not just the two shown above):
+///
+/// ```
+/// use multiversion::multiversion;
+///
+/// #[multiversion(targets = "simd")]
 /// fn square(x: &mut [f32]) {
 ///     for v in x {
 ///         *v *= *v

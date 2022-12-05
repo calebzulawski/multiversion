@@ -15,12 +15,8 @@ These optional features cannot be haphazardly compiled into programs--executing 
 
 **Function multiversioning** is the practice of compiling multiple versions of a function with various features enabled and safely detecting which version to use at runtime.
 
-## Features
-* Dynamic dispatching with minimal overhead, using runtime CPU feature detection
-* Support for most functions, including generic and `async`
-
 ## Example
-Automatic function multiversioning with the `multiversion` attribute, similar to GCC's `target_clones` attribute:
+The `multiversion` macro compiles a function for multiple possible targets, and selects the optimal one at runtime:
 ```rust
 use multiversion::multiversion;
 
