@@ -29,6 +29,10 @@ fn base_fn(values: &mut [f32]) {
 }
 
 pub fn benchmark_dispatcher(c: &mut Criterion) {
+    // Don't profile initial feature detection
+    indirect_fn(&mut []);
+    direct_fn(&mut []);
+
     for len in &[0, 16, 1000] {
         let mut g = c.benchmark_group(&format!("{len} elements"));
         let mut i = vec![0f32; *len];
