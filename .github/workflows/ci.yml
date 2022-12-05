@@ -45,9 +45,9 @@ jobs:
         profile: minimal
         components: clippy, rustfmt
     - name: Clippy lint
-      run: cargo clippy --all-features --all-targets --manifest-path multiversion/Cargo.toml -- -D warnings
+      run: cargo clippy --all-features --all-targets -- -D warnings
     - name: Clippy lint no-std
-      run: cargo clippy --no-default-features --all-targets --manifest-path multiversion/Cargo.toml -- -D warnings
+      run: cargo clippy --no-default-features --all-targets -- -D warnings
     - name: Check formatting
       run: cargo fmt -- --check
     - name: Deadlinks
