@@ -3,6 +3,7 @@ extern crate proc_macro;
 
 mod cfg;
 mod dispatcher;
+mod match_target;
 mod multiversion;
 mod target;
 mod util;
@@ -117,4 +118,19 @@ pub fn target_cfg_attr_impl(
         #input
     }
     .into()
+}
+
+#[proc_macro]
+pub fn match_target(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = TokenStream::from(input);
+    quote! {
+        __multiversion::match_target!{ #input }
+    }
+    .into()
+}
+
+#[proc_macro]
+pub fn match_target_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let match_target = parse_macro_input!(input as match_target::MatchTarget);
+    match_target.into_token_stream().into()
 }

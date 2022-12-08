@@ -1,6 +1,6 @@
 use multiversion::{
     multiversion,
-    target::{selected_target, target_cfg, target_cfg_attr},
+    target::{match_target, selected_target, target_cfg, target_cfg_attr},
 };
 
 #[test]
@@ -44,6 +44,24 @@ fn cfg_attr() {
         let has_avx =
             std::env::consts::ARCH == "x86_64" && selected_target!().supports_feature_str("avx");
         test_avx(has_avx);
+    }
+
+    foo();
+}
+
+#[test]
+fn match_target() {
+    #[multiversion(targets = "simd")]
+    fn foo() {
+        let match_avx = match_target! {
+            "x86_64+avx" => true,
+            _ => false,
+        };
+
+        let has_avx =
+            std::env::consts::ARCH == "x86_64" && selected_target!().supports_feature_str("avx");
+
+        assert_eq!(match_avx, has_avx);
     }
 
     foo();

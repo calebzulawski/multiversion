@@ -179,8 +179,29 @@ pub mod target {
     /// Equivalent to `#[cfg_attr]`, but considers `target_feature`s detected at runtime.
     pub use multiversion_macros::target_cfg_attr;
 
+    /// Match the selected target.
+    ///
+    /// Matching is done at compile time, as if by `#[cfg]`. Target matching considers both
+    /// detected features and statically-enabled features. Arms that do not match are not
+    /// compiled.
+    ///
+    /// # Example
+    /// ```
+    /// use multiversion::{multiversion, target::match_target};
+    ///
+    /// #[multiversion(targets = "simd")]
+    /// fn foo() {
+    ///     match_target! {
+    ///         "x86_64+avx" => println!("x86-64 with AVX"),
+    ///         "aarch64+neon" => println!("AArch64 with Neon"),
+    ///         _ => println!("another architecture"),
+    ///     }
+    /// }
+    /// ```
+    pub use multiversion_macros::match_target;
+
     #[doc(hidden)]
-    pub use multiversion_macros::{target_cfg_attr_impl, target_cfg_impl};
+    pub use multiversion_macros::{match_target_impl, target_cfg_attr_impl, target_cfg_impl};
 
     #[doc(no_inline)]
     pub use target_features::Target;

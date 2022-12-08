@@ -1,6 +1,9 @@
-use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
-use syn::{parse_quote, Attribute, Error, ItemFn, Lit, LitStr, Result};
+use proc_macro2::{Span, TokenStream};
+use quote::{format_ident, quote, ToTokens};
+use syn::{
+    parse::{Parse, ParseStream},
+    parse_quote, Attribute, Error, ItemFn, Lit, LitStr, Result,
+};
 use target_features::{Architecture, Feature};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -144,6 +147,23 @@ impl std::convert::TryFrom<&Lit> for Target {
             Lit::Str(s) => Self::parse(s),
             _ => Err(Error::new(lit.span(), "expected literal string")),
         }
+    }
+}
+
+impl Parse for Target {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
+        Target::parse(&input.parse()?)
+    }
+}
+
+impl ToTokens for Target {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let mut s = self.architecture.clone();
+        for feature in &self.features {
+            s.push('+');
+            s.push_str(feature);
+        }
+        LitStr::new(&s, Span::call_site()).to_tokens(tokens);
     }
 }
 
