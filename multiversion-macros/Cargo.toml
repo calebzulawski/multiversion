@@ -1,6 +1,6 @@
 [package]
 name = "multiversion-macros"
-version = "0.6.1"
+version = "0.7.0"
 authors = ["Caleb Zulawski <caleb.zulawski@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "Implementation crate for multiversion"
@@ -28,4 +28,4 @@ std = []
 syn = { version = "^1.0.36", features = ["full", "extra-traits", "visit-mut"] }
 quote = "1"
 proc-macro2 = "1"
-target-features = { git = "https://github.com/calebzulawski/target-features" }
+target-features = "0.1"
