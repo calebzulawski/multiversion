@@ -1,6 +1,5 @@
 #![allow(clippy::needless_doctest_main)]
-//! This crate provides the [`target`]  and [`multiversion`] attributes for implementing
-//! function multiversioning.
+//! This crate provides the [`multiversion`] attribute for implementing function multiversioning.
 //!
 //! Many CPU architectures have a variety of instruction set extensions that provide additional
 //! functionality. Common examples are single instruction, multiple data (SIMD) extensions such as
@@ -27,8 +26,9 @@
 //! If any other functions do not work please file an issue on GitHub.
 //!
 //! # Target specification strings
-//! Targets for the [`target`] and [`multiversion`] attributes are specified as a combination of
-//! architecture (as specified in [`target_arch`]) and feature (as specified in [`target_feature`]).
+//! Targets are specified as a combination of architecture (as specified in [`target_arch`]) and
+//! feature (as specified in [`target_feature`]).
+//!
 //! A target can be specified as:
 //! * `"arch"`
 //! * `"arch+feature"`
@@ -46,6 +46,9 @@
 //! * `"x86/i686+avx"` (matches the `"x86"` architecture with the `"i686"` CPU and `"avx"`
 //! feature)
 //! * `"arm+neon"` (matches the `arm` architecture with the `"neon"` feature
+//!
+//! A complete list of available target features and CPUs is available in the [`target-features`
+//! crate documentation](target_features::docs).
 //!
 //! [`target`]: attr.target.html
 //! [`multiversion`]: attr.multiversion.html
@@ -103,7 +106,9 @@
 /// }
 /// ```
 ///
-/// # Implementation details
+/// # Notes on dispatcher performance
+///
+/// ### Feature detection is performed only once
 /// The `direct` and `indirect` function version dispatcher performs function selection on the
 /// first invocation. This is implemented with a static atomic variable containing the selected
 /// function.
@@ -113,6 +118,12 @@
 /// atomic load.
 /// * If called in multiple threads, there is no contention.  Both threads may perform feature
 /// detection, but the atomic ensures these are synchronized correctly.
+///
+/// ### Dispatcher elision
+/// If the optimal set of features is already known to exist at compile time, the entire dispatcher
+/// is elided. For example, if the highest priority target requires `avx512f` and the function is
+/// compiled with `RUSTFLAGS=-Ctarget-cpu=skylake-avx512`, the function is not multiversioned and
+/// the highest priority target is used.
 ///
 /// [`target`]: attr.target.html
 /// [`multiversion`]: attr.multiversion.html
@@ -156,8 +167,9 @@ pub mod target {
 
     /// Get the selected target in a multiversioned function.
     ///
-    /// Returns the selected target as a [`Target`].  This macro only works in a
-    /// function marked with [`multiversion`].
+    /// Returns the selected target as a [`Target`].
+    ///
+    /// This macro only works in a function marked with [`multiversion`].
     ///
     /// # Example
     /// ```
@@ -174,9 +186,13 @@ pub mod target {
     pub use multiversion_macros::selected_target;
 
     /// Equivalent to `#[cfg]`, but considers `target_feature`s detected at runtime.
+    ///
+    /// This macro only works in a function marked with [`multiversion`].
     pub use multiversion_macros::target_cfg;
 
     /// Equivalent to `#[cfg_attr]`, but considers `target_feature`s detected at runtime.
+    ///
+    /// This macro only works in a function marked with [`multiversion`].
     pub use multiversion_macros::target_cfg_attr;
 
     /// Match the selected target.
@@ -184,6 +200,8 @@ pub mod target {
     /// Matching is done at compile time, as if by `#[cfg]`. Target matching considers both
     /// detected features and statically-enabled features. Arms that do not match are not
     /// compiled.
+    ///
+    /// This macro only works in a function marked with [`multiversion`].
     ///
     /// # Example
     /// ```
