@@ -87,6 +87,15 @@ pub fn target_cfg_attr(
     .into()
 }
 
+#[proc_macro]
+pub fn target_cfg_f(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = TokenStream::from(input);
+    quote! {
+        __multiversion::target_cfg_f!{ #input }
+    }
+    .into()
+}
+
 #[proc_macro_attribute]
 pub fn target_cfg_impl(
     attr: proc_macro::TokenStream,
@@ -116,6 +125,17 @@ pub fn target_cfg_attr_impl(
     quote! {
         #[cfg_attr(#meta, #attr)]
         #input
+    }
+    .into()
+}
+
+#[proc_macro]
+pub fn target_cfg_f_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let meta = parse_macro_input!(input with Punctuated::parse_terminated);
+
+    let meta = cfg::transform(meta);
+    quote! {
+        cfg!(#meta)
     }
     .into()
 }

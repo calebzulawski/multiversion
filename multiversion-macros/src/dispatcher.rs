@@ -104,6 +104,10 @@ impl Dispatcher {
                             { [$cfg:meta, $attr:meta] $($attached:tt)* } => { #[multiversion::target::target_cfg_attr_impl(#features, $cfg, $attr)] $($attached)* };
                         }
 
+                        macro_rules! target_cfg_f {
+                            { $cfg:meta } => { multiversion::target::target_cfg_f_impl!(#features, $cfg) };
+                        }
+
                         macro_rules! match_target {
                             { $($arms:tt)* } => { multiversion::target::match_target_impl!{ #features $($arms)* } }
                         }
@@ -111,6 +115,7 @@ impl Dispatcher {
                         pub(crate) use inherit_target;
                         pub(crate) use target_cfg;
                         pub(crate) use target_cfg_attr;
+                        pub(crate) use target_cfg_f;
                         pub(crate) use match_target;
                     }
                     #block

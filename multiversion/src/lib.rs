@@ -218,8 +218,15 @@ pub mod target {
     /// ```
     pub use multiversion_macros::match_target;
 
+    /// Equivalent to `cfg!`, but considers `target_feature`s detected at runtime.
+    ///
+    /// This macro only works in a function marked with [`multiversion`].
+    pub use multiversion_macros::target_cfg_f;
+
     #[doc(hidden)]
-    pub use multiversion_macros::{match_target_impl, target_cfg_attr_impl, target_cfg_impl};
+    pub use multiversion_macros::{
+        match_target_impl, target_cfg_attr_impl, target_cfg_f_impl, target_cfg_impl,
+    };
 
     #[doc(no_inline)]
     pub use target_features::Target;
