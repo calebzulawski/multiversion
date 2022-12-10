@@ -57,6 +57,9 @@
 
 /// Provides function multiversioning.
 ///
+/// The annotated function is compiled multiple times, once for each target, and the
+/// best target is selected at runtime.
+///
 /// Options:
 /// * `targets`
 ///   * Takes a list of targets, such as `targets("x86_64+avx2", "x86_64+sse4.1")`.
@@ -109,9 +112,8 @@
 /// # Notes on dispatcher performance
 ///
 /// ### Feature detection is performed only once
-/// The `direct` and `indirect` function version dispatcher performs function selection on the
-/// first invocation. This is implemented with a static atomic variable containing the selected
-/// function.
+/// The `direct` and `indirect` dispatchers perform function selection on the first invocation.
+/// This is implemented with a static atomic variable containing the selected function.
 ///
 /// This implementation has a few benefits:
 /// * The function selector is typically only invoked once.  Subsequent calls are reduced to an
