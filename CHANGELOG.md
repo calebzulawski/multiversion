@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-##[0.7.0] - 2022-12-09
+## [0.7.0] - 2022-12-09
 ### Changed
 - The `multiversion` macro has been overhauled. Now uses a single attribute macro, rather than helper attributes.
 - Increased minimum required Rust version to 1.61.0.
