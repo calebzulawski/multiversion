@@ -5,7 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     parse_quote,
     spanned::Spanned,
-    Error, Expr, LitStr, Result,
+    Error, Expr, ExprLit, Lit, LitStr, Pat, Result,
 };
 
 pub struct MatchTarget {
@@ -29,13 +29,37 @@ impl Parse for MatchTarget {
             if let Some(guard) = arm.guard {
                 return Err(Error::new(guard.0.span(), "unexpected guard"));
             }
-            if pat == parse_quote!(_) {
-                default_target = Some(*arm.body);
-                if !input.is_empty() {
-                    return Err(Error::new(input.span(), "unreachable targets"));
+
+            fn parse_target(e: &Expr) -> Result<Target> {
+                if let Expr::Lit(ExprLit {
+                    lit: Lit::Str(s), ..
+                }) = e
+                {
+                    Target::parse(s)
+                } else {
+                    Err(Error::new(e.span(), "expected a string literal"))
                 }
-            } else {
-                arms.push((parse_quote!(#pat), *arm.body));
+            }
+            match pat {
+                Pat::Lit(lit) => {
+                    arms.push((parse_target(&lit.expr)?, *arm.body));
+                }
+                Pat::Or(or) => {
+                    for case in or.cases.iter() {
+                        if let Pat::Lit(lit) = case {
+                            arms.push((parse_target(&lit.expr)?, *arm.body.clone()));
+                        } else {
+                            return Err(Error::new(case.span(), "expected a string literal"));
+                        }
+                    }
+                }
+                Pat::Wild(_) => {
+                    default_target = Some(*arm.body);
+                    if !input.is_empty() {
+                        return Err(Error::new(input.span(), "unreachable targets"));
+                    }
+                }
+                _ => return Err(Error::new(pat.span(), "expected string literal")),
             }
         }
 
