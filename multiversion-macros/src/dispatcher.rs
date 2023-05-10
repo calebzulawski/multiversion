@@ -88,6 +88,7 @@ impl Dispatcher {
             };
             parse_quote! {
                 {
+                    #[doc(hidden)] // https://github.com/rust-lang/rust/issues/111415
                     #[allow(unused)]
                     pub mod __multiversion {
                         pub const FEATURES: multiversion::target::Target = #features_init;
