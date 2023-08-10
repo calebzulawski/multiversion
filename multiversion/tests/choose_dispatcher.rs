@@ -1,27 +1,27 @@
 use multiversion::multiversion;
 
 #[multiversion(
-    targets("x86_64+avx", "x86+avx", "x86+sse", "arm+neon"),
+    targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+neon"),
     dispatcher = "default"
 )]
 fn default_dispatch() {}
 
 #[multiversion(
-    targets("x86_64+avx", "x86+avx", "x86+sse", "arm+neon"),
+    targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+neon"),
     dispatcher = "static"
 )]
 fn static_dispatch() {}
 
 #[cfg(feature = "std")]
 #[multiversion(
-    targets("x86_64+avx", "x86+avx", "x86+sse", "arm+neon"),
+    targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+neon"),
     dispatcher = "direct"
 )]
 fn direct_dispatch() {}
 
 #[cfg(feature = "std")]
 #[multiversion(
-    targets("x86_64+avx", "x86+avx", "x86+sse", "arm+neon"),
+    targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+neon"),
     dispatcher = "indirect"
 )]
 fn indirect_dispatch() {}

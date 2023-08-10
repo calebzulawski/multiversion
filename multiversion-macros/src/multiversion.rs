@@ -122,13 +122,13 @@ pub(crate) fn make_multiversioned_fn(
                         "x86+sse4.2",
                         "x86+sse2",
                         "aarch64+neon",
-                        "arm+neon",
-                        "mips+msa",
-                        "mips64+msa",
-                        "powerpc+vsx",
-                        "powerpc+altivec",
-                        "powerpc64+vsx",
-                        "powerpc64+altivec",
+                        // "arm+neon",
+                        // "mips+msa",
+                        // "mips64+msa",
+                        // "powerpc+vsx",
+                        // "powerpc+altivec",
+                        // "powerpc64+vsx",
+                        // "powerpc64+altivec",
                     ];
                     targets
                         .iter()

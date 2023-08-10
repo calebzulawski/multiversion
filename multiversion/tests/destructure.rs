@@ -3,27 +3,27 @@ struct Foo {
     y: i64,
 }
 
-#[multiversion::multiversion(targets("x86_64+avx", "arm+neon"))]
+#[multiversion::multiversion(targets("x86_64+avx", "aarch64+neon"))]
 fn destructure_tuple_multiversion((x, y): (i64, i64)) -> (i64, i64) {
     (x, y)
 }
 
-#[multiversion::multiversion(targets("x86_64+avx", "arm+neon"))]
+#[multiversion::multiversion(targets("x86_64+avx", "aarch64+neon"))]
 fn destructure_struct_multiversion(Foo { x, y }: Foo) -> (i64, i64) {
     (x, y)
 }
 
-#[multiversion::multiversion(targets("x86_64+avx", "arm+neon"))]
+#[multiversion::multiversion(targets("x86_64+avx", "aarch64+neon"))]
 fn destructure_tuple((x, y): (i64, i64)) -> (i64, i64) {
     (x, y)
 }
 
-#[multiversion::multiversion(targets("x86_64+avx", "arm+neon"))]
+#[multiversion::multiversion(targets("x86_64+avx", "aarch64+neon"))]
 fn destructure_struct(Foo { x, y }: Foo) -> (i64, i64) {
     (x, y)
 }
 
-#[multiversion::multiversion(targets("x86_64+avx", "arm+neon"))]
+#[multiversion::multiversion(targets("x86_64+avx", "aarch64+neon"))]
 fn destructure_tuple_generic<T>((x, y): (T, T)) -> (T, T) {
     (x, y)
 }

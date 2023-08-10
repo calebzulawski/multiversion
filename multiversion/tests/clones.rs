@@ -1,21 +1,21 @@
 use multiversion::multiversion;
 
-#[multiversion(targets("x86_64+avx", "x86+avx", "x86+sse", "arm+neon",))]
+#[multiversion(targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+neon",))]
 pub fn pub_add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
 
-#[multiversion(targets("x86_64+avx", "x86+avx", "x86+sse", "arm+neon",))]
+#[multiversion(targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+neon",))]
 fn priv_add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
 
-#[multiversion(targets("x86_64+avx", "x86+avx", "x86+sse", "arm+neon",))]
+#[multiversion(targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+neon",))]
 pub unsafe fn pub_unsafe_add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
 
-#[multiversion(targets("x86_64+avx", "x86+avx", "x86+sse", "arm+neon",))]
+#[multiversion(targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+neon",))]
 unsafe fn priv_unsafe_add(a: &mut [f32], b: &[f32]) {
     a.iter_mut().zip(b.iter()).for_each(|(a, b)| *a += b);
 }
