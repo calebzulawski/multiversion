@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] - 2023-08-10
+### Fixed
+- Don't include unstable target features in `targets = "simd"`.
+
 ## [0.7.2] - 2023-05-10
 ### Fixed
 - Added workaround for documentation bug (https://github.com/rust-lang/rust/issues/111415)
@@ -101,7 +105,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial multiversion implementation
 
-[Unreleased]: https://github.com/calebzulawski/multiversion/compare/0.7.2...HEAD
+[Unreleased]: https://github.com/calebzulawski/multiversion/compare/0.7.3...HEAD
+[0.7.2]: https://github.com/calebzulawski/multiversion/compare/0.7.2...0.7.3
 [0.7.2]: https://github.com/calebzulawski/multiversion/compare/0.7.1...0.7.2
 [0.7.1]: https://github.com/calebzulawski/multiversion/compare/0.7.0...0.7.1
 [0.7.0]: https://github.com/calebzulawski/multiversion/compare/0.6.1...0.7.0
