@@ -3,7 +3,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use std::collections::HashMap;
 use syn::{
-    parse_quote, Attribute, Block, Error, Expr, Ident, ItemFn, Result, Signature, Visibility,
+    parse_quote, Attribute, Block, Error, Expr, Ident, ItemFn, Result, Signature, Visibility, punctuated::Punctuated, ReturnType, token::RArrow, Type,
 };
 
 pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
@@ -53,6 +53,7 @@ pub(crate) enum DispatchMethod {
     Static,
     Direct,
     Indirect,
+    FunctionPointer
 }
 
 pub(crate) struct Dispatcher {
@@ -289,6 +290,69 @@ impl Dispatcher {
         })
     }
 
+    fn pointer_dispatcher_fn(&self) -> Result<Block> {
+        if !cfg!(feature = "std") {
+            return Err(Error::new(
+                Span::call_site(),
+                "indirect function dispatch only available with the `std` cargo feature",
+            ));
+        }
+        //if !util::fn_params(&self.func.sig).is_empty() {
+        //    return Err(Error::new(
+        //        Span::call_site(),
+        //        "indirect function dispatch does not support type generic or const generic parameters",
+        //    ));
+        //}
+        if self.func.sig.asyncness.is_some() {
+            return Err(Error::new(
+                Span::call_site(),
+                "indirect function dispatch does not support async functions",
+            ));
+        }
+        if util::impl_trait_present(&self.func.sig) {
+            return Err(Error::new(
+                Span::call_site(),
+                "indirect function dispatch does not support impl trait",
+            ));
+        }
+
+        let feature_detection = {
+            let return_if_detected = self.targets.iter().filter_map(|target| {
+                if target.has_features_specified() {
+                    let target_arch = target.target_arch();
+                    let features_detected = target.features_detected();
+                    let function = feature_fn_name(&self.func.sig.ident, Some(target));
+                    Some(quote! {
+                       #target_arch
+                       {
+                           if #features_detected {
+                               return #function
+                           }
+                       }
+                    })
+                } else {
+                    None
+                }
+            });
+            let default_fn = feature_fn_name(&self.func.sig.ident, None);
+            quote! {
+                #(#return_if_detected)*
+                return #default_fn
+            }
+        };
+        //let resolver_signature = Signature {
+        //    ident: Ident::new("__resolver_fn", Span::call_site()),
+        //    inputs: Punctuated::default(),
+        //    output: ReturnType::Type(RArrow::default(), Box::new(Type::BareFn(fn_ty.clone()))),
+        //    ..normalized_signature
+        //};
+        Ok(parse_quote! {
+            {
+                #feature_detection
+            }
+        })
+    }
+
     fn direct_dispatcher_fn(&self) -> Result<Block> {
         if !cfg!(feature = "std") {
             return Err(Error::new(
@@ -410,6 +474,7 @@ impl Dispatcher {
             DispatchMethod::Static => self.static_dispatcher_fn(),
             DispatchMethod::Direct => self.direct_dispatcher_fn()?,
             DispatchMethod::Indirect => self.indirect_dispatcher_fn()?,
+            DispatchMethod::FunctionPointer => self.pointer_dispatcher_fn()?,
         };
 
         // If we already know that the current build target supports the best function choice, we
@@ -437,31 +502,64 @@ impl Dispatcher {
             });
         }
         let specified_arches = best_targets.keys().collect::<Vec<_>>();
-        let call_default = self.call_target_fn(None);
         let (normalized_signature, _) = util::normalize_signature(&self.func.sig);
         let feature_fns = self.feature_fns()?;
-        Ok(ItemFn {
-            attrs: self.func.attrs.clone(),
-            vis: self.func.vis.clone(),
-            sig: normalized_signature,
-            block: Box::new(parse_quote! {
-                {
-                    #(#feature_fns)*
+        let mut return_type = util::fn_type_from_signature(&self.func.sig)?;
+        return_type.unsafety = Some(syn::token::Unsafe::default());
+        if matches!(self.dispatcher, DispatchMethod::FunctionPointer) {
+            let call_default = feature_fn_name(&self.func.sig.ident, None);
+            Ok(ItemFn {
+                attrs: self.func.attrs.clone(),
+                vis: self.func.vis.clone(),
+                sig: Signature {
+                    inputs: Punctuated::default(),
+                    output: ReturnType::Type(RArrow::default(), Box::new(Type::BareFn(return_type))),
+                    generics: self.func.sig.generics.clone(),
+                    ..normalized_signature
+                },
+                block: Box::new(parse_quote! {
+                    {
+                        #(#feature_fns)*
 
-                    #[cfg(any(
-                        not(any(#(target_arch = #specified_arches),*)),
-                        #(#skips),*
-                    ))]
-                    { return #call_default }
+                        #[cfg(any(
+                            not(any(#(target_arch = #specified_arches),*)),
+                            #(#skips),*
+                        ))]
+                        { return #call_default }
 
-                    #[cfg(not(any(
-                        not(any(#(target_arch = #specified_arches),*)),
-                        #(#skips),*
-                    )))]
-                    #block
-                }
-            }),
-        })
+                        #[cfg(not(any(
+                            not(any(#(target_arch = #specified_arches),*)),
+                            #(#skips),*
+                        )))]
+                        #block
+                    }
+                }),
+            })
+        } else {
+            let call_default = self.call_target_fn(None);
+            Ok(ItemFn {
+                attrs: self.func.attrs.clone(),
+                vis: self.func.vis.clone(),
+                sig: normalized_signature,
+                block: Box::new(parse_quote! {
+                    {
+                        #(#feature_fns)*
+
+                        #[cfg(any(
+                            not(any(#(target_arch = #specified_arches),*)),
+                            #(#skips),*
+                        ))]
+                        { return #call_default }
+
+                        #[cfg(not(any(
+                            not(any(#(target_arch = #specified_arches),*)),
+                            #(#skips),*
+                        )))]
+                        #block
+                    }
+                }),
+            })
+        }
     }
 }
 
