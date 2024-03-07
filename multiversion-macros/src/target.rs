@@ -134,7 +134,7 @@ impl Target {
             }
         );
         quote! {
-            true #( && std::#is_feature_detected!(#feature) )*
+            true #( && std::arch::#is_feature_detected!(#feature) )*
         }
     }
 }
