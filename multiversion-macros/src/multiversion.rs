@@ -2,7 +2,7 @@ use crate::dispatcher::{DispatchMethod, Dispatcher};
 use crate::target::Target;
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
-use std::{collections::HashMap, convert::TryFrom};
+use std::collections::HashMap;
 use syn::{
     parse::Parser, parse_quote, punctuated::Punctuated, spanned::Spanned, token::Comma, Error,
     ItemFn, Lit, LitStr, Meta, NestedMeta, ReturnType, Type,

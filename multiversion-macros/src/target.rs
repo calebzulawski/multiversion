@@ -177,7 +177,6 @@ pub(crate) fn make_target_fn(target: LitStr, func: ItemFn) -> Result<TokenStream
 #[cfg(test)]
 mod test {
     use super::*;
-    use proc_macro2::Span;
 
     #[test]
     fn parse_architecture() {}
