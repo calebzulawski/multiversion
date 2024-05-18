@@ -1,9 +1,9 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    parse_quote, spanned::Spanned, visit_mut::VisitMut, BareFnArg, Error, Expr, FnArg,
-    GenericParam, Ident, Lifetime, Pat, PatIdent, PatType, Result, ReturnType, Signature, Type,
-    TypeBareFn,
+    parse_quote, spanned::Spanned, visit::Visit, visit_mut::VisitMut, BareFnArg, Error, Expr,
+    FnArg, GenericParam, Ident, Lifetime, Pat, PatIdent, PatType, Result, Signature, TypeBareFn,
+    TypeImplTrait,
 };
 
 pub(crate) fn arg_exprs(sig: &Signature) -> Vec<Expr> {
@@ -57,19 +57,16 @@ pub(crate) fn normalize_signature(sig: &Signature) -> (Signature, Vec<Expr>) {
 }
 
 pub(crate) fn impl_trait_present(sig: &Signature) -> bool {
-    if let ReturnType::Type(_, ty) = &sig.output {
-        if let Type::ImplTrait(_) = **ty {
-            return true;
+    struct ImplTraitPresent(bool);
+    impl Visit<'_> for ImplTraitPresent {
+        fn visit_type_impl_trait(&mut self, _: &TypeImplTrait) {
+            self.0 = true;
         }
     }
-    sig.inputs.iter().any(|arg| {
-        if let FnArg::Typed(pat) = arg {
-            if let Type::ImplTrait(_) = *pat.ty {
-                return true;
-            }
-        }
-        false
-    })
+
+    let mut visitor = ImplTraitPresent(false);
+    visitor.visit_signature(sig);
+    visitor.0
 }
 
 struct LifetimeRenamer;
