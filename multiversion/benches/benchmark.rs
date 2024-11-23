@@ -39,7 +39,7 @@ pub fn benchmark_dispatcher(c: &mut Criterion) {
     }
 
     for len in &[0, 16, 1000] {
-        let mut g = c.benchmark_group(&format!("{len} elements"));
+        let mut g = c.benchmark_group(format!("{len} elements"));
         let mut i = vec![0f32; *len];
 
         #[cfg(feature = "std")]

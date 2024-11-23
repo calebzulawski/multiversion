@@ -41,10 +41,10 @@
 //! The following are some valid target specification strings:
 //! * `"x86"` (matches the `"x86"` architecture)
 //! * `"x86_64+avx+avx2"` (matches the `"x86_64"` architecture with the `"avx"` and `"avx2"`
-//! features)
+//!   features)
 //! * `"x86_64/x86-64-v2"` (matches the `"x86_64"` architecture with the `"x86-64-v2"` CPU)
 //! * `"x86/i686+avx"` (matches the `"x86"` architecture with the `"i686"` CPU and `"avx"`
-//! feature)
+//!   feature)
 //! * `"arm+neon"` (matches the `arm` architecture with the `"neon"` feature
 //!
 //! A complete list of available target features and CPUs is available in the [`target-features`
@@ -117,9 +117,9 @@
 ///
 /// This implementation has a few benefits:
 /// * The function selector is typically only invoked once.  Subsequent calls are reduced to an
-/// atomic load.
+///   atomic load.
 /// * If called in multiple threads, there is no contention.  Both threads may perform feature
-/// detection, but the atomic ensures these are synchronized correctly.
+///   detection, but the atomic ensures these are synchronized correctly.
 ///
 /// ### Dispatcher elision
 /// If the optimal set of features is already known to exist at compile time, the entire dispatcher

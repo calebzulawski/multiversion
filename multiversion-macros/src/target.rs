@@ -23,7 +23,7 @@ impl Target {
             .ok_or_else(|| Error::new(s.span(), "expected architecture specifier"))?;
 
         // Architecture can be either "architecture" or "architecture/cpu"
-        let mut maybe_cpu = architecture.splitn(2, |c| c == '/');
+        let mut maybe_cpu = architecture.splitn(2, '/');
         let architecture = maybe_cpu
             .next()
             .ok_or_else(|| Error::new(s.span(), "expected architecture specifier"))?
