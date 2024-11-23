@@ -381,27 +381,11 @@ impl Dispatcher {
                     if !crate::util::fn_params(&self.func.sig).is_empty()
                         || self.func.sig.asyncness.is_some()
                         || util::impl_trait_present(&self.func.sig)
+                        || cfg!(retpoline)
                     {
                         self.direct_dispatcher_fn()?
                     } else {
-                        let indirect = self.indirect_dispatcher_fn()?;
-                        let direct = self.direct_dispatcher_fn()?;
-                        parse_quote! {
-                            {
-                                #[cfg(not(any(
-                                    target_feature = "retpoline",
-                                    target_feature = "retpoline-indirect-branches",
-                                    target_feature = "retpoline-indirect-calls",
-                                )))]
-                                #indirect
-                                #[cfg(any(
-                                    target_feature = "retpoline",
-                                    target_feature = "retpoline-indirect-branches",
-                                    target_feature = "retpoline-indirect-calls",
-                                ))]
-                                #direct
-                            }
-                        }
+                        self.indirect_dispatcher_fn()?
                     }
                 } else {
                     self.static_dispatcher_fn()
