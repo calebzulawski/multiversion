@@ -30,11 +30,8 @@ impl Parse for MatchTarget {
                 return Err(Error::new(guard.0.span(), "unexpected guard"));
             }
 
-            fn parse_target(e: &Expr) -> Result<Target> {
-                if let Expr::Lit(ExprLit {
-                    lit: Lit::Str(s), ..
-                }) = e
-                {
+            fn parse_target(e: &ExprLit) -> Result<Target> {
+                if let Lit::Str(s) = &e.lit {
                     Target::parse(s)
                 } else {
                     Err(Error::new(e.span(), "expected a string literal"))
@@ -42,12 +39,12 @@ impl Parse for MatchTarget {
             }
             match pat {
                 Pat::Lit(lit) => {
-                    arms.push((parse_target(&lit.expr)?, *arm.body));
+                    arms.push((parse_target(&lit)?, *arm.body));
                 }
                 Pat::Or(or) => {
                     for case in or.cases.iter() {
                         if let Pat::Lit(lit) = case {
-                            arms.push((parse_target(&lit.expr)?, *arm.body.clone()));
+                            arms.push((parse_target(&lit)?, *arm.body.clone()));
                         } else {
                             return Err(Error::new(case.span(), "expected a string literal"));
                         }

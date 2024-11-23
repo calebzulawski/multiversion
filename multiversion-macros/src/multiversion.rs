@@ -1,81 +1,11 @@
 use crate::dispatcher::{DispatchMethod, Dispatcher};
 use crate::target::Target;
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::ToTokens;
-use std::collections::HashMap;
 use syn::{
-    parse::Parser, parse_quote, punctuated::Punctuated, spanned::Spanned, token::Comma, Error,
-    ItemFn, Lit, LitStr, Meta, NestedMeta, ReturnType, Type,
+    parenthesized, parse::Parser, parse_quote, punctuated::Punctuated, spanned::Spanned, token,
+    Attribute, Error, ItemFn, LitStr, Meta, ReturnType, Type,
 };
-
-fn meta_path_string(meta: &Meta) -> Result<String, Error> {
-    meta.path()
-        .get_ident()
-        .ok_or_else(|| Error::new(meta.path().span(), "expected identifier, got path"))
-        .map(ToString::to_string)
-}
-
-fn meta_kv_value(meta: Meta) -> Result<Lit, Error> {
-    if let Meta::NameValue(nv) = meta {
-        Ok(nv.lit)
-    } else {
-        Err(Error::new(meta.span(), "expected name-value pair"))
-    }
-}
-
-fn lit_str(lit: &Lit) -> Result<&LitStr, Error> {
-    if let Lit::Str(s) = lit {
-        Ok(s)
-    } else {
-        Err(Error::new(lit.span(), "expected string"))
-    }
-}
-
-struct MetaMap {
-    map: HashMap<String, Meta>,
-    span: Span,
-}
-
-impl TryFrom<Punctuated<NestedMeta, Comma>> for MetaMap {
-    type Error = Error;
-
-    fn try_from(meta: Punctuated<NestedMeta, Comma>) -> Result<Self, Self::Error> {
-        let mut map = HashMap::new();
-        let span = meta.span();
-        for meta in meta.into_iter() {
-            let meta = if let NestedMeta::Meta(m) = meta {
-                Ok(m)
-            } else {
-                Err(Error::new(meta.span(), "expected meta, got literal"))
-            }?;
-
-            let key = meta_path_string(&meta)?;
-            if map.contains_key(&key) {
-                return Err(Error::new(meta.path().span(), "key already provided"));
-            }
-            map.insert(key, meta);
-        }
-        Ok(Self { map, span })
-    }
-}
-
-impl MetaMap {
-    fn try_remove(&mut self, key: &str) -> Option<Meta> {
-        self.map.remove(key)
-    }
-
-    fn span(&self) -> Span {
-        self.span
-    }
-
-    fn finish(self) -> Result<(), Error> {
-        if let Some((_, v)) = self.map.into_iter().next() {
-            Err(Error::new(v.span(), "unexpected key"))
-        } else {
-            Ok(())
-        }
-    }
-}
 
 pub(crate) fn make_multiversioned_fn(
     attr: TokenStream,
@@ -90,30 +20,31 @@ pub(crate) fn make_multiversioned_fn(
         }
     }
 
-    let parser = Punctuated::parse_terminated;
-    let mut map = MetaMap::try_from(parser.parse2(attr)?)?;
+    let mut targets: Option<Vec<Target>> = None;
+    let mut inner_attrs: Option<Vec<Attribute>> = None;
+    let mut dispatcher: Option<DispatchMethod> = None;
 
-    let targets = if let Some(targets) = map.try_remove("targets") {
-        if let Meta::List(list) = targets {
-            list.nested
-                .into_iter()
-                .map(|x| {
-                    if let NestedMeta::Lit(lit) = &x {
-                        let target = Target::parse(lit_str(lit)?)?;
-                        if target.has_features_specified() {
-                            Ok(target)
-                        } else {
-                            Err(Error::new(x.span(), "target must have features specified"))
-                        }
-                    } else {
-                        Err(Error::new(x.span(), "expected target string"))
-                    }
-                })
-                .collect::<Result<Vec<_>, _>>()
-        } else if let Meta::NameValue(nv) = targets {
-            match lit_str(&nv.lit)?.value().as_str() {
-                "simd" => {
-                    let targets = [
+    let parser = syn::meta::parser(|meta| {
+        if targets.is_some() && (meta.path.is_ident("targets") || meta.path.is_ident("simd")) {
+            return Err(meta.error("can't specify `targets` or `simd` multiple times"));
+        }
+
+        if meta.path.is_ident("targets") {
+            if meta.input.peek(token::Paren) {
+                let content;
+                parenthesized!(content in meta.input);
+                targets = Some(
+                    Punctuated::<Target, token::Comma>::parse_terminated(&content)?
+                        .into_iter()
+                        .collect(),
+                );
+                return Ok(());
+            } else {
+                let value = meta.value()?;
+                let s: LitStr = value.parse()?;
+
+                if s.value().as_str() == "simd" {
+                    let default_targets = [
                         // "x86_64+avx512f+avx512bw+avx512cd+avx512dq+avx512vl",
                         "x86_64+avx2+fma",
                         "x86_64+sse4.2",
@@ -130,57 +61,73 @@ pub(crate) fn make_multiversioned_fn(
                         // "powerpc64+vsx",
                         // "powerpc64+altivec",
                     ];
-                    targets
-                        .iter()
-                        .map(|x| Target::parse(&LitStr::new(x, nv.lit.span())))
-                        .collect()
+                    targets = Some(
+                        default_targets
+                            .iter()
+                            .map(|x| Target::parse(&LitStr::new(x, meta.path.span())).unwrap())
+                            .collect(),
+                    );
+                    return Ok(());
                 }
-                _ => Err(Error::new(nv.lit.span(), "expected \"simd\"")),
+
+                return Err(meta.error("expected a list of features or \"simd\""));
             }
-        } else {
-            Err(Error::new(
-                targets.span(),
-                "expected list of function clone targets",
-            ))
         }
-    } else {
-        Err(Error::new(map.span(), "expected `targets`"))
-    }?;
 
-    let inner_attrs = if let Some(attrs) = map.try_remove("attrs") {
-        if let Meta::List(list) = attrs {
-            Ok(list
-                .nested
-                .into_iter()
-                .map(|x| {
-                    parse_quote! { #[#x] }
-                })
-                .collect())
-        } else {
-            Err(Error::new(attrs.span(), "expected list of attributes"))
-        }
-    } else {
-        Ok(Vec::new())
-    }?;
-
-    let dispatcher = map
-        .try_remove("dispatcher")
-        .map(|x| {
-            let s = meta_kv_value(x)?;
-            match lit_str(&s)?.value().as_str() {
-                "default" => Ok(DispatchMethod::Default),
-                "static" => Ok(DispatchMethod::Static),
-                "direct" => Ok(DispatchMethod::Direct),
-                "indirect" => Ok(DispatchMethod::Indirect),
-                _ => Err(Error::new(
-                    s.span(),
-                    "expected `default`, `static`, `direct`, or `indirect`",
-                )),
+        if meta.path.is_ident("attrs") {
+            if inner_attrs.is_some() {
+                return Err(meta.error("can't specify `attrs` multiple times"));
             }
-        })
-        .unwrap_or_else(|| Ok(DispatchMethod::Default))?;
+            inner_attrs = Some(Vec::new());
+            let content;
+            parenthesized!(content in meta.input);
+            inner_attrs = Some(
+                Punctuated::<Meta, token::Comma>::parse_terminated(&content)?
+                    .into_iter()
+                    .map(|meta| parse_quote! { #[#meta] })
+                    .collect(),
+            );
+            return Ok(());
+        }
 
-    map.finish()?;
+        if meta.path.is_ident("dispatcher") {
+            if dispatcher.is_some() {
+                return Err(meta.error("can't specify `dispatcher` multiple times"));
+            }
+            let value = meta.value()?;
+            let s: LitStr = value.parse()?;
+            dispatcher = Some(match s.value().as_str() {
+                "default" => DispatchMethod::Default,
+                "static" => DispatchMethod::Static,
+                "direct" => DispatchMethod::Direct,
+                "indirect" => DispatchMethod::Indirect,
+                _ => {
+                    return Err(meta.error("expected `default`, `static`, `direct`, or `indirect`"))
+                }
+            });
+            return Ok(());
+        };
+
+        Err(meta.error("unrecognized option"))
+    });
+
+    let span = attr.span();
+    parser.parse2(attr)?;
+
+    let targets = if let Some(targets) = targets {
+        for target in targets.iter() {
+            if !target.has_features_specified() {
+                // TODO add span to Target
+                return Err(Error::new(span, "target must have features specified"));
+            }
+        }
+        targets
+    } else {
+        return Err(Error::new(span, "expected `targets`"));
+    };
+
+    let inner_attrs = inner_attrs.unwrap_or(Vec::new());
+    let dispatcher = dispatcher.unwrap_or(DispatchMethod::Default);
 
     Ok(Dispatcher {
         targets,
