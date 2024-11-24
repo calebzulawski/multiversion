@@ -122,7 +122,7 @@ pub(crate) fn make_multiversioned_fn(
                         "x86+sse4.2",
                         "x86+sse2",
                         "aarch64+neon",
-                        // "arm+neon",
+                        "arm+neon",
                         // "mips+msa",
                         // "mips64+msa",
                         // "powerpc+vsx",
@@ -172,6 +172,7 @@ pub(crate) fn make_multiversioned_fn(
                 "static" => Ok(DispatchMethod::Static),
                 "direct" => Ok(DispatchMethod::Direct),
                 "indirect" => Ok(DispatchMethod::Indirect),
+                "pointer" => Ok(DispatchMethod::FunctionPointer),
                 _ => Err(Error::new(
                     s.span(),
                     "expected `default`, `static`, `direct`, or `indirect`",
