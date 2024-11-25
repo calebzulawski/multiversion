@@ -126,7 +126,7 @@ pub(crate) fn make_multiversioned_fn(
         return Err(Error::new(span, "expected `targets`"));
     };
 
-    let inner_attrs = inner_attrs.unwrap_or(Vec::new());
+    let inner_attrs = inner_attrs.unwrap_or_default();
     let dispatcher = dispatcher.unwrap_or(DispatchMethod::Default);
 
     Ok(Dispatcher {

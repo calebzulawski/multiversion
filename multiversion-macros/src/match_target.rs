@@ -44,7 +44,7 @@ impl Parse for MatchTarget {
                 Pat::Or(or) => {
                     for case in or.cases.iter() {
                         if let Pat::Lit(lit) = case {
-                            arms.push((parse_target(&lit)?, *arm.body.clone()));
+                            arms.push((parse_target(lit)?, *arm.body.clone()));
                         } else {
                             return Err(Error::new(case.span(), "expected a string literal"));
                         }
