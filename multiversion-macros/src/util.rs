@@ -96,6 +96,10 @@ pub(crate) fn fn_type_from_signature(sig: &Signature) -> Result<TypeBareFn> {
             })
         })
         .collect::<Result<Vec<_>>>()?;
+    assert!(
+        sig.variadic.is_none(),
+        "cannot multiversion function with variadic arguments"
+    );
     let mut fn_ty = TypeBareFn {
         lifetimes: if lifetimes.is_empty() {
             None
@@ -107,7 +111,7 @@ pub(crate) fn fn_type_from_signature(sig: &Signature) -> Result<TypeBareFn> {
         fn_token: sig.fn_token,
         paren_token: sig.paren_token,
         inputs: parse_quote! { #(#args),* },
-        variadic: sig.variadic.clone(),
+        variadic: None,
         output: sig.output.clone(),
     };
     LifetimeRenamer {}.visit_type_bare_fn_mut(&mut fn_ty);

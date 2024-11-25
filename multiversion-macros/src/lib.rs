@@ -104,10 +104,14 @@ pub fn target_cfg_impl(
     let meta = parse_macro_input!(attr with Punctuated::parse_terminated);
     let input = TokenStream::from(input);
 
-    let meta = cfg::transform(meta);
-    quote! {
-        #[cfg(#meta)]
-        #input
+    match cfg::transform(meta) {
+        Ok(meta) => {
+            quote! {
+                #[cfg(#meta)]
+                #input
+            }
+        }
+        Err(err) => err.to_compile_error(),
     }
     .into()
 }
@@ -121,10 +125,14 @@ pub fn target_cfg_attr_impl(
     let input = TokenStream::from(input);
 
     let attr = meta.pop().unwrap();
-    let meta = cfg::transform(meta);
-    quote! {
-        #[cfg_attr(#meta, #attr)]
-        #input
+    match cfg::transform(meta) {
+        Ok(meta) => {
+            quote! {
+                #[cfg_attr(#meta, #attr)]
+                #input
+            }
+        }
+        Err(err) => err.to_compile_error(),
     }
     .into()
 }
@@ -133,9 +141,13 @@ pub fn target_cfg_attr_impl(
 pub fn target_cfg_f_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let meta = parse_macro_input!(input with Punctuated::parse_terminated);
 
-    let meta = cfg::transform(meta);
-    quote! {
-        cfg!(#meta)
+    match cfg::transform(meta) {
+        Ok(meta) => {
+            quote! {
+                cfg!(#meta)
+            }
+        }
+        Err(err) => err.to_compile_error(),
     }
     .into()
 }

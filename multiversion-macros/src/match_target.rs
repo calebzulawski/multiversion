@@ -77,8 +77,8 @@ impl ToTokens for MatchTarget {
             let features = target.features();
             let selected_features = &self.features;
             let cfg = crate::cfg::transform(
-                parse_quote! { #selected_features, all(target_arch = #arch #(, target_feature = #features)*) },
-            );
+                parse_quote! { target_features = #selected_features, all(target_arch = #arch #(, target_feature = #features)*) },
+            ).unwrap();
             exprs.push(quote! {
                 #[cfg(all(#cfg, not(any(#(#not_targets),*))))]
                 { #expr }

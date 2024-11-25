@@ -1,45 +1,47 @@
-use syn::{
-    parse_quote, punctuated::Punctuated, token::Comma, visit_mut::VisitMut, Lit, Meta, NestedMeta,
-};
+use quote::ToTokens;
+use syn::{parse_quote, punctuated::Punctuated, token::Comma, Expr, Lit, Meta, Result};
 
-fn parse_features(features: &NestedMeta) -> Vec<String> {
-    let lit = match features {
-        NestedMeta::Lit(lit) => lit,
-        _ => unimplemented!(),
-    };
-    let s = match lit {
-        Lit::Str(s) => s,
-        _ => unimplemented!(),
-    };
-    s.value().split(',').map(str::to_string).collect()
-}
-
-pub(crate) fn transform(input: Punctuated<NestedMeta, Comma>) -> NestedMeta {
-    assert!(input.len() == 2);
-
-    let features = parse_features(&input[0]);
-    let mut attr = input.into_iter().nth(1).unwrap();
-
-    struct Visitor(Vec<String>);
-
-    impl VisitMut for Visitor {
-        fn visit_meta_mut(&mut self, i: &mut Meta) {
-            // replace instances of `target_feature = "..."` when they match a detected target
-            // feature.
-            if let Meta::NameValue(nv) = i {
-                if nv.path == parse_quote!(target_feature) {
-                    if let Lit::Str(s) = &nv.lit {
-                        if self.0.contains(&s.value()) {
-                            *i = parse_quote! { all() };
+fn transform_recursive(features: &[&str], input: Meta) -> Result<Meta> {
+    match input {
+        Meta::NameValue(nv) => {
+            if nv.path == parse_quote!(target_feature) {
+                if let Expr::Lit(lit) = &nv.value {
+                    if let Lit::Str(lit) = &lit.lit {
+                        if features.contains(&lit.value().as_str()) {
+                            return Ok(parse_quote! { all() });
                         }
                     }
                 }
             }
-
-            syn::visit_mut::visit_meta_mut(self, i);
+            Ok(Meta::NameValue(nv))
         }
+        Meta::List(mut list) => {
+            let mut metas = list.parse_args_with(Punctuated::<Meta, Comma>::parse_terminated)?;
+            for meta in metas.iter_mut() {
+                *meta = transform_recursive(features, meta.clone())?;
+            }
+            list.tokens = metas.into_token_stream();
+            Ok(Meta::List(list))
+        }
+        input => Ok(input),
     }
+}
 
-    Visitor(features).visit_nested_meta_mut(&mut attr);
-    attr
+pub(crate) fn transform(mut input: Punctuated<Meta, Comma>) -> Result<Meta> {
+    assert_eq!(input.len(), 2);
+
+    let features = if let Expr::Lit(features) = &input[0].require_name_value()?.value {
+        if let Lit::Str(features) = &features.lit {
+            Some(features.value())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let features = features.expect("couldn't parse first argument");
+    let features = features.split(',').collect::<Vec<&str>>();
+
+    transform_recursive(&features, input.pop().unwrap().into_value())
 }

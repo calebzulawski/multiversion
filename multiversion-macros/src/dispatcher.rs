@@ -98,15 +98,15 @@ impl Dispatcher {
                         }
 
                         macro_rules! target_cfg {
-                            { [$cfg:meta] $($attached:tt)* } => { #[multiversion::target::target_cfg_impl(#features, $cfg)] $($attached)* };
+                            { [$cfg:meta] $($attached:tt)* } => { #[multiversion::target::target_cfg_impl(target_features = #features, $cfg)] $($attached)* };
                         }
 
                         macro_rules! target_cfg_attr {
-                            { [$cfg:meta, $attr:meta] $($attached:tt)* } => { #[multiversion::target::target_cfg_attr_impl(#features, $cfg, $attr)] $($attached)* };
+                            { [$cfg:meta, $attr:meta] $($attached:tt)* } => { #[multiversion::target::target_cfg_attr_impl(target_features = #features, $cfg, $attr)] $($attached)* };
                         }
 
                         macro_rules! target_cfg_f {
-                            { $cfg:meta } => { multiversion::target::target_cfg_f_impl!(#features, $cfg) };
+                            { $cfg:meta } => { multiversion::target::target_cfg_f_impl!(target_features = #features, $cfg) };
                         }
 
                         macro_rules! match_target {

@@ -3,3 +3,4 @@ members = [
     "multiversion",
     "multiversion-macros",
 ]
+resolver = "2"
