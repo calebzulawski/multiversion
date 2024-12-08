@@ -1,6 +1,6 @@
 [package]
 name = "multiversion"
-version = "0.7.4"
+version = "0.8.0"
 authors = ["Caleb Zulawski <caleb.zulawski@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "Easy function multiversioning"
@@ -23,7 +23,7 @@ default = ["std"]
 std = ["multiversion-macros/std"]
 
 [dependencies]
-multiversion-macros = { version = "0.7.4", path = "../multiversion-macros", default-features = false }
+multiversion-macros = { version = "0.8.0", path = "../multiversion-macros", default-features = false }
 target-features = "0.1"
 
 [dev-dependencies]

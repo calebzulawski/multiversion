@@ -1,6 +1,6 @@
 [package]
 name = "multiversion-macros"
-version = "0.7.4"
+version = "0.8.0"
 authors = ["Caleb Zulawski <caleb.zulawski@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "Implementation crate for multiversion"

@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2024-12-07
+### Changed
+- Upgraded to syn 2. This shouldn't break compatibility with the 0.7 releases, but there might be minor differences.
+### Fixed
+- Read retpoline target features from command line flags because they're LLVM features, not Rust features.
+
 ## [0.7.4] - 2024-03-15
 ### Fixed
 - Fix `is_{arch}_feature_detected` path for non-x86.
@@ -109,7 +115,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial multiversion implementation
 
-[Unreleased]: https://github.com/calebzulawski/multiversion/compare/0.7.4...HEAD
+[Unreleased]: https://github.com/calebzulawski/multiversion/compare/0.8.0...HEAD
+[0.8.0]: https://github.com/calebzulawski/multiversion/compare/0.7.4...0.8.0
 [0.7.4]: https://github.com/calebzulawski/multiversion/compare/0.7.3...0.7.4
 [0.7.3]: https://github.com/calebzulawski/multiversion/compare/0.7.2...0.7.3
 [0.7.2]: https://github.com/calebzulawski/multiversion/compare/0.7.1...0.7.2
