@@ -1,7 +1,7 @@
 use crate::{target::Target, util};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use syn::{
     parse_quote, Attribute, Block, Error, Expr, Ident, ItemFn, Result, Signature, Visibility,
 };
@@ -407,12 +407,15 @@ impl Dispatcher {
         //   dispatch entirely and call the default function.
         //
         // In these cases, the default function is called instead.
+        // BTreeMap (not HashMap): iteration and `.keys()` order below are spliced into
+        // `#[cfg(...)]` tokens, so the order must be deterministic across proc-macro
+        // invocations or the generated crate's Svh varies build-to-build (rust#89904).
         let best_targets = self
             .targets
             .iter()
             .rev()
             .map(|t| (t.arch(), t))
-            .collect::<HashMap<_, _>>();
+            .collect::<BTreeMap<_, _>>();
         let mut skips = Vec::new();
         for (arch, target) in best_targets.iter() {
             let feature = target.features();
