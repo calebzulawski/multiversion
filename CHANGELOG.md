@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Increased the minimum supported Rust version to 1.82.0.
 - Explicit target features now use rustc for validation and implied-feature expansion.
+- The `target-features` dependency is now optional; enable the `target-features` feature to use `selected_target!`.
 ### Removed
 - Removed CPU target specifications because their feature mappings could not be kept consistent as rustc's feature database changed.
 ### Fixed

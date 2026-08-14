@@ -23,10 +23,11 @@ rust-version = "1.82"
 default = ["std"]
 std = ["multiversion-macros/std"]
 nightly = ["multiversion-macros/nightly"]
+target-features = ["dep:target-features"]
 
 [dependencies]
 multiversion-macros = { version = "0.8.0", path = "../multiversion-macros", default-features = false }
-target-features = "0.1"
+target-features = { version = "0.1", optional = true }
 
 [dev-dependencies]
 rustversion = "1"
