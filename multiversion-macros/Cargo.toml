@@ -16,6 +16,7 @@ include = [
     "/tests/**",
 ]
 edition = "2021"
+rust-version = "1.82"
 
 [lib]
 proc-macro = true
