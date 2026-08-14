@@ -3,14 +3,14 @@ name: Build
 on: [push]
 
 env:
-  OLDEST_RUST: "1.93.0"
+  MSRV: "1.82.0"
 
 jobs:
   test:
     strategy:
       matrix:
         include:
-          - version: oldest
+          - version: msrv
             os: ubuntu-latest
           - version: stable
             os: ubuntu-latest
@@ -28,7 +28,7 @@ jobs:
     - name: Install toolchain
       uses: dtolnay/rust-toolchain@master
       with:
-        toolchain: ${{ matrix.version == 'oldest' && env.OLDEST_RUST || matrix.version }}
+        toolchain: ${{ matrix.version == 'msrv' && env.MSRV || matrix.version }}
     - name: Run tests
       run: cargo test --workspace --verbose --features std
     - name: Run no-std tests
@@ -63,10 +63,10 @@ jobs:
       matrix:
         include:
           - target: aarch64-unknown-linux-gnu
-            toolchain: oldest
+            toolchain: stable
             features: std
           - target: s390x-unknown-linux-gnu
-            toolchain: oldest
+            toolchain: stable
             features: std
           - target: armv7-unknown-linux-gnueabihf
             toolchain: nightly
@@ -91,7 +91,7 @@ jobs:
     - name: Install toolchain
       uses: dtolnay/rust-toolchain@master
       with:
-        toolchain: ${{ matrix.toolchain == 'oldest' && env.OLDEST_RUST || matrix.toolchain }}
+        toolchain: ${{ matrix.toolchain }}
         targets: ${{ matrix.target }}
     - name: Check target
       run: cargo check --manifest-path multiversion/Cargo.toml --features ${{ matrix.features }} --test simd --target ${{ matrix.target }}

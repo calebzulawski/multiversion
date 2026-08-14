@@ -56,19 +56,27 @@ impl Target {
             } else {
                 target_features::Target::new(architecture)
             };
-            for feature in specified_features {
-                target =
-                    target.with_feature(Feature::new(architecture, &feature).map_err(|_| {
-                        Error::new(s.span(), format!("unknown target feature: {feature}"))
-                    })?);
+            for feature in &specified_features {
+                let feature = Feature::new(architecture, feature).map_err(|_| {
+                    Error::new(s.span(), format!("unknown target feature: {feature}"))
+                })?;
+                if cpu.is_some() {
+                    target = target.with_feature(feature);
+                }
             }
             target
         };
-        let mut features = target
-            .features()
-            .map(|f| f.name().to_string())
-            .collect::<Vec<_>>();
+        // CPU targets must be resolved because Rust has no per-function target CPU attribute.
+        let mut features = if cpu.is_some() {
+            target
+                .features()
+                .map(|feature| feature.name().to_string())
+                .collect()
+        } else {
+            specified_features
+        };
         features.sort_unstable();
+        features.dedup();
 
         Ok(Self {
             architecture,
