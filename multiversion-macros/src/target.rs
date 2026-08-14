@@ -58,7 +58,7 @@ impl Target {
     }
 
     pub fn features_string(&self) -> String {
-        self.features.join("_").replace('.', "")
+        self.features.join("_").replace('.', "").replace('-', "_")
     }
 
     pub fn has_features_specified(&self) -> bool {
@@ -102,7 +102,8 @@ impl Target {
             "is_{}_feature_detected",
             match self.architecture.as_str() {
                 "x86_64" => "x86",
-                "risv64" => "riscv",
+                "loongarch32" | "loongarch64" => "loongarch",
+                "riscv32" | "riscv64" => "riscv",
                 f => f,
             }
         );

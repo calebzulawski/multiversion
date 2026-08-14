@@ -5,6 +5,7 @@ mod cfg;
 mod dispatcher;
 mod match_target;
 mod multiversion;
+mod simd;
 mod target;
 mod util;
 
@@ -56,7 +57,7 @@ pub fn inherit_target(
 pub fn selected_target(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     parse_macro_input!(input as Nothing);
     quote! {
-        __multiversion::FEATURES
+        __multiversion::selected_target! {}
     }
     .into()
 }

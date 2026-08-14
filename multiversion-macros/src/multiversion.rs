@@ -44,29 +44,7 @@ pub(crate) fn make_multiversioned_fn(
                 let s: LitStr = value.parse()?;
 
                 if s.value().as_str() == "simd" {
-                    let default_targets = [
-                        // "x86_64+avx512f+avx512bw+avx512cd+avx512dq+avx512vl",
-                        "x86_64+avx2+fma",
-                        "x86_64+sse4.2",
-                        // "x86+avx512f+avx512bw+avx512cd+avx512dq+avx512vl",
-                        "x86+avx2+fma",
-                        "x86+sse4.2",
-                        "x86+sse2",
-                        "aarch64+neon",
-                        // "arm+neon",
-                        // "mips+msa",
-                        // "mips64+msa",
-                        // "powerpc+vsx",
-                        // "powerpc+altivec",
-                        // "powerpc64+vsx",
-                        // "powerpc64+altivec",
-                    ];
-                    targets = Some(
-                        default_targets
-                            .iter()
-                            .map(|x| Target::parse(&LitStr::new(x, meta.path.span())).unwrap())
-                            .collect(),
-                    );
+                    targets = Some(crate::simd::targets(meta.path.span()));
                     return Ok(());
                 }
 

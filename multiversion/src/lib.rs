@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "std"), no_std)]
 #![allow(clippy::needless_doctest_main)]
 //! This crate provides the [`multiversion`] attribute for implementing function multiversioning.
 //!
@@ -12,10 +13,12 @@
 //! with various features enabled and safely detecting which version to use at runtime.
 //!
 //! # Cargo features
-//! There is one cargo feature, `std`, enabled by default.  When enabled, [`multiversion`] will
+//! The cargo feature `std` is enabled by default.  When enabled, [`multiversion`] will
 //! use CPU feature detection at runtime to dispatch the appropriate function. Disabling this
 //! feature will only allow compile-time function dispatch using `#[cfg(target_feature)]` and can
 //! be used in `#[no_std]` crates.
+//!
+//! The `nightly` feature adds nightly-only targets to `targets = "simd"`.
 //!
 //! # Capabilities
 //! The intention of this crate is to allow nearly any function to be multiversioned.

@@ -278,6 +278,7 @@ version = "0.8.0"
 dependencies = [
  "proc-macro2",
  "quote",
+ "rustversion",
  "syn",
 ]
 
