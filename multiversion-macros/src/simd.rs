@@ -6,27 +6,27 @@ const SINCE_1_89: bool = rustversion::cfg!(since(1.89));
 const SINCE_1_93: bool = rustversion::cfg!(since(1.93));
 const NIGHTLY: bool = cfg!(feature = "nightly");
 
+macro_rules! x86_level {
+    // Rust does not provide runtime detection for x86-64-v4's `lahfsahf`.
+    ($architecture:literal, v4) => {
+        concat!($architecture, "+avx+avx2+avx512bw+avx512cd+avx512dq+avx512f+avx512vl+bmi1+bmi2+cmpxchg16b+f16c+fma+lzcnt+movbe+popcnt+sse3+sse4.1+sse4.2+ssse3+xsave")
+    };
+    ($architecture:literal, v3) => {
+        concat!($architecture, "+avx+avx2+bmi1+bmi2+cmpxchg16b+f16c+fma+lzcnt+movbe+popcnt+sse3+sse4.1+sse4.2+ssse3+xsave")
+    };
+    ($architecture:literal, v2) => {
+        concat!($architecture, "+cmpxchg16b+popcnt+sse3+sse4.1+sse4.2+ssse3")
+    };
+}
+
 const TARGETS: &[(&str, bool)] = &[
-    // x86-64-v4; Rust does not provide runtime detection for `lahfsahf`.
-    (
-        "x86_64+avx+avx2+avx512bw+avx512cd+avx512dq+avx512f+avx512vl+bmi1+bmi2+cmpxchg16b+f16c+fma+lzcnt+movbe+popcnt+sse3+sse4.1+sse4.2+ssse3+xsave",
-        SINCE_1_89,
-    ),
-    // x86-64-v3
-    (
-        "x86_64+avx+avx2+bmi1+bmi2+cmpxchg16b+f16c+fma+lzcnt+movbe+popcnt+sse3+sse4.1+sse4.2+ssse3+xsave",
-        true,
-    ),
-    // x86-64-v2
-    (
-        "x86_64+cmpxchg16b+popcnt+sse3+sse4.1+sse4.2+ssse3",
-        true,
-    ),
-    (
-        "x86+avx+avx2+fma+sse+sse2+sse3+sse4.1+sse4.2+ssse3",
-        true,
-    ),
-    ("x86+sse+sse2+sse3+sse4.1+sse4.2+ssse3", true),
+    (x86_level!("x86_64", v4), SINCE_1_89),
+    (x86_level!("x86_64", v3), true),
+    (x86_level!("x86_64", v2), true),
+    (x86_level!("x86", v4), SINCE_1_89),
+    (x86_level!("x86", v3), true),
+    (x86_level!("x86", v2), true),
+    // x86-64-v1 includes SSE2 in its baseline, so enable it explicitly for 32-bit x86.
     ("x86+sse+sse2", true),
     ("aarch64+fp16+sve+sve2", true),
     ("aarch64+fp16+sve", true),
