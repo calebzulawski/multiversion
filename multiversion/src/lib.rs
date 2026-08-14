@@ -21,7 +21,9 @@
 //! The `target-features` feature enables `selected_target!` and adds the optional
 //! `target-features` dependency.
 //!
-//! The `nightly` feature adds nightly-only targets to `targets = "simd"`.
+//! The `nightly` feature adds nightly-only targets to `targets = "simd"`. On affected targets,
+//! the consuming crate must also enable the corresponding `*_target_feature` and
+//! `stdarch_*_feature_detection` nightly compiler features.
 //!
 //! # Capabilities
 //! The intention of this crate is to allow nearly any function to be multiversioned.
