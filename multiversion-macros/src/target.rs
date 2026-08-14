@@ -4,7 +4,6 @@ use syn::{
     parse::{Parse, ParseStream},
     parse_quote, Attribute, Error, ItemFn, Lit, LitStr, Result,
 };
-use target_features::{Architecture, Feature};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Target {
@@ -21,14 +20,6 @@ impl Target {
         let architecture = it
             .next()
             .ok_or_else(|| Error::new(s.span(), "expected architecture specifier"))?;
-
-        // Architecture can be either "architecture" or "architecture/cpu"
-        let mut maybe_cpu = architecture.splitn(2, '/');
-        let architecture = maybe_cpu
-            .next()
-            .ok_or_else(|| Error::new(s.span(), "expected architecture specifier"))?
-            .to_string();
-        let cpu = maybe_cpu.next();
 
         if architecture.is_empty()
             || !architecture
@@ -48,38 +39,12 @@ impl Target {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let target = {
-            let architecture = Architecture::from_str(&architecture);
-            let mut target = if let Some(cpu) = cpu {
-                target_features::Target::from_cpu(architecture, cpu)
-                    .map_err(|_| Error::new(s.span(), format!("unknown target CPU: {cpu}")))?
-            } else {
-                target_features::Target::new(architecture)
-            };
-            for feature in &specified_features {
-                let feature = Feature::new(architecture, feature).map_err(|_| {
-                    Error::new(s.span(), format!("unknown target feature: {feature}"))
-                })?;
-                if cpu.is_some() {
-                    target = target.with_feature(feature);
-                }
-            }
-            target
-        };
-        // CPU targets must be resolved because Rust has no per-function target CPU attribute.
-        let mut features = if cpu.is_some() {
-            target
-                .features()
-                .map(|feature| feature.name().to_string())
-                .collect()
-        } else {
-            specified_features
-        };
+        let mut features = specified_features;
         features.sort_unstable();
         features.dedup();
 
         Ok(Self {
-            architecture,
+            architecture: architecture.to_string(),
             features,
         })
     }
@@ -216,24 +181,6 @@ mod test {
     fn parse_extra_plus_end() {
         let s = LitStr::new("x86+sse4.2+xsave+", Span::call_site());
         Target::parse(&s).unwrap_err();
-    }
-
-    #[test]
-    fn parse_cpu() {
-        let s = LitStr::new("powerpc64/pwr7", Span::call_site());
-        let target = Target::parse(&s).unwrap();
-        assert_eq!(target.architecture, "powerpc64");
-        assert!(target.features.iter().any(|f| f == "altivec"));
-        assert!(target.features.iter().any(|f| f == "vsx"));
-    }
-
-    #[test]
-    fn parse_cpu_features() {
-        let s = LitStr::new("x86/i686+xsave", Span::call_site());
-        let target = Target::parse(&s).unwrap();
-        assert_eq!(target.architecture, "x86");
-        assert!(target.features.iter().any(|f| f == "sse2"));
-        assert!(target.features.iter().any(|f| f == "xsave"));
     }
 
     #[test]
