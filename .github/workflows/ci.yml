@@ -2,46 +2,107 @@ name: Build
 
 on: [push]
 
+env:
+  OLDEST_RUST: "1.93.0"
+
 jobs:
   test:
     strategy:
       matrix:
-        version:
-          - stable
-          - beta
-          - nightly
-        os:
-          - macos-latest
-          - ubuntu-latest
-          #- windows-latest
-          # disabled due to rustup errors
-        features:
-          - --all-features
-          - --no-default-features
+        include:
+          - version: oldest
+            os: ubuntu-latest
+          - version: stable
+            os: ubuntu-latest
+          - version: stable
+            os: macos-latest
+          - version: stable
+            os: windows-latest
+          - version: beta
+            os: ubuntu-latest
 
     runs-on: ${{ matrix.os }}
-    
+
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v7
     - name: Install toolchain
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@master
       with:
-        toolchain: ${{ matrix.version }}
-        override: true
-        profile: minimal
+        toolchain: ${{ matrix.version == 'oldest' && env.OLDEST_RUST || matrix.version }}
     - name: Run tests
-      run: cargo test --verbose ${{ matrix.features }} --manifest-path multiversion/Cargo.toml
+      run: cargo test --workspace --verbose --features std
+    - name: Run no-std tests
+      run: cargo test --workspace --verbose --no-default-features
+
+  nightly:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - name: Install toolchain
+      uses: dtolnay/rust-toolchain@nightly
+    - name: Run tests
+      run: cargo test --workspace --verbose --all-features
+    - name: Run nightly no-std tests
+      run: cargo test --workspace --verbose --no-default-features --features nightly
+
+  no-std:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - name: Install toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: thumbv7em-none-eabihf
+    - name: Check no-std target
+      run: cargo check --package multiversion --no-default-features --target thumbv7em-none-eabihf
+
+  cross:
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-unknown-linux-gnu
+            toolchain: oldest
+            features: std
+          - target: s390x-unknown-linux-gnu
+            toolchain: oldest
+            features: std
+          - target: armv7-unknown-linux-gnueabihf
+            toolchain: nightly
+            features: nightly
+          - target: loongarch64-unknown-linux-gnu
+            toolchain: nightly
+            features: nightly
+          - target: powerpc-unknown-linux-gnu
+            toolchain: nightly
+            features: nightly
+          - target: powerpc64-unknown-linux-gnu
+            toolchain: nightly
+            features: nightly
+          - target: riscv64gc-unknown-linux-gnu
+            toolchain: nightly
+            features: nightly
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - name: Install toolchain
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.toolchain == 'oldest' && env.OLDEST_RUST || matrix.toolchain }}
+        targets: ${{ matrix.target }}
+    - name: Check target
+      run: cargo check --manifest-path multiversion/Cargo.toml --features ${{ matrix.features }} --test simd --target ${{ matrix.target }}
 
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v7
     - name: Install toolchain
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@nightly
       with:
-        toolchain: nightly
-        override: true
-        profile: minimal
         components: clippy, rustfmt
     - name: Clippy lint
       run: cargo clippy --all-features --all-targets -- -D warnings
