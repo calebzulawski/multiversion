@@ -72,8 +72,8 @@ jobs:
             toolchain: nightly
             features: nightly
           - target: loongarch64-unknown-linux-gnu
-            toolchain: nightly
-            features: nightly
+            toolchain: stable
+            features: std
           - target: powerpc-unknown-linux-gnu
             toolchain: nightly
             features: nightly

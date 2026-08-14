@@ -68,7 +68,7 @@ impl Dispatcher {
         let make_block = |target: Option<&Target>| {
             let block = &self.func.block;
             let features = target.map(|t| t.features()).unwrap_or(&[]);
-            let features_init = quote! {
+            let selected_target = quote! {
                 (multiversion::target_features::CURRENT_TARGET)#(.with_feature_str(#features))*
             };
             let feature_attrs = if let Some(target) = target {
@@ -91,7 +91,9 @@ impl Dispatcher {
                     #[doc(hidden)] // https://github.com/rust-lang/rust/issues/111415
                     #[allow(unused)]
                     pub mod __multiversion {
-                        pub const FEATURES: multiversion::target::Target = #features_init;
+                        macro_rules! selected_target {
+                            {} => { #selected_target }
+                        }
 
                         macro_rules! inherit_target {
                             { $f:item } => { #(#feature_attrs)* $f }
@@ -114,6 +116,7 @@ impl Dispatcher {
                         }
 
                         pub(crate) use inherit_target;
+                        pub(crate) use selected_target;
                         pub(crate) use target_cfg;
                         pub(crate) use target_cfg_attr;
                         pub(crate) use target_cfg_f;

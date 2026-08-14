@@ -24,8 +24,10 @@ proc-macro = true
 [features]
 default = ["std"]
 std = []
+nightly = []
 
 [dependencies]
 syn = { version = "2", features = ["full", "extra-traits", "visit", "visit-mut", "printing"] }
 quote = "1"
 proc-macro2 = "1"
+rustversion = "1"

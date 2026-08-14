@@ -5,11 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Expanded `targets = "simd"` with corrected x86-64 architecture levels and support for AArch64 SVE, LoongArch64 LASX, S390x vectors, and additional architectures behind a new `nightly` Cargo feature.
 ### Changed
-- Increased the minimum required Rust version to 1.82.0.
-- The macro now leaves validation and implication expansion for explicitly specified target features to rustc.
+- Increased the minimum supported Rust version to 1.82.0.
+- Explicit target features now use rustc for validation and implied-feature expansion.
 ### Removed
-- Removed CPU target specifications because the feature database changes frequently and is difficult to keep up to date while maintaining consistent, expected behavior.
+- Removed CPU target specifications because their feature mappings could not be kept consistent as rustc's feature database changed.
+### Fixed
+- Disabling the `std` feature now makes the crate `no_std`.
 
 ## [0.8.0] - 2024-12-07
 ### Changed
