@@ -7,97 +7,76 @@ env:
 
 jobs:
   test:
+    name: Test (${{ matrix.toolchain }} / ${{ matrix.target || matrix.os || 'ubuntu-latest' }}${{ contains(matrix.args, '--no-default-features') && ' / no-std' || '' }})
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - version: msrv
-            os: ubuntu-latest
-          - version: stable
-            os: ubuntu-latest
-          - version: stable
+          # Host tests
+          - toolchain: msrv
+            args: --workspace
+          - toolchain: stable
+            args: --workspace
+          - toolchain: stable
             os: macos-latest
-          - version: stable
+            args: --workspace
+          - toolchain: stable
             os: windows-latest
-          - version: beta
-            os: ubuntu-latest
+            args: --workspace
+          - toolchain: stable
+            os: ubuntu-24.04-arm
+            args: --workspace
+          - toolchain: beta
+            args: --workspace
+          - toolchain: nightly
+            args: --workspace --all-features
 
-    runs-on: ${{ matrix.os }}
+          # No-std
+          - toolchain: stable
+            args: --workspace --no-default-features
+          - toolchain: stable
+            target: thumbv7em-none-eabihf
+            args: --package multiversion --no-default-features
 
-    steps:
-    - uses: actions/checkout@v7
-    - name: Install toolchain
-      uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: ${{ matrix.version == 'msrv' && env.MSRV || matrix.version }}
-    - name: Run tests
-      run: cargo test --workspace --verbose --features std
-    - name: Run no-std tests
-      run: cargo test --workspace --verbose --no-default-features
+          # Stable cross targets
+          - toolchain: stable
+            target: i686-unknown-linux-gnu
+            args: --package multiversion --tests
+          - toolchain: stable
+            target: loongarch64-unknown-linux-gnu
+            args: --package multiversion --tests
+          - toolchain: stable
+            target: s390x-unknown-linux-gnu
+            args: --package multiversion --tests
 
-  nightly:
-    runs-on: ubuntu-latest
+          # Nightly cross targets
+          - toolchain: nightly
+            target: armv7-unknown-linux-gnueabihf
+            args: --package multiversion --features nightly --tests
+          - toolchain: nightly
+            target: powerpc-unknown-linux-gnu
+            args: --package multiversion --features nightly --tests
+          - toolchain: nightly
+            target: powerpc64-unknown-linux-gnu
+            args: --package multiversion --features nightly --tests
+          - toolchain: nightly
+            target: riscv64gc-unknown-linux-gnu
+            args: --package multiversion --features nightly --tests
 
-    steps:
-    - uses: actions/checkout@v7
-    - name: Install toolchain
-      uses: dtolnay/rust-toolchain@nightly
-    - name: Run tests
-      run: cargo test --workspace --verbose --all-features
-    - name: Run nightly no-std tests
-      run: cargo test --workspace --verbose --no-default-features --features nightly
-
-  no-std:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v7
-    - name: Install toolchain
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: thumbv7em-none-eabihf
-    - name: Check no-std target
-      run: cargo check --package multiversion --no-default-features --target thumbv7em-none-eabihf
-
-  cross:
-    strategy:
-      matrix:
-        include:
-          - target: i686-unknown-linux-gnu
-            toolchain: stable
-            features: std
-          - target: aarch64-unknown-linux-gnu
-            toolchain: stable
-            features: std
-          - target: s390x-unknown-linux-gnu
-            toolchain: stable
-            features: std
-          - target: armv7-unknown-linux-gnueabihf
-            toolchain: nightly
-            features: nightly
-          - target: loongarch64-unknown-linux-gnu
-            toolchain: stable
-            features: std
-          - target: powerpc-unknown-linux-gnu
-            toolchain: nightly
-            features: nightly
-          - target: powerpc64-unknown-linux-gnu
-            toolchain: nightly
-            features: nightly
-          - target: riscv64gc-unknown-linux-gnu
-            toolchain: nightly
-            features: nightly
-
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
 
     steps:
     - uses: actions/checkout@v7
     - name: Install toolchain
       uses: dtolnay/rust-toolchain@master
       with:
-        toolchain: ${{ matrix.toolchain }}
-        targets: ${{ matrix.target }}
-    - name: Check target
-      run: cargo check --manifest-path multiversion/Cargo.toml --features ${{ matrix.features }} --test simd --target ${{ matrix.target }}
+        toolchain: ${{ matrix.toolchain == 'msrv' && env.MSRV || matrix.toolchain }}
+        targets: ${{ matrix.target || '' }}
+    - name: Check
+      run: cargo check --verbose ${{ matrix.args }} ${{ matrix.target && format('--target {0}', matrix.target) || '' }}
+    - name: Test
+      if: matrix.target == ''
+      run: cargo test --verbose ${{ matrix.args }}
 
   lint:
     runs-on: ubuntu-latest
