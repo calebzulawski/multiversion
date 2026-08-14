@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - Increased the minimum required Rust version to 1.82.0.
-- The macro no longer expands implications for explicitly specified target features because rustc now applies them automatically.
+- The macro now leaves validation and implication expansion for explicitly specified target features to rustc.
+### Removed
+- Removed CPU target specifications because the feature database changes frequently and is difficult to keep up to date while maintaining consistent, expected behavior.
 
 ## [0.8.0] - 2024-12-07
 ### Changed
