@@ -1,6 +1,8 @@
+#[cfg(feature = "target-features")]
+use multiversion::target::selected_target;
 use multiversion::{
     multiversion,
-    target::{match_target, selected_target, target_cfg, target_cfg_attr, target_cfg_f},
+    target::{match_target, target_cfg, target_cfg_attr, target_cfg_f},
 };
 
 #[test]
@@ -57,6 +59,7 @@ fn cfg_f() {
             _ => false,
         };
         assert_eq!(cfg_avx, match_avx);
+        #[cfg(feature = "target-features")]
         assert!(!cfg_avx || selected_target!().supports_feature_str("avx"));
     }
 

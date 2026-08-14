@@ -1,3 +1,5 @@
+#![cfg(feature = "target-features")]
+
 #[multiversion::multiversion(targets = "simd")]
 fn foo() {
     const WIDTH: Option<usize> =

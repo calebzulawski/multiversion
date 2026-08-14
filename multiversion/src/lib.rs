@@ -18,6 +18,9 @@
 //! feature will only allow compile-time function dispatch using `#[cfg(target_feature)]` and can
 //! be used in `#[no_std]` crates.
 //!
+//! The `target-features` feature enables `selected_target!` and adds the optional
+//! `target-features` dependency.
+//!
 //! The `nightly` feature adds nightly-only targets to `targets = "simd"`.
 //!
 //! # Capabilities
@@ -178,6 +181,7 @@ pub mod target {
     ///         println!("AVX not detected");
     ///     }
     /// }
+    #[cfg(feature = "target-features")]
     pub use multiversion_macros::selected_target;
 
     /// Equivalent to `#[cfg]`, but considers `target_feature`s detected at runtime.
@@ -223,9 +227,11 @@ pub mod target {
         match_target_impl, target_cfg_attr_impl, target_cfg_f_impl, target_cfg_impl,
     };
 
+    #[cfg(feature = "target-features")]
     #[doc(no_inline)]
     pub use target_features::Target;
 }
 
+#[cfg(feature = "target-features")]
 #[doc(hidden)]
 pub use target_features;
