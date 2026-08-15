@@ -27,7 +27,7 @@ std = []
 nightly = []
 
 [dependencies]
-syn = { version = "2", features = ["full", "extra-traits", "visit", "visit-mut", "printing"] }
+syn = { version = "3", features = ["full", "extra-traits", "visit", "visit-mut", "printing"] }
 quote = "1"
 proc-macro2 = "1"
 rustversion = "1"

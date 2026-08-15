@@ -43,5 +43,5 @@ pub(crate) fn transform(mut input: Punctuated<Meta, Comma>) -> Result<Meta> {
     let features = features.expect("couldn't parse first argument");
     let features = features.split(',').collect::<Vec<&str>>();
 
-    transform_recursive(&features, input.pop().unwrap().into_value())
+    transform_recursive(&features, input.pop().unwrap())
 }

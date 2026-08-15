@@ -3,7 +3,8 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use std::collections::BTreeMap;
 use syn::{
-    parse_quote, Attribute, Block, Error, Expr, Ident, ItemFn, Result, Signature, Visibility,
+    parse_quote, Attribute, Block, Error, Expr, Ident, ItemFn, Result, Safety, Signature,
+    Visibility,
 };
 
 pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
@@ -24,7 +25,7 @@ fn unsafe_fn_safe_block(f: ItemFn) -> ItemFn {
     let safe_fn = ItemFn {
         vis: Visibility::Inherited,
         sig: Signature {
-            unsafety: None,
+            safety: Safety::Default,
             ident: Ident::new("__safe_inner", f.sig.ident.span()),
             ..f.sig.clone()
         },
@@ -142,9 +143,10 @@ impl Dispatcher {
             let mut f = unsafe_fn_safe_block(ItemFn {
                 attrs: self.inner_attrs.clone(),
                 vis: Visibility::Inherited,
+                modifiers: Default::default(),
                 sig: Signature {
                     ident: feature_fn_name(&self.func.sig.ident, Some(target)),
-                    unsafety: parse_quote! { unsafe },
+                    safety: Safety::Unsafe(Default::default()),
                     ..self.func.sig.clone()
                 },
                 block: make_block(Some(target)),
@@ -160,6 +162,7 @@ impl Dispatcher {
         fns.push(ItemFn {
             attrs,
             vis: self.func.vis.clone(),
+            modifiers: Default::default(),
             sig: Signature {
                 ident: feature_fn_name(&self.func.sig.ident, None),
                 ..self.func.sig.clone()
@@ -234,7 +237,7 @@ impl Dispatcher {
         }
 
         let fn_ty = util::fn_type_from_signature(&Signature {
-            unsafety: parse_quote! { unsafe },
+            safety: Safety::Unsafe(Default::default()),
             ..self.func.sig.clone()
         })?;
         let (normalized_signature, argument_names) = util::normalize_signature(&self.func.sig);
@@ -433,6 +436,7 @@ impl Dispatcher {
         Ok(ItemFn {
             attrs: self.func.attrs.clone(),
             vis: self.func.vis.clone(),
+            modifiers: Default::default(),
             sig: normalized_signature,
             block: Box::new(parse_quote! {
                 {

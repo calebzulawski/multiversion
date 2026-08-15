@@ -26,9 +26,6 @@ impl Parse for MatchTarget {
                 return Err(Error::new(arm.attrs[0].span(), "unexpected attribute"));
             }
             let pat = arm.pat;
-            if let Some(guard) = arm.guard {
-                return Err(Error::new(guard.0.span(), "unexpected guard"));
-            }
 
             fn parse_target(e: &ExprLit) -> Result<Target> {
                 if let Lit::Str(s) = &e.lit {

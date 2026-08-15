@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded `targets = "simd"` with corrected x86-64 architecture levels and support for AArch64 SVE, LoongArch64 LASX, S390x vectors, and additional architectures behind a new `nightly` Cargo feature.
 ### Changed
 - Increased the minimum supported Rust version to 1.82.0.
+- Upgraded to syn 3.
 - Explicit target features now use rustc for validation and implied-feature expansion.
 - The `target-features` dependency is now optional; enable the `target-features` feature to use `selected_target!`.
 ### Removed

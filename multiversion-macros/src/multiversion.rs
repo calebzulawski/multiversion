@@ -11,6 +11,9 @@ pub(crate) fn make_multiversioned_fn(
     attr: TokenStream,
     func: ItemFn,
 ) -> Result<TokenStream, syn::Error> {
+    // Modifiers such as `default` cannot be applied to the free functions generated below.
+    func.modifiers.require_empty()?;
+
     if let ReturnType::Type(_, ty) = &func.sig.output {
         if let Type::ImplTrait(_) = **ty {
             return Err(Error::new(
