@@ -73,6 +73,9 @@ struct LifetimeRenamer;
 
 impl VisitMut for LifetimeRenamer {
     fn visit_lifetime_mut(&mut self, i: &mut Lifetime) {
+        if i.ident == "static" || i.ident == "_" {
+            return;
+        }
         i.ident = Ident::new(&format!("__mv_inner_{}", i.ident), i.ident.span());
     }
 }
