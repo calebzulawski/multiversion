@@ -1,9 +1,9 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
-    parse_quote, spanned::Spanned, visit::Visit, visit_mut::VisitMut, BareFnArg, Error, Expr,
-    FnArg, GenericParam, Ident, Lifetime, Pat, PatIdent, PatType, Result, Signature, TypeBareFn,
-    TypeImplTrait,
+    parse_quote, spanned::Spanned, visit::Visit, visit_mut::VisitMut, Error, Expr, FnArg,
+    GenericParam, Ident, Lifetime, NamedArg, Pat, PatIdent, PatType, Result, Safety, Signature,
+    TypeFnPtr, TypeImplTrait,
 };
 
 pub(crate) fn arg_exprs(sig: &Signature) -> Vec<Expr> {
@@ -77,13 +77,13 @@ impl VisitMut for LifetimeRenamer {
     }
 }
 
-pub(crate) fn fn_type_from_signature(sig: &Signature) -> Result<TypeBareFn> {
+pub(crate) fn fn_type_from_signature(sig: &Signature) -> Result<TypeFnPtr> {
     let lifetimes = sig.generics.lifetimes().collect::<Vec<_>>();
     let args = sig
         .inputs
         .iter()
         .map(|x| {
-            Ok(BareFnArg {
+            Ok(NamedArg {
                 attrs: Vec::new(),
                 name: None,
                 ty: match x {
@@ -100,13 +100,18 @@ pub(crate) fn fn_type_from_signature(sig: &Signature) -> Result<TypeBareFn> {
         sig.variadic.is_none(),
         "cannot multiversion function with variadic arguments"
     );
-    let mut fn_ty = TypeBareFn {
+    let mut fn_ty = TypeFnPtr {
+        attrs: Vec::new(),
         lifetimes: if lifetimes.is_empty() {
             None
         } else {
             Some(parse_quote! { for<#(#lifetimes),*> })
         },
-        unsafety: sig.unsafety,
+        unsafety: if let Safety::Unsafe(token) = &sig.safety {
+            Some(*token)
+        } else {
+            None
+        },
         abi: sig.abi.clone(),
         fn_token: sig.fn_token,
         paren_token: sig.paren_token,
@@ -114,7 +119,7 @@ pub(crate) fn fn_type_from_signature(sig: &Signature) -> Result<TypeBareFn> {
         variadic: None,
         output: sig.output.clone(),
     };
-    LifetimeRenamer {}.visit_type_bare_fn_mut(&mut fn_ty);
+    LifetimeRenamer {}.visit_type_fn_ptr_mut(&mut fn_ty);
     Ok(fn_ty)
 }
 
