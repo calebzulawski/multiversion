@@ -241,21 +241,21 @@ impl Dispatcher {
         };
         Ok(parse_quote! {
             {
-                use core::sync::atomic::{AtomicPtr, Ordering};
                 #[cold]
                 #resolver_signature {
                     #feature_detection
                     let __current_fn = __get_fn();
-                    __DISPATCHED_FN.store(__current_fn as *mut (), Ordering::Relaxed);
+                    __DISPATCHED_FN.store(__current_fn as *mut (), ::core::sync::atomic::Ordering::Relaxed);
                     unsafe { __current_fn(#(#argument_names),*) }
                 }
-                static __DISPATCHED_FN: AtomicPtr<()> = AtomicPtr::new(__resolver_fn as *mut ());
-                let __current_ptr = __DISPATCHED_FN.load(Ordering::Relaxed);
+                static __DISPATCHED_FN: ::core::sync::atomic::AtomicPtr<()> =
+                    ::core::sync::atomic::AtomicPtr::new(__resolver_fn as *mut ());
+                let __current_ptr = __DISPATCHED_FN.load(::core::sync::atomic::Ordering::Relaxed);
                 // Safety: the pointer is a fn pointer, so we can transmute it back to its original
                 // representation.
                 #[allow(clippy::undocumented_unsafe_blocks)]
                 unsafe {
-                    let __current_fn = core::mem::transmute::<*mut (), #fn_ty>(__current_ptr);
+                    let __current_fn = ::core::mem::transmute::<*mut (), #fn_ty>(__current_ptr);
                     __current_fn(#(#argument_names),*)
                 }
             }
@@ -298,12 +298,12 @@ impl Dispatcher {
                         0
                     }
 
-                    use core::sync::atomic::{AtomicUsize, Ordering};
-                    static SELECTED: AtomicUsize = AtomicUsize::new(usize::MAX);
-                    let selected = SELECTED.load(Ordering::Relaxed);
+                    static SELECTED: ::core::sync::atomic::AtomicUsize =
+                        ::core::sync::atomic::AtomicUsize::new(usize::MAX);
+                    let selected = SELECTED.load(::core::sync::atomic::Ordering::Relaxed);
                     if selected == usize::MAX {
                         let selected = __detect();
-                        SELECTED.store(selected, Ordering::Relaxed);
+                        SELECTED.store(selected, ::core::sync::atomic::Ordering::Relaxed);
                         selected
                     } else {
                         selected
@@ -328,7 +328,7 @@ impl Dispatcher {
                 match __detect_index() {
                     #(#match_arm)*
                     0 => #call_default,
-                    _ => unsafe { core::hint::unreachable_unchecked() },
+                    _ => unsafe { ::core::hint::unreachable_unchecked() },
                 }
             }
         })

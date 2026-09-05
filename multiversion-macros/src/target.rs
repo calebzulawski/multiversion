@@ -92,7 +92,7 @@ impl Target {
     pub fn features_enabled(&self) -> TokenStream {
         let feature = self.features.iter();
         quote! {
-            true #( && core::cfg!(target_feature = #feature) )*
+            true #( && ::core::cfg!(target_feature = #feature) )*
         }
     }
 
@@ -108,7 +108,7 @@ impl Target {
             }
         );
         quote! {
-            true #( && std::arch::#is_feature_detected!(#feature) )*
+            true #( && ::std::arch::#is_feature_detected!(#feature) )*
         }
     }
 }

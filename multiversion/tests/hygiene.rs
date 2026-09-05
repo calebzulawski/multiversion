@@ -1,5 +1,58 @@
 use multiversion::multiversion;
 
+#[cfg(feature = "std")]
+#[test]
+fn atomic_type_names_in_signature() {
+    struct Ordering(u8);
+    struct AtomicPtr(Ordering);
+
+    #[multiversion(targets("x86_64+avx", "aarch64+sve"), dispatcher = "indirect")]
+    fn wrap(value: Ordering) -> AtomicPtr {
+        AtomicPtr(value)
+    }
+
+    let AtomicPtr(Ordering(value)) = wrap(Ordering(42));
+    assert_eq!(value, 42);
+}
+
+#[cfg(feature = "std")]
+#[test]
+fn shadowed_standard_library_paths() {
+    mod core {}
+    mod std {}
+
+    #[multiversion(targets("x86_64+avx", "aarch64+sve"), dispatcher = "direct")]
+    fn direct() -> bool {
+        multiversion::target::target_cfg_f!(target_pointer_width = "64")
+    }
+
+    #[multiversion(targets("x86_64+avx", "aarch64+sve"), dispatcher = "indirect")]
+    fn indirect() -> bool {
+        multiversion::target::target_cfg_f!(target_pointer_width = "64")
+    }
+
+    assert_eq!(direct(), ::core::cfg!(target_pointer_width = "64"));
+    assert_eq!(indirect(), ::core::cfg!(target_pointer_width = "64"));
+}
+
+#[test]
+fn shadowed_cfg_macro() {
+    mod core {}
+    #[allow(unused_macros)]
+    macro_rules! cfg {
+        ($($tokens:tt)*) => {
+            compile_error!("resolved the caller's cfg macro")
+        };
+    }
+
+    #[multiversion(targets("x86_64+avx", "aarch64+sve"), dispatcher = "static")]
+    fn selected() -> bool {
+        multiversion::target::target_cfg_f!(target_pointer_width = "64")
+    }
+
+    assert_eq!(selected(), ::core::cfg!(target_pointer_width = "64"));
+}
+
 #[multiversion(targets("x86_64+avx", "aarch64+sve"))]
 fn r#type(value: u8) -> u8 {
     value + 1

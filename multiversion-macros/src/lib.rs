@@ -145,7 +145,7 @@ pub fn target_cfg_f_impl(input: proc_macro::TokenStream) -> proc_macro::TokenStr
     match cfg::transform(meta) {
         Ok(meta) => {
             quote! {
-                cfg!(#meta)
+                ::core::cfg!(#meta)
             }
         }
         Err(err) => err.to_compile_error(),
