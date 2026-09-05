@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(clippy::needless_doctest_main)]
 //! This crate provides the [`multiversion`] attribute for implementing function multiversioning.
@@ -188,6 +189,7 @@ pub mod target {
     /// # }
     /// ```
     #[cfg(feature = "target-features")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "target-features")))]
     pub use multiversion_macros::selected_target;
 
     /// Equivalent to `#[cfg]`, but considers `target_feature`s detected at runtime.
@@ -234,6 +236,7 @@ pub mod target {
     };
 
     #[cfg(feature = "target-features")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "target-features")))]
     #[doc(no_inline)]
     pub use target_features::TargetFeatures;
 }

@@ -19,6 +19,9 @@ include = [
 edition = "2021"
 rust-version = "1.82"
 
+[package.metadata.docs.rs]
+features = ["target-features"]
+
 [features]
 default = ["std"]
 std = ["multiversion-macros/std"]
@@ -32,6 +35,9 @@ target-features = { version = "0.2", optional = true }
 [dev-dependencies]
 rustversion = "1"
 criterion = "0.4"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(docsrs)"] }
 
 [[bench]]
 name = "benchmark"
