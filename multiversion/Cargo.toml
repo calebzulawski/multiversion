@@ -17,7 +17,7 @@ include = [
     "/benches/**",
 ]
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.86"
 
 [package.metadata.docs.rs]
 features = ["target-features"]

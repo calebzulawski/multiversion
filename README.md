@@ -2,7 +2,7 @@ Multiversion
 ============
 [![Crates.io](https://img.shields.io/crates/v/multiversion)](https://crates.io/crates/multiversion)
 [![Rust Documentation](https://img.shields.io/badge/api-rustdoc-blue.svg)](https://docs.rs/multiversion)
-![Rustc Version 1.82+](https://img.shields.io/badge/rustc-1.82+-lightgray.svg)
+![Rustc Version 1.86+](https://img.shields.io/badge/rustc-1.86+-lightgray.svg)
 [![License](https://img.shields.io/crates/l/multiversion)](https://crates.io/crates/multiversion)
 
 Function multiversioning attribute macros for Rust.

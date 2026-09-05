@@ -150,14 +150,33 @@ pub use multiversion_macros::target;
 /// # Example
 /// ```
 /// use multiversion::{multiversion, inherit_target};
+///
 /// #[multiversion(targets = "simd")]
-/// fn select_sum() -> unsafe fn(x: &mut[f32]) -> f32 {
+/// fn sum(x: &[f32]) -> f32 {
 ///     #[inherit_target]
-///     unsafe fn sum(x: &mut[f32]) -> f32 {
+///     fn inner(x: &[f32]) -> f32 {
 ///         x.iter().sum()
 ///     }
-///     sum as unsafe fn(&mut[f32]) -> f32
+///     inner(x)
 /// }
+/// ```
+///
+/// Return a helper as a safe function pointer to select once and dispatch through the pointer:
+///
+/// ```
+/// use multiversion::{multiversion, inherit_target};
+/// #[multiversion(targets = "simd")]
+/// fn select_sum() -> fn(&[f32]) -> f32 {
+///     #[inherit_target]
+///     fn sum(x: &[f32]) -> f32 {
+///         x.iter().sum()
+///     }
+///     sum
+/// }
+///
+/// let sum = select_sum();
+/// assert_eq!(sum(&[1.0, 2.0, 3.0]), 6.0);
+/// ```
 pub use multiversion_macros::inherit_target;
 
 /// Information related to the current target.
