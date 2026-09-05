@@ -199,6 +199,12 @@ impl Dispatcher {
                 "indirect function dispatch does not support impl trait",
             ));
         }
+        if util::lifetime_bounds_present(&self.func.sig) {
+            return Err(Error::new(
+                self.func.sig.ident.span(),
+                "indirect function dispatch does not support bounded lifetimes",
+            ));
+        }
 
         let fn_ty = util::fn_type_from_signature(&Signature {
             safety: Safety::Unsafe(Default::default()),
@@ -338,8 +344,8 @@ impl Dispatcher {
         // If the dispatcher is unspecified, decide on the following criteria:
         // * If the std feature is not enabled, dispatch statically, since we can't do CPU feature
         //   detection.
-        // * If the function is generic, async, or has impl Trait, use direct dispatch, since we
-        //   can't take a function pointer.
+        // * If the function has type/const generics, bounded lifetimes, async, or impl Trait,
+        //   use direct dispatch, since we can't take a suitable function pointer.
         // * If any retpoline features are enabled use direct dispatch, since retpolines hurt
         //   performance of indirect dispatch significantly.
         // * Otherwise, prefer indirect dispatch, since it appears to have better performance on
@@ -351,6 +357,7 @@ impl Dispatcher {
                     if !crate::util::fn_params(&self.func.sig).is_empty()
                         || self.func.sig.asyncness.is_some()
                         || util::impl_trait_present(&self.func.sig)
+                        || util::lifetime_bounds_present(&self.func.sig)
                         || cfg!(retpoline)
                     {
                         self.direct_dispatcher_fn()?

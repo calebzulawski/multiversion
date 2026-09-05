@@ -73,8 +73,8 @@
 ///       attempting to choose the fastest choice.  If the `std` feature is not enabled, uses `static`.
 ///     * `static`: Detects features at compile time from the enabled target features.
 ///     * `indirect`: Detect features at runtime, and dispatches with an indirect function call.
-///       Cannot be used for generic functions, `async` functions, or functions that take or return an
-///       `impl Trait`.  This is usually the default.
+///       Cannot be used with type or const generics, bounded lifetimes, `async`, or `impl Trait`.
+///       This is usually the default.
 ///     * `direct`: Detects features at runtime, and dispatches with direct function calls. This is
 ///       the default on functions that do not support indirect dispatch, or in the presence of
 ///       indirect branch exploit mitigations such as retpolines.

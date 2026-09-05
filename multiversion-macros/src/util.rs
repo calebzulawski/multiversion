@@ -2,8 +2,8 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
     parse_quote, spanned::Spanned, visit::Visit, visit_mut::VisitMut, Error, Expr, FnArg,
-    GenericParam, Ident, Lifetime, NamedArg, Pat, PatIdent, PatType, Result, Safety, Signature,
-    TypeFnPtr, TypeImplTrait,
+    GenericParam, Generics, Ident, Lifetime, NamedArg, Pat, PatIdent, PatType, Result, Safety,
+    Signature, TypeFnPtr, TypeImplTrait,
 };
 
 pub(crate) fn arg_exprs(sig: &Signature) -> Vec<Expr> {
@@ -67,6 +67,38 @@ pub(crate) fn impl_trait_present(sig: &Signature) -> bool {
     let mut visitor = ImplTraitPresent(false);
     visitor.visit_signature(sig);
     visitor.0
+}
+
+pub(crate) fn lifetime_bounds_present(sig: &Signature) -> bool {
+    let generics = &sig.generics;
+    // Check bounds declared on lifetime parameters, such as `'a: 'b`.
+    if generics.lifetimes().any(|param| !param.bounds.is_empty()) {
+        return true;
+    }
+
+    // Check for these lifetimes anywhere in a where clause, including type bounds.
+    // Function pointer types cannot express these constraints.
+    struct LifetimeInBounds<'a> {
+        generics: &'a Generics,
+        present: bool,
+    }
+    impl Visit<'_> for LifetimeInBounds<'_> {
+        fn visit_lifetime(&mut self, lifetime: &Lifetime) {
+            self.present |= self
+                .generics
+                .lifetimes()
+                .any(|param| param.lifetime.ident == lifetime.ident);
+        }
+    }
+
+    let mut visitor = LifetimeInBounds {
+        generics,
+        present: false,
+    };
+    if let Some(clause) = &generics.where_clause {
+        visitor.visit_where_clause(clause);
+    }
+    visitor.present
 }
 
 struct LifetimeRenamer;
