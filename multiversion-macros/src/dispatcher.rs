@@ -70,7 +70,8 @@ impl Dispatcher {
             let block = &self.func.block;
             let features = target.map(|t| t.features()).unwrap_or(&[]);
             let selected_target = quote! {
-                (multiversion::target_features::CURRENT_TARGET)#(.with_feature_str(#features))*
+                multiversion::target_features::TargetFeatures::enabled_for_target()
+                    .with(multiversion::target_features::target_features!(#(#features),*))
             };
             let feature_attrs = if let Some(target) = target {
                 target.target_feature()

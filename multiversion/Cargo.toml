@@ -27,7 +27,7 @@ target-features = ["dep:target-features"]
 
 [dependencies]
 multiversion-macros = { version = "0.8.0", path = "../multiversion-macros", default-features = false }
-target-features = { version = "0.1", optional = true }
+target-features = { version = "0.2", optional = true }
 
 [dev-dependencies]
 rustversion = "1"
