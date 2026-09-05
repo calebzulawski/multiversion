@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed CPU target specifications because their feature mappings could not be kept consistent as rustc's feature database changed.
 ### Fixed
+- Fixed multiversioning functions with raw identifiers such as `r#type`.
 - Disabling the `std` feature now makes the crate `no_std`.
 - Fixed handling of `'static`, `'_`, and bounded lifetimes in multiversioned function signatures.
 - Fixed compilation of multiversioned `unsafe fn` bodies containing implicit unsafe operations.

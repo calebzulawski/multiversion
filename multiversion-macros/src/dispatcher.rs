@@ -1,6 +1,6 @@
 use crate::{target::Target, util};
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens};
+use quote::{format_ident, quote, ToTokens};
 use std::collections::BTreeMap;
 use syn::{
     parse_quote, Attribute, Block, Error, Expr, Ident, ItemFn, Result, Safety, Signature,
@@ -10,15 +10,12 @@ use syn::{
 pub(crate) fn feature_fn_name(ident: &Ident, target: Option<&Target>) -> Ident {
     if let Some(target) = target {
         if target.has_features_specified() {
-            return Ident::new(
-                &format!("{}_{}_version", ident, target.features_string()),
-                ident.span(),
-            );
+            return format_ident!("{}_{}_version", ident, target.features_string());
         }
     }
 
     // If this is a default fn, it doesn't have a dedicated static dispatcher
-    Ident::new(&format!("{ident}_default_version"), ident.span())
+    format_ident!("{}_default_version", ident)
 }
 
 pub(crate) enum DispatchMethod {

@@ -96,13 +96,17 @@ pub(crate) fn make_multiversioned_fn(
     parser.parse2(attr)?;
 
     let targets = if let Some(targets) = targets {
-        for target in targets.iter() {
+        let mut unique_targets = Vec::new();
+        for target in targets {
             if !target.has_features_specified() {
                 // TODO add span to Target
                 return Err(Error::new(span, "target must have features specified"));
             }
+            if !unique_targets.contains(&target) {
+                unique_targets.push(target);
+            }
         }
-        targets
+        unique_targets
     } else {
         return Err(Error::new(span, "expected `targets`"));
     };
