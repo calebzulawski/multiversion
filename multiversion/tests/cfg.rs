@@ -23,6 +23,8 @@
 
 #[cfg(feature = "target-features")]
 use multiversion::target::selected_target;
+#[cfg(all(feature = "target-features", target_arch = "x86_64"))]
+use multiversion::target_features::x86_64::AVX;
 use multiversion::{
     multiversion,
     target::{match_target, target_cfg, target_cfg_attr, target_cfg_f},
@@ -82,8 +84,8 @@ fn cfg_f() {
             _ => false,
         };
         assert_eq!(cfg_avx, match_avx);
-        #[cfg(feature = "target-features")]
-        assert!(!cfg_avx || selected_target!().supports_feature_str("avx"));
+        #[cfg(all(feature = "target-features", target_arch = "x86_64"))]
+        assert!(!cfg_avx || selected_target!().contains(AVX));
     }
 
     foo();

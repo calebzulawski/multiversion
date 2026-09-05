@@ -481,9 +481,9 @@ dependencies = [
 
 [[package]]
 name = "target-features"
-version = "0.1.6"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1bbb9f3c5c463a01705937a24fdabc5047929ac764b2d5b9cf681c1f5041ed5"
+checksum = "b238b286f90000defba706b4cbab60c44283fd00125433fb7a4738c50c7b8ef9"
 
 [[package]]
 name = "textwrap"

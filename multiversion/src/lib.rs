@@ -167,22 +167,26 @@ pub mod target {
 
     /// Get the selected target in a multiversioned function.
     ///
-    /// Returns the selected target as a [`Target`].
+    /// Returns the selected target features as [`TargetFeatures`].
     ///
     /// This macro only works in a function marked with [`multiversion`].
     ///
     /// # Example
     /// ```
+    /// # #[cfg(target_arch = "x86_64")] {
     /// use multiversion::{multiversion, target::selected_target};
+    /// use multiversion::target_features::x86_64::AVX;
     ///
     /// #[multiversion(targets = "simd")]
     /// fn foo() {
-    ///     if selected_target!().supports_feature_str("avx") {
+    ///     if selected_target!().contains(AVX) {
     ///         println!("AVX detected");
     ///     } else {
     ///         println!("AVX not detected");
     ///     }
     /// }
+    /// # }
+    /// ```
     #[cfg(feature = "target-features")]
     pub use multiversion_macros::selected_target;
 
@@ -231,7 +235,7 @@ pub mod target {
 
     #[cfg(feature = "target-features")]
     #[doc(no_inline)]
-    pub use target_features::Target;
+    pub use target_features::TargetFeatures;
 }
 
 #[cfg(feature = "target-features")]
