@@ -7,8 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Expanded `targets = "simd"` with corrected x86-64 architecture levels and support for AArch64 SVE, LoongArch64 LASX, S390x vectors, and additional architectures behind a new `nightly` Cargo feature.
+- Safe `#[inherit_target]` functions can now be called without an `unsafe` block or returned as safe function pointers from their enclosing multiversioned function.
 ### Changed
-- Increased the minimum supported Rust version to 1.82.0.
+- Increased the minimum supported Rust version to 1.86.0.
 - Upgraded to syn 3.
 - Upgraded to target-features 0.2.
 - Explicit target features now use rustc for validation and implied-feature expansion.
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Disabling the `std` feature now makes the crate `no_std`.
 - Fixed handling of `'static` and `'_` lifetimes in multiversioned function signatures.
+- Fixed compilation of multiversioned `unsafe fn` bodies containing implicit unsafe operations.
 
 ## [0.8.0] - 2024-12-07
 ### Changed
