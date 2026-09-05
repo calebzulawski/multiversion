@@ -2,6 +2,29 @@ use multiversion::multiversion;
 
 #[cfg(feature = "std")]
 #[test]
+fn dispatcher_variable_names_in_parameters() {
+    #[multiversion(targets("x86_64+avx", "aarch64+sve"), dispatcher = "indirect")]
+    fn add(current_fn: u8, current_ptr: u8) -> u8 {
+        current_fn + current_ptr
+    }
+
+    assert_eq!(add(10, 20), 30);
+    assert_eq!(add(11, 21), 32);
+}
+
+#[test]
+fn synthesized_parameter_names() {
+    #[multiversion(targets("x86_64+avx", "aarch64+sve"))]
+    fn add((value,): (u8,), arg_0: u8) -> u8 {
+        value + arg_0
+    }
+
+    assert_eq!(add((10,), 20), 30);
+    assert_eq!(add((11,), 21), 32);
+}
+
+#[cfg(feature = "std")]
+#[test]
 fn atomic_type_names_in_signature() {
     struct Ordering(u8);
     struct AtomicPtr(Ordering);

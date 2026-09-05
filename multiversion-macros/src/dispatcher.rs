@@ -208,6 +208,9 @@ impl Dispatcher {
             ..self.func.sig.clone()
         })?;
         let (normalized_signature, argument_names) = util::normalize_signature(&self.func.sig);
+        // Keep dispatcher locals distinct from user parameters with the same names.
+        let current_fn = Ident::new("current_fn", Span::mixed_site());
+        let current_ptr = Ident::new("current_ptr", Span::mixed_site());
 
         let feature_detection = {
             let return_if_detected = self.targets.iter().filter_map(|target| {
@@ -244,19 +247,19 @@ impl Dispatcher {
                 #[cold]
                 #resolver_signature {
                     #feature_detection
-                    let __current_fn = __get_fn();
-                    __DISPATCHED_FN.store(__current_fn as *mut (), ::core::sync::atomic::Ordering::Relaxed);
-                    unsafe { __current_fn(#(#argument_names),*) }
+                    let #current_fn = __get_fn();
+                    __DISPATCHED_FN.store(#current_fn as *mut (), ::core::sync::atomic::Ordering::Relaxed);
+                    unsafe { #current_fn(#(#argument_names),*) }
                 }
                 static __DISPATCHED_FN: ::core::sync::atomic::AtomicPtr<()> =
                     ::core::sync::atomic::AtomicPtr::new(__resolver_fn as *mut ());
-                let __current_ptr = __DISPATCHED_FN.load(::core::sync::atomic::Ordering::Relaxed);
+                let #current_ptr = __DISPATCHED_FN.load(::core::sync::atomic::Ordering::Relaxed);
                 // Safety: the pointer is a fn pointer, so we can transmute it back to its original
                 // representation.
                 #[allow(clippy::undocumented_unsafe_blocks)]
                 unsafe {
-                    let __current_fn = ::core::mem::transmute::<*mut (), #fn_ty>(__current_ptr);
-                    __current_fn(#(#argument_names),*)
+                    let #current_fn = ::core::mem::transmute::<*mut (), #fn_ty>(#current_ptr);
+                    #current_fn(#(#argument_names),*)
                 }
             }
         })
