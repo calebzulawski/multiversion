@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.9.0] - 2026-09-06
 ### Added
 - Expanded `targets = "simd"` with corrected x86-64 architecture levels and support for AArch64 SVE, LoongArch64 LASX, S390x vectors, and additional architectures behind a new `nightly` Cargo feature.
 - Safe `#[inherit_target]` functions can now be called without an `unsafe` block or returned as safe function pointers from their enclosing multiversioned function.
@@ -131,7 +133,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial multiversion implementation
 
-[Unreleased]: https://github.com/calebzulawski/multiversion/compare/0.8.0...HEAD
+[Unreleased]: https://github.com/calebzulawski/multiversion/compare/0.9.0...HEAD
+[0.9.0]: https://github.com/calebzulawski/multiversion/compare/0.8.0...0.9.0
 [0.8.0]: https://github.com/calebzulawski/multiversion/compare/0.7.4...0.8.0
 [0.7.4]: https://github.com/calebzulawski/multiversion/compare/0.7.3...0.7.4
 [0.7.3]: https://github.com/calebzulawski/multiversion/compare/0.7.2...0.7.3

@@ -1,6 +1,6 @@
 [package]
 name = "multiversion"
-version = "0.8.0"
+version = "0.9.0"
 authors = ["Caleb Zulawski <caleb.zulawski@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "Easy function multiversioning"
@@ -29,7 +29,7 @@ nightly = ["multiversion-macros/nightly"]
 target-features = ["dep:target-features"]
 
 [dependencies]
-multiversion-macros = { version = "0.8.0", path = "../multiversion-macros", default-features = false }
+multiversion-macros = { version = "0.9.0", path = "../multiversion-macros", default-features = false }
 target-features = { version = "0.2", optional = true }
 
 [dev-dependencies]
