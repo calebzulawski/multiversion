@@ -78,6 +78,24 @@ jobs:
       if: matrix.target == ''
       run: cargo test --verbose ${{ matrix.args }}
 
+  minimal-versions:
+    name: Minimal dependency versions
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - name: Install nightly
+      uses: dtolnay/rust-toolchain@nightly
+    - name: Install Cargo tools
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-hack,cargo-minimal-versions
+    - name: Check minimal dependency versions
+      run: cargo +nightly minimal-versions check --workspace --rust-version
+    - name: Check minimal dependency versions without std
+      run: cargo +nightly minimal-versions check --workspace --rust-version --no-default-features
+    - name: Check minimal dependency versions with target-features
+      run: cargo +nightly minimal-versions check --package multiversion --rust-version --features target-features
+
   lint:
     runs-on: ubuntu-latest
     steps:
