@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-19
+### Fixed
+- Corrected the minimum `syn` version to 2.0.1 to fix builds using minimal dependency versions ([#60](https://github.com/calebzulawski/multiversion/issues/60)).
+
 ## [0.8.0] - 2024-12-07
 ### Changed
 - Upgraded to syn 2. This shouldn't break compatibility with the 0.7 releases, but there might be minor differences.
@@ -115,7 +119,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial multiversion implementation
 
-[Unreleased]: https://github.com/calebzulawski/multiversion/compare/0.8.0...HEAD
+[Unreleased]: https://github.com/calebzulawski/multiversion/compare/0.8.1...HEAD
+[0.8.1]: https://github.com/calebzulawski/multiversion/compare/0.8.0...0.8.1
 [0.8.0]: https://github.com/calebzulawski/multiversion/compare/0.7.4...0.8.0
 [0.7.4]: https://github.com/calebzulawski/multiversion/compare/0.7.3...0.7.4
 [0.7.3]: https://github.com/calebzulawski/multiversion/compare/0.7.2...0.7.3
