@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-20
+### Fixed
+- Corrected the minimum `rustversion` dependency to 1.0.6 to fix builds using minimal dependency versions.
+
 ## [0.9.0] - 2026-09-06
 ### Added
 - Expanded `targets = "simd"` with corrected x86-64 architecture levels and support for AArch64 SVE, LoongArch64 LASX, S390x vectors, and additional architectures behind a new `nightly` Cargo feature.
@@ -23,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Disabling the `std` feature now makes the crate `no_std`.
 - Fixed handling of `'static`, `'_`, and bounded lifetimes in multiversioned function signatures.
 - Fixed compilation of multiversioned `unsafe fn` bodies containing implicit unsafe operations.
+
+## [0.8.1] - 2026-10-19
+### Fixed
+- Corrected the minimum `syn` version to 2.0.1 to fix builds using minimal dependency versions ([#60](https://github.com/calebzulawski/multiversion/issues/60)).
 
 ## [0.8.0] - 2024-12-07
 ### Changed
@@ -133,8 +141,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial multiversion implementation
 
-[Unreleased]: https://github.com/calebzulawski/multiversion/compare/0.9.0...HEAD
+[Unreleased]: https://github.com/calebzulawski/multiversion/compare/0.9.1...HEAD
+[0.9.1]: https://github.com/calebzulawski/multiversion/compare/0.9.0...0.9.1
 [0.9.0]: https://github.com/calebzulawski/multiversion/compare/0.8.0...0.9.0
+[0.8.1]: https://github.com/calebzulawski/multiversion/compare/0.8.0...0.8.1
 [0.8.0]: https://github.com/calebzulawski/multiversion/compare/0.7.4...0.8.0
 [0.7.4]: https://github.com/calebzulawski/multiversion/compare/0.7.3...0.7.4
 [0.7.3]: https://github.com/calebzulawski/multiversion/compare/0.7.2...0.7.3
