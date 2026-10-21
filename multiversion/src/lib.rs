@@ -108,6 +108,13 @@
 /// }
 /// ```
 ///
+/// # Notes on target selection
+///
+/// Some Intel CPUs incur frequency-scaling penalties when using AVX-512. VBMI2 was added
+/// in Ice Lake, where these penalties are typically no longer an issue, so runtime selection
+/// skips AVX-512 targets on Intel CPUs without VBMI2.
+/// Override with `RUSTFLAGS="--cfg multiversion_allow_slow_avx512"`.
+///
 /// # Notes on dispatcher performance
 ///
 /// ### Feature detection is performed only once

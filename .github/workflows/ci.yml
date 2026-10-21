@@ -7,7 +7,7 @@ env:
 
 jobs:
   test:
-    name: Test (${{ matrix.toolchain }} / ${{ matrix.target || matrix.os || 'ubuntu-latest' }}${{ contains(matrix.args, '--no-default-features') && ' / no-std' || '' }})
+    name: Test (${{ matrix.name || matrix.target || matrix.os || matrix.toolchain }})
     strategy:
       fail-fast: false
       matrix:
@@ -17,6 +17,10 @@ jobs:
             args: --workspace
           - toolchain: stable
             args: --workspace
+          - toolchain: stable
+            name: allow-slow-avx512
+            args: --workspace
+            rustflags: --cfg multiversion_allow_slow_avx512
           - toolchain: stable
             os: macos-latest
             args: --workspace
@@ -33,6 +37,7 @@ jobs:
 
           # No-std
           - toolchain: stable
+            name: no-std
             args: --workspace --no-default-features
           - toolchain: stable
             target: thumbv7em-none-eabihf
@@ -64,6 +69,8 @@ jobs:
             args: --package multiversion --features nightly --tests
 
     runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    env:
+      RUSTFLAGS: ${{ matrix.rustflags || '' }}
 
     steps:
     - uses: actions/checkout@v7
