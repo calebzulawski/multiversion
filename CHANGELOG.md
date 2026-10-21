@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.9.1] - 2026-10-20
 ### Fixed
 - Corrected the minimum `rustversion` dependency to 1.0.6 to fix builds using minimal dependency versions.
+- Runtime dispatch now skips AVX-512 targets on Intel CPUs without VBMI2 to avoid older implementations' frequency penalties ([#59](https://github.com/calebzulawski/multiversion/issues/59)).
 
 ## [0.9.0] - 2026-09-06
 ### Added
