@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Simplified the AVX-512 performance fix introduced in 0.9.1 ([#59](https://github.com/calebzulawski/multiversion/issues/59)).
 
+### Fixed
+- Fixed PowerPC64 builds on newer nightly Rust versions ([rust-lang/rust#164612](https://github.com/rust-lang/rust/pull/164612)).
+
 ## [0.9.1] - 2026-10-20
 ### Fixed
 - Corrected the minimum `rustversion` dependency to 1.0.6 to fix builds using minimal dependency versions.
