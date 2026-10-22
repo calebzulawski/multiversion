@@ -112,7 +112,7 @@
 ///
 /// Some Intel CPUs incur frequency-scaling penalties when using AVX-512. VBMI2 was added
 /// in Ice Lake, where these penalties are typically no longer an issue, so runtime selection
-/// skips AVX-512 targets on Intel CPUs without VBMI2.
+/// requires Ice Lake's SIMD extensions for AVX-512 targets.
 /// Override with `RUSTFLAGS="--cfg multiversion_allow_slow_avx512"`.
 ///
 /// # Notes on dispatcher performance
@@ -130,7 +130,7 @@
 /// ### Dispatcher elision
 /// If the optimal set of features is already known to exist at compile time, the entire dispatcher
 /// is elided. For example, if the highest priority target requires `avx512f` and the function is
-/// compiled with `RUSTFLAGS=-Ctarget-cpu=skylake-avx512`, the function is not multiversioned and
+/// compiled with `RUSTFLAGS=-Ctarget-cpu=icelake-server`, the function is not multiversioned and
 /// the highest priority target is used.
 ///
 /// [`target`]: attr.target.html

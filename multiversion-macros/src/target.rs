@@ -29,7 +29,7 @@ impl Target {
             return Err(Error::new(s.span(), "invalid architecture specifier"));
         };
 
-        let specified_features = it
+        let mut features = it
             .map(|x| {
                 if x.is_empty() {
                     Err(Error::new(s.span(), "feature string cannot be empty"))
@@ -39,7 +39,32 @@ impl Target {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let mut features = specified_features;
+        #[allow(unexpected_cfgs)]
+        if !cfg!(multiversion_allow_slow_avx512)
+            && matches!(architecture, "x86" | "x86_64")
+            && features.iter().any(|f| f.starts_with("avx512"))
+        {
+            features.extend(
+                [
+                    "avx512bitalg",
+                    "avx512bw",
+                    "avx512cd",
+                    "avx512dq",
+                    "avx512f",
+                    "avx512ifma",
+                    "avx512vbmi",
+                    "avx512vbmi2",
+                    "avx512vl",
+                    "avx512vnni",
+                    "avx512vpopcntdq",
+                    "gfni",
+                    "vaes",
+                    "vpclmulqdq",
+                ]
+                .into_iter()
+                .map(String::from),
+            );
+        }
         features.sort_unstable();
         features.dedup();
 
@@ -98,33 +123,6 @@ impl Target {
 
     pub fn features_detected(&self) -> TokenStream {
         let feature = self.features.iter();
-        let require_fast_avx512 = (matches!(self.arch(), "x86" | "x86_64")
-            && self.features.iter().any(|f| f.starts_with("avx512")))
-        .then(|| {
-            let arch = format_ident!("{}", self.arch());
-            quote! {
-                {
-                    // This cfg is evaluated in the consuming crate.
-                    #[allow(unexpected_cfgs)]
-                    let allow_slow_avx512 = ::core::cfg!(multiversion_allow_slow_avx512);
-
-                    let is_intel = || {
-                        // SAFETY: CPUID leaf 0 is available on all x86 CPUs supported by std.
-                        #[allow(unused_unsafe)] // __cpuid became safe in Rust 1.94.
-                        let vendor = unsafe { ::core::arch::#arch::__cpuid(0) };
-                        vendor.ebx.to_le_bytes() == *b"Genu"
-                            && vendor.edx.to_le_bytes() == *b"ineI"
-                            && vendor.ecx.to_le_bytes() == *b"ntel"
-                    };
-
-                    // VBMI2 identifies Ice Lake and newer Intel AVX-512 implementations.
-                    allow_slow_avx512
-                        || !is_intel()
-                        || ::std::arch::is_x86_feature_detected!("avx512vbmi2")
-                }
-            }
-        })
-        .into_iter();
         let is_feature_detected = format_ident!(
             "is_{}_feature_detected",
             match self.architecture.as_str() {
@@ -135,7 +133,7 @@ impl Target {
             }
         );
         quote! {
-            true #( && ::std::arch::#is_feature_detected!(#feature) )* #( && #require_fast_avx512 )*
+            true #( && ::std::arch::#is_feature_detected!(#feature) )*
         }
     }
 }
