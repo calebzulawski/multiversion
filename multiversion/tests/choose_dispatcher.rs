@@ -1,27 +1,27 @@
 use multiversion::multiversion;
 
 #[multiversion(
-    targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+neon"),
+    targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+sve"),
     dispatcher = "default"
 )]
 fn default_dispatch() {}
 
 #[multiversion(
-    targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+neon"),
+    targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+sve"),
     dispatcher = "static"
 )]
 fn static_dispatch() {}
 
 #[cfg(feature = "std")]
 #[multiversion(
-    targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+neon"),
+    targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+sve"),
     dispatcher = "direct"
 )]
 fn direct_dispatch() {}
 
 #[cfg(feature = "std")]
 #[multiversion(
-    targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+neon"),
+    targets("x86_64+avx", "x86+avx", "x86+sse", "aarch64+sve"),
     dispatcher = "indirect"
 )]
 fn indirect_dispatch() {}
@@ -30,7 +30,7 @@ fn indirect_dispatch() {}
 #[multiversion(targets("x86_64+sse"), dispatcher = "default")]
 fn skip_dispatch() {}
 
-// Since aarch64 always has neon, this should never result in runtime dispatch
+// Standard AArch64 targets enable NEON by default, so this should elide runtime dispatch.
 #[multiversion(targets("aarch64+neon"), dispatcher = "default")]
 fn skip_dispatch_2() {}
 

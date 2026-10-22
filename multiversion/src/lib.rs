@@ -5,10 +5,10 @@
 //!
 //! Many CPU architectures have a variety of instruction set extensions that provide additional
 //! functionality. Common examples are single instruction, multiple data (SIMD) extensions such as
-//! SSE and AVX on x86/x86-64 and NEON on ARM/AArch64. When available, these extended features can
-//! provide significant speed improvements to some functions. These optional features cannot be
-//! haphazardly compiled into programs–executing an unsupported instruction will result in a
-//! crash.
+//! SSE and AVX on x86/x86-64, NEON on ARM, and SVE on AArch64. When available, these extended
+//! features can provide significant speed improvements to some functions. These optional features
+//! cannot be haphazardly compiled into programs–executing an unsupported instruction will result
+//! in a crash.
 //!
 //! **Function multiversioning** is the practice of compiling multiple versions of a function
 //! with various features enabled and safely detecting which version to use at runtime.
@@ -47,7 +47,7 @@
 //! * `"x86"` (matches the `"x86"` architecture)
 //! * `"x86_64+avx+avx2"` (matches the `"x86_64"` architecture with the `"avx"` and `"avx2"`
 //!   features)
-//! * `"arm+neon"` (matches the `arm` architecture with the `"neon"` feature
+//! * `"aarch64+sve"` (matches the `"aarch64"` architecture with the `"sve"` feature)
 //!
 //! [`target`]: attr.target.html
 //! [`multiversion`]: attr.multiversion.html
@@ -244,7 +244,7 @@ pub mod target {
     /// fn foo() {
     ///     match_target! {
     ///         "x86_64+avx" => println!("x86-64 with AVX"),
-    ///         "aarch64+neon" => println!("AArch64 with Neon"),
+    ///         "aarch64+sve" => println!("AArch64 with SVE"),
     ///         _ => println!("another architecture"),
     ///     }
     /// }
