@@ -128,6 +128,8 @@ impl Target {
             match self.architecture.as_str() {
                 "x86_64" => "x86",
                 "loongarch32" | "loongarch64" => "loongarch",
+                // rust-lang/rust#164612
+                "powerpc64" if rustversion::cfg!(since(2026 - 10 - 21)) => "powerpc",
                 "riscv32" | "riscv64" => "riscv",
                 f => f,
             }
