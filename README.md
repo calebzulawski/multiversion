@@ -9,7 +9,7 @@ Function multiversioning attribute macros for Rust.
 
 ## What is function multiversioning?
 Many CPU architectures have a variety of instruction set extensions that provide additional functionality.
-Common examples are single instruction, multiple data (SIMD) extensions such as SSE and AVX on x86/x86-64 and NEON on ARM/AArch64.
+Common examples are single instruction, multiple data (SIMD) extensions such as SSE and AVX on x86/x86-64, NEON on ARM, and SVE on AArch64.
 When available, these extended features can provide significant speed improvements to some functions.
 These optional features cannot be haphazardly compiled into programs--executing an unsupported instruction will result in a crash.
 
@@ -20,7 +20,19 @@ The `multiversion` macro compiles a function for multiple possible targets, and 
 ```rust
 use multiversion::multiversion;
 
-#[multiversion(targets("x86_64+avx", "aarch64+neon"))]
+#[multiversion(targets("x86_64+avx", "aarch64+sve"))]
+fn square(x: &mut [f32]) {
+    for v in x {
+        *v *= *v;
+    }
+}
+```
+
+Use `targets = "simd"` to compile versions of the function for a built-in set of common SIMD targets supported by your Rust toolchain:
+```rust
+use multiversion::multiversion;
+
+#[multiversion(targets = "simd")]
 fn square(x: &mut [f32]) {
     for v in x {
         *v *= *v;

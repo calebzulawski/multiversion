@@ -97,7 +97,7 @@ fn match_target() {
     fn foo() {
         let match_avx = match_target! {
             "x86_64+avx" => true,
-            "aarch64+neon" | "x86_64+sse" => false,
+            "aarch64+sve" | "x86_64+sse" => false,
             _ => false,
         };
 
