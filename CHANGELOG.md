@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Code selected by `target_cfg` or marked `#[inherit_target]` for target features that the build already enables (such as NEON on AArch64, or SSE4.2 with `-C target-cpu=x86-64-v2`) now has those features in every function, including the default, so it can call their intrinsics without `unsafe`, as it does when the features are detected at runtime.
 
 ## [0.9.2] - 2026-10-21
 ### Changed
