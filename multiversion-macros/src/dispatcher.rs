@@ -33,8 +33,31 @@ pub(crate) struct Dispatcher {
 }
 
 impl Dispatcher {
+    // Attributes enabling each target feature named by any target, where the build already enables
+    // it. `target_cfg` treats such features as enabled in every function, including the default,
+    // so each function must also have them for the code it selects to call their intrinsics.
+    fn enabled_feature_attrs(&self) -> Vec<Attribute> {
+        let mut attrs = Vec::new();
+        for target in &self.targets {
+            let arch = target.arch();
+            for feature in target.features() {
+                let attr: Attribute = parse_quote! {
+                    #[cfg_attr(
+                        all(target_arch = #arch, target_feature = #feature),
+                        target_feature(enable = #feature)
+                    )]
+                };
+                if !attrs.contains(&attr) {
+                    attrs.push(attr);
+                }
+            }
+        }
+        attrs
+    }
+
     // Create functions for each target
     fn feature_fns(&self) -> Result<Vec<ItemFn>> {
+        let enabled_feature_attrs = self.enabled_feature_attrs();
         let make_block = |target: Option<&Target>| {
             let block = &self.func.block;
             let features = target.map(|t| t.features()).unwrap_or(&[]);
@@ -42,11 +65,12 @@ impl Dispatcher {
                 multiversion::target_features::TargetFeatures::enabled_for_target()
                     .with(multiversion::target_features::target_features!(#(#features),*))
             };
-            let feature_attrs = if let Some(target) = target {
+            let mut feature_attrs = if let Some(target) = target {
                 target.target_feature()
             } else {
                 Vec::new()
             };
+            feature_attrs.extend(enabled_feature_attrs.iter().cloned());
             let features = if let Some(target) = target {
                 let s = target
                     .features()
@@ -113,12 +137,22 @@ impl Dispatcher {
                 block: make_block(Some(target)),
             };
             f.attrs.extend(target.fn_attrs());
+            f.attrs.extend(enabled_feature_attrs.iter().cloned());
+            // Unused where the build already enables the best target's features.
+            f.attrs.push(parse_quote! { #[allow(dead_code)] });
             fns.push(f);
         }
 
-        // Create default fn
+        // Create default fn, inlined unless it enables target features, which forbid that
         let mut attrs = self.inner_attrs.clone();
-        attrs.push(parse_quote! { #[inline(always)] });
+        let enabled = self.targets.iter().flat_map(|target| {
+            let arch = target.arch();
+            target.features().iter().map(move |feature| {
+                quote! { all(target_arch = #arch, target_feature = #feature) }
+            })
+        });
+        attrs.push(parse_quote! { #[cfg_attr(not(any(#(#enabled),*)), inline(always))] });
+        attrs.extend(enabled_feature_attrs.iter().cloned());
         let block = make_block(None);
         fns.push(ItemFn {
             attrs,
